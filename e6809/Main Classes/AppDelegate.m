@@ -52,7 +52,16 @@
 								   userInfo:nil
 									repeats:YES];
 
-    
+
+    NSInteger testOffset = 5;
+    NSUInteger testAddress = 0xFFFF;
+    testAddress = testAddress + testOffset;
+    testAddress = testAddress & 0xFFFF;
+    NSLog(@"%lu", (unsigned long)testAddress);
+
+    cpu.regPC = 0xFFFF;
+    NSUInteger l = [cpu loadFromRam];
+    NSLog(@"%lu", (unsigned long)cpu.regPC);
 }
 
 

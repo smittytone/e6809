@@ -23,10 +23,14 @@
 - (void)configMemory:(NSUInteger)memSizeInBytes;
 
 // Memory Access Methods
-- (NSUInteger)addressFromNextTwoBytes:(NSUInteger)address;
+- (NSUInteger)addressFromNextTwoBytes;
 - (NSUInteger)contentsOfMemory:(NSUInteger)address;
 - (void)setContentsOfMemory:(NSUInteger)address :(NSUInteger)value;
+- (NSUInteger)addressFromDPR;
 - (NSUInteger)addressFromDPR:(NSInteger)offset;
+- (NSUInteger)loadFromRam;
+- (void)incrementPC:(NSUInteger)amount;
+- (NSInteger)checkRange:(NSInteger)address;
 
 // Utility Methods
 - (void)clearBits;

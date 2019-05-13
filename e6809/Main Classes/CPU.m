@@ -60,28 +60,44 @@
 
 
 
-
 #pragma mark - Memory access
 
 
 - (NSUInteger)addressFromNextTwoBytes
 {
+    // Reads the bytes at regPC and regPC + 1 and returns them as a 16-bit address
+    // NOTE 'loadFromRAM:' auto-increments regPC and handles rollover
+
     NSUInteger msb = [self loadFromRam];
     NSUInteger lsb = [self loadFromRam];
     return (msb << 8) + lsb;
 }
 
 
+- (NSUInteger)addressFromDPR
+{
+    return [self addressFromDPR:0];
+}
+
+
 - (NSUInteger)addressFromDPR:(NSInteger)offset
 {
+    // Returns the address composed from regDP (MSB) and the byte at
+    // regPC (LSB) plus any supplied offset
+    // Does not increment regPC
+    // TODO Should we increment regPC?
     return (regDP * 256) + [ram peek:(regPC + offset)];
 }
 
 
+
 - (NSUInteger)contentsOfMemory:(NSUInteger)address
 {
-	return [ram peek:address];
+    // Returns the byte at the specified address
+
+    return [ram peek:address];
 }
+
 
 
 - (void)setContentsOfMemory:(NSUInteger)address :(NSUInteger)value
@@ -90,13 +106,18 @@
 }
 
 
+
 - (NSUInteger)loadFromRam
 {
-    NSUInteger load = [ram peek:regPC];
+    // Return the byte at the address stored in regPC and
+    // auto-increment regPC aftewards, handling rollover
+    
+    NSUInteger load = [self contentsOfMemory:regPC];
     regPC++;
     if (regPC > ram.topAddress) regPC = regPC & ram.topAddress;
     return load;
 }
+
 
 
 - (void)incrementPC:(NSUInteger)amount
@@ -112,8 +133,8 @@
     // Handle RAM address rollover
 
     if (address < 0) return ram.topAddress - address;
-    if (address > ram.topAddress) return address - ram.topAddress;
-    return address;
+    if (address > ram.topAddress) return address & ram.topAddress;
+    return address & ram.topAddress;
 }
 
 
@@ -122,15 +143,19 @@
 
 - (void)clearBits
 {
-	for (NSUInteger i = 0 ; i < 16 ; i++) bit[i] = 0;
+    // Clear all the values in the 'bit' array
+
+    for (NSUInteger i = 0 ; i < 16 ; i++) bit[i] = 0;
 }
 
 
 - (void)decimalToBits:(NSUInteger)value
 {
-    // Convert an 8-bit value into its binary equivalent stored as individual bits
+    // Convert the 8-bit byte 'value' into its binary equivalent stored as individual bits
+    // in the array 'bit'
+    // NOTE 'bit' can hold a 16-bit value, but we only use eight of the elements here
 
-    for (NSUInteger i = 0 ; i < 8 ; i++) bit[i] = 0;
+    [self clearBits];
 
     if (value & 0x80) bit[7] = 1;
     if (value & 0x40) bit[6] = 1;
@@ -148,12 +173,19 @@
 
 - (void)decimal16ToBits:(NSUInteger)value
 {
-    // Convert a 16-bit value into its binary equivalent stored as individual bits
+    // Convert the 16-bit byte 'value' into its binary equivalent stored as individual bits
 
     [self clearBits];
+
+    // Convert the MSB
+
     [self decimalToBits:((value >> 8) & 0xFF)];
 
+    // Shift the bits left
+
     for (NSUInteger i = 0 ; i < 8 ; i++) bit[i + 8] = bit[i];
+
+    // Convert the LSB
 
     [self decimalToBits:(value & 0xFF)];
 }
@@ -161,6 +193,8 @@
 
 - (NSUInteger)bitsToDecimal
 {
+    // Reads the first eight bits of the 'bit' array and returns them as a decimal value
+
     NSUInteger a = (bit[3] * 0x08) + (bit[2] * 0x04) + (bit[1] * 0x02) + bit[0];
     a += (bit[4] * 0x10) + (bit[5] * 0x20) + (bit[6] * 0x40) + (bit[7] * 0x80);
     return a;
@@ -169,6 +203,8 @@
 
 - (NSUInteger)bits16ToDecimal
 {
+    // Reads the full 16 bits of the 'bit' array and returns them as a decimal value
+
     NSUInteger a = bit[0];
     for (NSUInteger i = 1 ; i < 16 ; i++) a += (((NSUInteger)pow(2,i)) * bit[i]);
     return a;
@@ -177,6 +213,9 @@
 
 - (BOOL)bitSet:(NSUInteger)value :(NSUInteger)bit
 {
+    // Set bit 'bit' of the byte or word 'value'
+    // Doesn't yet check the value of bit
+
     return (((value >> bit) & 1) == 1);
 }
 
@@ -258,8 +297,10 @@
     // Simulates addition of two unsigned 8-bit values in a binary ALU
     // Checks for half-carry, carry and overflow (CC bits h, c, v)
 
-    BOOL bitCarry, bit6Carry;
     NSUInteger binary1[8], binary2[8], answer[8];
+
+    BOOL bitCarry = NO;
+    BOOL bit6Carry = NO;
 
     [self clrCCV];
 
@@ -269,9 +310,7 @@
     [self decimalToBits:(value2 & 0xFF)];
     for (NSUInteger i = 0 ; i < 8 ; i++) binary2[i] = bit[i];
 
-	bit6Carry = NO;
-    bitCarry = NO;
-    if (useCarry) bitCarry = [self bitSet:regCC :kCC_c];
+	if (useCarry) bitCarry = [self bitSet:regCC :kCC_c];
 
     for (NSUInteger i = 0 ; i < 8 ; i++)
     {
@@ -292,7 +331,7 @@
             answer[i] = bitCarry ? 0 : 1;
         }
 
-		// Check for half carry, ie. result of bit 3 add is a carry
+		// Check for half carry, ie. result of bit 3 add is a carry into bit 4
 
         if (i == 3 && bitCarry == YES) regCC = [self setBit:regCC :kCC_h];
 
@@ -381,61 +420,61 @@
     switch (opcode)
     {
 		case opcode_NEG_direct:
-			operand = [self addressFromDPR:0];
-			[ram poke:operand :[self negate:[ram peek:operand]]];
-            [self incrementPC:1];
+			address = [self addressFromDPR];
+            [self setContentsOfMemory:address :[self negate:[ram peek:address]]];
+			[self incrementPC:1];
 			break;
 
 		case opcode_COM_direct:
-			operand = [self addressFromDPR:0];
+			address = [self addressFromDPR];
 			[ram poke:operand :[self complement:[ram peek:operand]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_LSR_direct:
-			operand = [self addressFromDPR:0];
+			address = [self addressFromDPR];
 			[ram poke:operand :[self lShiftRight:[ram peek:operand]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_ROR_direct:
-			operand = [self addressFromDPR:0];
+			address = [self addressFromDPR];
 			[ram poke:operand :[self rotateRight:[ram peek:operand]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_ASR_direct:
-			operand = [self addressFromDPR:0];
+			address = [self addressFromDPR];
 			[ram poke:operand :[self aShiftRight:[ram peek:operand]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_ASL_direct:
-			operand = [self addressFromDPR:0];
+			address = [self addressFromDPR];
 			[ram poke:operand :[self aShiftLeft:[ram peek:operand]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_ROL_direct:
-			operand = [self addressFromDPR:0];
+			address = [self addressFromDPR];
 			[ram poke:operand :[self rotateLeft:[ram peek:operand]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_DEC_direct:
-			operand = [self addressFromDPR:0];
+			address = [self addressFromDPR];
 			[ram poke:operand :[self decrement:[ram peek:operand]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_INC_direct:
-			operand = [self addressFromDPR:0];
+			address = [self addressFromDPR];
 			[ram poke:operand :[self increment:[ram peek:operand]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_TST_direct:
-			operand = [self addressFromDPR:0];
+			address = [self addressFromDPR];
 			[self test:[ram peek:operand]];
 			[self incrementPC:1];
 			break;
@@ -1255,13 +1294,11 @@
             break;
 
 		case opcode_SUBB_immed:
-			regB = [self sub:regB :[ram peek:regPC]];
-			regPC++;
+			regB = [self sub:regB :[self loadFromRam]];
 			break;
 
 		case opcode_CMPB_immed:
-			[self compare:regB :[ram peek:regPC]];
-			regPC++;
+			[self compare:regB :[self loadFromRam]];
 			break;
 
 		case opcode_SBCB_immed:
@@ -1270,7 +1307,12 @@
 			break;
 			
 		case opcode_ADDD_immed:
-            
+            // ADD 16-bit value to D
+            i = [self addressFromNextTwoBytes];
+            msb = (i >> 8) & 0xFF;
+            lsb = i & 0xFF;
+            regB = [self add:regB :lsb];
+            regA = [self addWithCarry:regA :msb];
 			break;
 
 		case opcode_ANDB_immed:
