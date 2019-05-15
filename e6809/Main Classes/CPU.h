@@ -24,12 +24,12 @@
 
 // Memory Access Methods
 - (NSUInteger)addressFromNextTwoBytes;
-- (NSUInteger)contentsOfMemory:(NSUInteger)address;
-- (void)setContentsOfMemory:(NSUInteger)address :(NSUInteger)value;
+- (NSUInteger)fromRam:(NSUInteger)address;
+- (void)toRam:(NSUInteger)address :(NSUInteger)value;
 - (NSUInteger)addressFromDPR;
 - (NSUInteger)addressFromDPR:(NSInteger)offset;
 - (NSUInteger)loadFromRam;
-- (void)incrementPC:(NSUInteger)amount;
+- (void)incrementPC:(NSInteger)amount;
 - (NSInteger)checkRange:(NSInteger)address;
 
 // Utility Methods
@@ -98,6 +98,7 @@
 - (NSUInteger)rotateLeft:(NSUInteger)value;
 - (NSUInteger)rotateRight:(NSUInteger)value;
 
+- (void)sex;
 - (void)store:(NSUInteger)value;
 - (void)store16bit:(NSUInteger)value;
 - (NSUInteger)sub:(NSUInteger)value :(NSUInteger)amount;
@@ -111,7 +112,7 @@
 // Indexed Addressing Helpers
 - (NSUInteger)indexedAddressing:(NSUInteger)postByte;
 - (NSUInteger)registerValue:(NSUInteger)sourceRegister;
-- (void)incrementRegister:(NSUInteger)sourceRegister :(NSUInteger)value;
+- (void)incrementRegister:(NSUInteger)sourceRegister :(NSInteger)amount;
 
 // Processing
 - (void)processNextInstruction;

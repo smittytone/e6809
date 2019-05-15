@@ -19,19 +19,19 @@
 - (id)init
 {
     self = [super init];
-    
+
     if (self)
     {
         // Extra init code here
-        
+
         regPC = 0;
         regHSP = 0;
         regUSP = 0;
         regCC = 0;
-        
+
 		[self configMemory:65535];
    	}
-    
+
     return self;
 }
 
@@ -40,18 +40,18 @@
 - (void)configMemory:(NSUInteger)memSizeInBytes
 {
 	// Impose a minimum RAM of 1KB
-    
+
     if (memSizeInBytes == 0) memSizeInBytes = 1024;
 	if (memSizeInBytes > 65535) memSizeInBytes = 65535;
-	
+
 	topAddress = memSizeInBytes;
-	
+
 	ram = [[RAM alloc] init];
 	[ram bootRam:topAddress];
-	
+
 	// Load in Standard Low RAM memory
 	// "$15E-1AF are three-byte subroutines used by Basic. By default they return immediately with an RTS
-	
+
 	for (NSUInteger i = kRamBasicSubroutineVectorsStart ; i < (kRamBasicSubroutineVectorsEnd + 1) ; i++)
 	{
 		[ram poke:i :opcode_RTS];
@@ -74,12 +74,14 @@
 }
 
 
+
 - (NSUInteger)addressFromDPR
 {
     // Convenience method that calls 'addressFromDPR:' with no offset
 
     return [self addressFromDPR:0];
 }
+
 
 
 - (NSUInteger)addressFromDPR:(NSInteger)offset
@@ -89,24 +91,25 @@
     // Does not increment regPC
     // TODO Should we increment regPC?
 
-    NSUInteger address = (regPC + offset) & 0xFFFF;
-    return (regDP << 8) + [self contentsOfMemory:address];
+    unsigned short address = (unsigned short)regPC;
+    address += (short)offset;
+    return (regDP << 8) + [self fromRam:(NSUInteger)address];
 }
 
 
 
-- (NSUInteger)contentsOfMemory:(NSUInteger)address
+- (NSUInteger)fromRam:(NSUInteger)address
 {
     // Returns the byte at the specified address
 
-    return [ram peek:address];
+    return [ram peek:address] & 0xFF;
 }
 
 
 
-- (void)setContentsOfMemory:(NSUInteger)address :(NSUInteger)value
+- (void)toRam:(NSUInteger)address :(NSUInteger)value
 {
-	[ram poke:address :value];
+	[ram poke:(address & 0xFFFF) :(value & 0xFF)];
 }
 
 
@@ -115,19 +118,21 @@
 {
     // Return the byte at the address stored in regPC and
     // auto-increment regPC aftewards, handling rollover
-    
-    NSUInteger load = [self contentsOfMemory:regPC];
-    regPC++;
-    if (regPC > ram.topAddress) regPC = regPC & ram.topAddress;
+
+    NSUInteger load = [self fromRam:regPC];
+    unsigned short address = (unsigned short)regPC;
+    address++;
+    regPC = (NSUInteger)address;
     return load;
 }
 
 
 
-- (void)incrementPC:(NSUInteger)amount
+- (void)incrementPC:(NSInteger)amount
 {
-    regPC += amount;
-    if (regPC > ram.topAddress) regPC = regPC & ram.topAddress;
+    unsigned short address = (unsigned short)regPC;
+    address += (short)amount;
+    regPC = (NSUInteger)address;
 }
 
 
@@ -341,14 +346,14 @@
         if (i == 3 && bitCarry == YES) regCC = [self setBit:regCC :kCC_h];
 
         // Record bit 6 carry for carry check
-        
+
 		if (i == 6) bit6Carry = bitCarry;
     }
 
     // Preserve the final carry value in the CC register's c bit
 
     regCC = bitCarry ? [self setBit:regCC :kCC_c] : [self clrBit:regCC :kCC_c];
-    
+
     // Check for an overflow:
     // 1. Sum of two positive numbers yields sign bit set
     // 2. Sum of two negative numbers yields sign bit unset
@@ -370,17 +375,17 @@
 - (NSUInteger)alu16:(NSUInteger)value1 :(NSUInteger)value2 :(BOOL)useCarry
 {
     // Add the LSBs
-    
+
     NSUInteger lsb1 = value1 & 0xFF;
     NSUInteger lsb2 = value2 & 0xFF;
     NSUInteger total = [self alu:lsb1 :lsb2 :useCarry];
-    
+
     // Now add the MSBs, using the carry (if any) from the LSB calculation
-    
+
     NSUInteger msb1 = (value1 >> 8) & 0xFF;
     NSUInteger msb2 = (value2 >> 8) & 0xFF;
     NSUInteger subtotal = [self alu:msb1 :msb2 :YES];
-    
+
     return ((subtotal << 8) + total) & 0xFFFF;
 }
 
@@ -388,122 +393,125 @@
 
 #pragma mark - Process Instructions
 
-- (void)processNextInstruction  
+- (void)processNextInstruction
 {
 	// At this point the PC register should be pointing to the instruction to process,
 	// ie. previous operations will have moved PC on sufficiently
-	
+
 	NSUInteger i, operand, opcode, address, msb, lsb;
     NSInteger offset;
+    unsigned short shortAddress;
+    short shortOffset;
+    char charOffset;
 
     // Are we awaiting an interrupt? If so check/handle then bail
-    
+
     if (waitForInterruptFlag == YES)
 	{
 		// Process interrupts
 
 		return;
 	}
-    
+
     // Get the memory cell contents
-    
+
 	opcode = [self loadFromRam];
-    
+
     // Zero auxilliary variables
-    
+
     operand = 0;
-    
+
     if (opcode == opcode_extended_set_1 || opcode == opcode_extended_set_2)
     {
         // We have an extended instruction prefixed with 0x10 or 0x11
 		// Move the PC along one and get the next opcode portion from RAM
-        
+
         opcode = (opcode << 8) + [self loadFromRam];
     }
-    
+
     // Program counter already pointing to the operand at this point
-    
+
     switch (opcode)
     {
 		case opcode_NEG_direct:
             // 0x00 - NEG M
 			address = [self addressFromDPR];
-            [self setContentsOfMemory:address :[self negate:[self contentsOfMemory:address]]];
+            [self toRam:address :[self negate:[self fromRam:address]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_COM_direct:
             // 0x03 - COM M
             address = [self addressFromDPR];
-			[self setContentsOfMemory:address :[self complement:[self contentsOfMemory:address]]];
+			[self toRam:address :[self complement:[self fromRam:address]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_LSR_direct:
             // 0x04 - LSR M
 			address = [self addressFromDPR];
-			[self setContentsOfMemory:address :[self lShiftRight:[self contentsOfMemory:address]]];
+			[self toRam:address :[self lShiftRight:[self fromRam:address]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_ROR_direct:
             // 0x06 - ROR M
             address = [self addressFromDPR];
-			[self setContentsOfMemory:address :[self rotateRight:[self contentsOfMemory:address]]];
+			[self toRam:address :[self rotateRight:[self fromRam:address]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_ASR_direct:
             // 0x07 - ASR M
             address = [self addressFromDPR];
-			[self setContentsOfMemory:address :[self aShiftRight:[self contentsOfMemory:address]]];
+			[self toRam:address :[self aShiftRight:[self fromRam:address]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_ASL_direct:
             // 0x08 - ASL M
 			address = [self addressFromDPR];
-			[self setContentsOfMemory:address :[self aShiftLeft:[self contentsOfMemory:address]]];
+			[self toRam:address :[self aShiftLeft:[self fromRam:address]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_ROL_direct:
             // 0x09 - ROL M
             address = [self addressFromDPR];
-			[self setContentsOfMemory:address :[self rotateLeft:[self contentsOfMemory:address]]];
+			[self toRam:address :[self rotateLeft:[self fromRam:address]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_DEC_direct:
             // 0x0A - DEC M
 			address = [self addressFromDPR];
-			[self setContentsOfMemory:address :[self decrement:[self contentsOfMemory:address]]];
+			[self toRam:address :[self decrement:[self fromRam:address]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_INC_direct:
             // 0x0C - INC M
             address = [self addressFromDPR];
-			[self setContentsOfMemory:address :[self increment:[self contentsOfMemory:address]]];
+			[self toRam:address :[self increment:[self fromRam:address]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_TST_direct:
             // 0x0D - TST M
 			address = [self addressFromDPR];
-			[self test:[self contentsOfMemory:address]];
+			[self test:[self fromRam:address]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_JMP_direct:
-            // 0x0E - JMP M
+            // 0x0E - JMP M ***UNTESTED***
             regPC = [self addressFromDPR];
 			break;
 
 		case opcode_CLR_direct:
             // 0x0F - CLR M
             address = [self addressFromDPR];
-			[self setContentsOfMemory:address :0];
+			[self toRam:address :0];
 			[self setCCAfterClear];
 			[self incrementPC:1];
 			break;
@@ -528,13 +536,12 @@
 
 		case opcode_LBRA_rel:
             // 0x16 LBRA M
-            // NOTE 'offset' is an int16
-            offset = ([self contentsOfMemory:regPC] << 8);
+            shortOffset = (short)([self fromRam:regPC] << 8);
             [self incrementPC:1];
-            offset += [self contentsOfMemory:regPC];
-            offset = ((offset << 48) >> 48);
-            regPC += offset;
-            regPC = (regPC & 0xFFFF);
+            shortOffset += (short)[self fromRam:regPC];
+            shortAddress = (unsigned short)regPC;
+            shortAddress += shortOffset;
+            regPC = (NSUInteger)shortAddress;
 			break;
 
 		case opcode_LBSR_rel:
@@ -546,54 +553,42 @@
 			[ram poke:regHSP :msb];
 			break;
 
-// DAA buggy
 		case opcode_DAA:
-			// Decimal Adjust A
+			// 0x19 DAA ***BUGGY***
             [self decimalAdjustA];
 			break;
 
 		case opcode_ORCC_immed:
-			// OR the CC register
-            [self orcc:[ram peek:regPC]];
+			// 0x1A ORCC M
+            [self orcc:[self fromRam:regPC]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_ANDCC_immed:
-			[self andcc:[ram peek:regPC]];
+            // 0x1A ANDCC M
+            [self andcc:[self fromRam:regPC]];
 			[self incrementPC:1];
 			break;
 
-// SEX UNTESTED
 		case opcode_SEX:
-			// Sign EXtend B to D
-            // Affects n and z
-
-            [self clrCCN];
-            [self clrCCZ];
-            
-			regA = 0x00;
-
-			if ([self bitSet:regB :kSignBit])
-			{
-				regA = 0xFF;
-				[self setCCN];
-			}
-            
-            if (regB == 0) [self setCCZ]; // CHECK
-			break;
+			// 0x1D SEX ***UNTESTED***
+            [self sex];
+            break;
 
 		case opcode_EXG_immed:
-			[self transferDecode:[ram peek:regPC] :YES];
+            // 0x1E EXG M (M is post byte)
+            [self transferDecode:[self fromRam:regPC] :YES];
 			[self incrementPC:1];
             break;
 
 		case opcode_TFR_immed:
-			[self transferDecode:[ram peek:regPC] :NO];
+			// 0x1F TFR M (M is post byte)
+            [self transferDecode:[self fromRam:regPC] :NO];
             [self incrementPC:1];
             break;
 
 // Branches untested
-            
+
 		case opcode_BRA_rel:
 			regPC += (char)[ram peek:regPC];
 			break;
@@ -601,7 +596,7 @@
 		case opcode_BRN_rel:
 			[self incrementPC:1];
 			break;
-			
+
 		case opcode_BHI_rel:
             if (![self bitSet:regCC :kCC_c] && ![self bitSet:regCC :kCC_z]) regPC += (char)[ram peek:regPC];
 			break;
@@ -626,7 +621,13 @@
 			break;
 
 		case opcode_BVC_rel:
-			if (![self bitSet:regCC :kCC_v]) regPC += (char)[ram peek:regPC];
+            // 0x28 BVC +/-int8
+            if (![self bitSet:regCC :kCC_v])
+            {
+                shortAddress = (unsigned short)regPC;
+                shortAddress += (char)[self fromRam:regPC];
+                regPC = (NSUInteger)shortAddress;
+            }
 			break;
 
 		case opcode_BVS_rel:
@@ -658,18 +659,18 @@
 		case opcode_BLE_rel:
 			if ([self bitSet:regCC :kCC_z])
 			{
-                regPC += (char)[ram peek:regPC];
+                regPC += (char)[self fromRam:regPC];
 			}
 			else if (([self bitSet:regCC :kCC_n] || [self bitSet:regCC :kCC_v]) && [self bitSet:regCC :kCC_n] != [self bitSet:regCC :kCC_v])
             {
-                regPC += (char)[ram peek:regPC];
+                regPC += (char)[self fromRam:regPC];
 			}
 			break;
 
 		case opcode_LEAX_indexed:
 			// Load Effective Address into X
             // NOTE 'indexedAddressing:' updates PC
-            regX = [self indexedAddressing:[ram peek:regPC]];
+            regX = [self indexedAddressing:[self fromRam:regPC]];
             [self clrCCZ];
             if (regX == 0) [self setCCZ];
 			break;
@@ -677,7 +678,7 @@
 		case opcode_LEAY_indexed:
             // Load Effective Address into Y
             // NOTE 'indexedAddressing:' updates PC
-            regY = [self indexedAddressing:[ram peek:regPC]];
+            regY = [self indexedAddressing:[self fromRam:regPC]];
 			[self clrCCZ];
 			if (regY == 0) [self setCCZ];
 			break;
@@ -685,17 +686,17 @@
 		case opcode_LEAS_indexed:
             // Load Effective Address into S
             // NOTE 'indexedAddressing:' updates PC
-            regHSP = [self indexedAddressing:[ram peek:regPC]];
+            regHSP = [self indexedAddressing:[self fromRam:regPC]];
 			break;
 
 		case opcode_LEAU_indexed:
             // Load Effective Address into U
             // NOTE 'indexedAddressing:' updates PC
-            regUSP = [self indexedAddressing:[ram peek:regPC]];
+            regUSP = [self indexedAddressing:[self fromRam:regPC]];
 			break;
 
 		case opcode_PSHS_immed:
-			[self push:YES :[ram peek:regPC]];
+			[self push:YES :[self fromRam:regPC]];
             [self incrementPC:1];
             break;
 
@@ -704,11 +705,11 @@
             // as we don't want to progress a new counter value
             i = regPC;
             [self incrementPC:1];
-            [self pull:YES :[ram peek:i]];
+            [self pull:YES :[self fromRam:i]];
 			break;
 
 		case opcode_PSHU_immed:
-			[self push:NO :[ram peek:regPC]];
+			[self push:NO :[self fromRam:regPC]];
             [self incrementPC:1];
             break;
 
@@ -763,19 +764,19 @@
 		case opcode_SWI:
             // SoftWare Interrupt
             // Set e to 1 then push every register to the hardware stack
-            
+
             regCC = [self setBit:regCC :kCC_e];
             [self push:YES :kPushPullRegEvery];
-            
+
             // Set i and f
             regCC = [self setBit:regCC :kCC_i];
             regCC = [self setBit:regCC :kCC_f];
 			waitForInterruptFlag = NO;
-            
+
             // Set the PC to the interrupt vector
 			regPC = [ram peek:kInterruptVectorOne] * 256 + [ram peek:kInterruptVectorOne + 1];
 			break;
-			
+
 		case opcode_NEGA:
 			regA = [self negate:regA];
 			break;
@@ -803,7 +804,7 @@
 		case opcode_ROLA:
 			regA = [self rotateLeft:regA];
 			break;
-			
+
 		case opcode_DECA:
 			regA = [self decrement:regA];
 			break;
@@ -820,7 +821,7 @@
 			regA = 0;
 			[self setCCAfterClear];
 			break;
-			
+
 		case opcode_NEGB:
 			regB = [self negate:regB];
 			break;
@@ -844,7 +845,7 @@
 		case opcode_ASLB:
 			regB = [self aShiftLeft:regB];
 			break;
-			
+
 		case opcode_ROLB:
 			regB = [self rotateLeft:regB];
 			break;
@@ -921,7 +922,7 @@
 			[ram poke:address :0];
 			[self setCCAfterClear];
 			break;
-			
+
 		case opcode_NEG_extended:
             address = [self addressFromNextTwoBytes];
 			[ram poke:address :[self negate:[ram peek:address]]];
@@ -931,18 +932,18 @@
             address = [self addressFromNextTwoBytes];
             [ram poke:address :[self complement:[ram peek:address]]];
 			break;
-			
+
 		case opcode_LSR_extended:
             address = [self addressFromNextTwoBytes];
             [ram poke:address :[self lShiftRight:[ram peek:address]]];
 			regPC = regPC + 2;
 			break;
-			
+
 		case opcode_ROR_extended:
 			address = [self addressFromNextTwoBytes];
 			[ram poke:address :[self rotateRight:[ram peek:address]]];
 			break;
-			
+
 		case opcode_ASR_extended:
 			address = [self addressFromNextTwoBytes];
 			[ram poke:address :[self aShiftRight:[ram peek:address]]];
@@ -997,7 +998,7 @@
 			regA = [self subWithCarry:regA :[ram peek:regPC]];
 			[self incrementPC:1];
 			break;
-			
+
 		case opcode_SUBD_immed:
 			break;
 
@@ -1005,7 +1006,7 @@
 			regA = [self and:regA with:[ram peek:regPC]];
 			[self incrementPC:1];
 			break;
-			
+
 		case opcode_BITA_immed:
 			[self bitTest:regA with:[ram peek:regPC]];
 			[self incrementPC:1];
@@ -1089,7 +1090,7 @@
 			[self bitTest:regA with:[ram peek:address]];
 			[self incrementPC:1];
 			break;
-			
+
 		case opcode_LDA_direct:
 			address = [self addressFromDPR:0];
 			[self load:[ram peek:address] :kRegA];
@@ -1126,7 +1127,7 @@
 			regA = [self add:regA :[ram peek:address]];
 			[self incrementPC:1];
 			break;
-			
+
 		case opcode_CMPX_direct:
 			address = [self addressFromDPR:0];
 			[self compare16bit:regX :address];
@@ -1158,36 +1159,36 @@
 
 		case opcode_SUBA_indexed:
 			break;
-			
+
 		case opcode_CMPA_indexed:
             address = [self indexedAddressing:[ram peek:regPC]];
             [self compare:regA :[ram peek:address]];
             break;
-			
+
 		case opcode_SBCA_indexed:
 			break;
-			
+
 		case opcode_SUBD_indexed:
 			break;
-			
+
 		case opcode_ANDA_indexed:
             address = [self indexedAddressing:[ram peek:regPC]];
             regA = [self and:regA with:[ram peek:address]];
             break;
-			
+
 		case opcode_BITA_indexed:
             address = [self indexedAddressing:[ram peek:regPC]];
             [self bitTest:regA with:[ram peek:address]];
             break;
-			
+
 		case opcode_LDA_indexed:
 			address = [self indexedAddressing:[ram peek:regPC]];
             [self load:[ram peek:address] :kRegA];
             break;
-			
+
 		case opcode_STA_indexed:
 			break;
-			
+
 		case opcode_EORA_indexed:
             address = [self indexedAddressing:[ram peek:regPC]];
             regA = [self exclusiveor:regA :[ram peek:address]];
@@ -1197,7 +1198,7 @@
 			address = [self indexedAddressing:[ram peek:regPC]];
 			regA = [self addWithCarry:regA :[ram peek:address]];
 			break;
-			
+
 		case opcode_ORA_indexed:
             address = [self indexedAddressing:[ram peek:regPC]];
             regA = [self orr:regA :[ram peek:address]];
@@ -1210,102 +1211,102 @@
 
 		case opcode_CMPX_indexed:
 			break;
-			
+
 		case opcode_JSR_indexed:
 			break;
-			
+
 		case opcode_LDX_indexed:
 			break;
-			
+
 		case opcode_STX_indexed:
 			break;
-			
+
 		case opcode_SUBA_extended:
             i = ([ram peek:regPC] * 256) + [ram peek:regPC + 1];
             regA = [self sub:regA :[ram peek:i]];
             regPC = regPC + 2;
             break;
-			
+
 		case opcode_CMPA_extended:
             i = ([ram peek:regPC] * 256) + [ram peek:regPC + 1];
             [self compare:regA :[ram peek:i]];
             regPC = regPC + 2;
             break;
-			
+
 		case opcode_SBCA_extended:
             i = ([ram peek:regPC] * 256) + [ram peek:regPC + 1];
             regA = [self subWithCarry:regA :[ram peek:i]];
             regPC = regPC + 2;
             break;
-			
+
 		case opcode_SUBD_extended:
 			break;
-			
+
 		case opcode_ANDA_extended:
             i = ([ram peek:regPC] * 256) + [ram peek:regPC + 1];
             regA = [self and:regA with:[ram peek:i]];
             regPC = regPC + 2;
             break;
-			
+
 		case opcode_BITA_extended:
             i = ([ram peek:regPC] * 256) + [ram peek:regPC + 1];
             [self bitTest:regA with:[ram peek:i]];
             regPC = regPC + 2;
             break;
-			
+
 		case opcode_LDA_extended:
             i = ([ram peek:regPC] * 256) + [ram peek:regPC + 1];
             [self load:[ram peek:i] :kRegA];
             regPC = regPC + 2;
 			break;
-			
+
 		case opcode_STA_extended:
             i = ([ram peek:regPC] * 256) + [ram peek:regPC + 1];
             [ram poke:i :regA];
             [self store:regA];
             regPC = regPC + 2;
 			break;
-			
+
 		case opcode_EORA_extended:
             i = ([ram peek:regPC] * 256) + [ram peek:regPC + 1];
             regA = [self exclusiveor:regA :[ram peek:i]];
             regPC = regPC + 2;
             break;
-			
+
 		case opcode_ADCA_extended:
             i = ([ram peek:regPC] * 256) + [ram peek:regPC + 1];
             regA = [self addWithCarry:regA :[ram peek:i]];
             regPC = regPC + 2;
             break;
-			
+
 		case opcode_ORA_extended:
             i = ([ram peek:regPC] * 256) + [ram peek:regPC + 1];
             regA = [self orr:regA :[ram peek:i]];
             regPC = regPC + 2;
             break;
-			
+
 		case opcode_ADDA_extended:
             i = ([ram peek:regPC] * 256) + [ram peek:regPC + 1];
             regA = [self add:regA :[ram peek:i]];
             regPC = regPC + 2;
             break;
-			
+
 		case opcode_CMPX_extended:
             i = ([ram peek:regPC] * 256) + [ram peek:regPC + 1];
             [self compare16bit:regX :([ram peek:i] * 256 + [ram peek:i + 1])];
             regPC = regPC + 2;
 			break;
-			
+
 		case opcode_JSR_extended:
 			break;
-			
+
 		case opcode_LDX_extended:
             i = ([ram peek:regPC] * 256) + [ram peek:regPC + 1];
             regX = [ram peek:i] * 256 + [ram peek:i + 1];
             [self load16bit:regX];
             regPC = regPC + 2;
             break;
-			
+
 		case opcode_STX_extended:
             i = ([ram peek:regPC] * 256) + [ram peek:regPC + 1];
             [ram poke:i :((regX >> 8) & 0xFF)];
@@ -1326,7 +1327,7 @@
 			regB = [self subWithCarry:regB :[ram peek:regPC]];
 			regPC++;
 			break;
-			
+
 		case opcode_ADDD_immed:
             // ADD 16-bit value to D
             i = [self addressFromNextTwoBytes];
@@ -1370,7 +1371,7 @@
 			regB = [self add:regB :[ram peek:regPC]];
 			regPC++;
 			break;
-			
+
 		case opcode_LDD_immed:
 			regA = [ram peek:regPC];
 			regB = [ram peek:regPC + 1];
@@ -1401,7 +1402,7 @@
 			regB = [self subWithCarry:regB :[ram peek:i]];
 			regPC++;
 			break;
-			
+
 		case opcode_ADDD_direct:
 			break;
 
@@ -1422,7 +1423,7 @@
 			[self load:[ram peek:i] :kRegB];
 			regPC++;
 			break;
-			
+
 		case opcode_STB_direct:
 			i = [self addressFromDPR:0];
 			[ram poke:i :regB];
@@ -1591,7 +1592,7 @@
             [self store16bit:regUSP];
             regPC++;
             break;
-            
+
         case opcode_SUBB_extended:
             i = [ram peek:regPC] * 256 + [ram peek:regPC + 1];
             [self sub:regB :[ram peek:i]];
@@ -1700,68 +1701,68 @@
             break;
 
         // First Extended Instructions Begin Here
-			
+
 		case opcode_LBRN_rel:
             regPC += 2;
 			break;
-			
+
 		case opcode_LBHI_rel:
             if (![self bitSet:regCC :kCC_c] && ![self bitSet:regCC :kCC_z])
                 regPC += (short)([ram peek:regPC] * 256 + [ram peek:(regPC + 1)]);
 			break;
-			
+
 		case opcode_LBLS_rel:
             if ([self bitSet:regCC :kCC_c] || [self bitSet:regCC :kCC_z])
                 regPC += (short)([ram peek:regPC] * 256 + [ram peek:(regPC + 1)]);
 			break;
-			
+
 		case opcode_LBHS_rel:
             if (![self bitSet:regCC :kCC_c]) regPC += (short)([ram peek:regPC] * 256 + [ram peek:(regPC + 1)]);
 			break;
-			
+
 		case opcode_LBLO_rel:
             if ([self bitSet:regCC :kCC_c]) regPC +=+ (short)([ram peek:regPC] * 256 + [ram peek:(regPC + 1)]);
 			break;
-			
+
 		case opcode_LBNE_rel:
             if (![self bitSet:regCC :kCC_z]) regPC += (short)([ram peek:regPC] * 256 + [ram peek:(regPC + 1)]);
 			break;
-			
+
 		case opcode_LBEQ_rel:
             if ([self bitSet:regCC :kCC_z]) regPC += (short)([ram peek:regPC] * 256 + [ram peek:(regPC + 1)]);
 			break;
-			
+
 		case opcode_LBVC_rel:
             if (![self bitSet:regCC :kCC_v]) regPC += (short)([ram peek:regPC] * 256 + [ram peek:(regPC + 1)]);
             break;
-			
+
 		case opcode_LBVS_rel:
             if ([self bitSet:regCC :kCC_v]) regPC += (short)([ram peek:regPC] * 256 + [ram peek:(regPC + 1)]);
 			break;
-			
+
 		case opcode_LBPL_rel:
             if (![self bitSet:regCC :kCC_n]) regPC += (short)([ram peek:regPC] * 256 + [ram peek:(regPC + 1)]);
 			break;
-			
+
 		case opcode_LBMI_rel:
             if ([self bitSet:regCC :kCC_n]) regPC += (short)([ram peek:regPC] * 256 + [ram peek:(regPC + 1)]);
 			break;
-			
+
 		case opcode_LBGE_rel:
             if ([self bitSet:regCC :kCC_n] == [self bitSet:regCC :kCC_v])
                 regPC += (short)([ram peek:regPC] * 256 + [ram peek:(regPC + 1)]);
 			break;
-			
+
 		case opcode_LBLT_rel:
             if (([self bitSet:regCC :kCC_n] || [self bitSet:regCC :kCC_v]) && ([self bitSet:regCC :kCC_c] != [self bitSet:regCC :kCC_v]))
                 regPC += (short)([ram peek:regPC] * 256 + [ram peek:(regPC + 1)]);
 			break;
-			
+
 		case opcode_LBGT_rel:
             if (![self bitSet:regCC :kCC_z] && [self bitSet:regCC :kCC_n] == [self bitSet:regCC :kCC_v])
                 regPC += (short)([ram peek:regPC] * 256 + [ram peek:(regPC + 1)]);
 			break;
-			
+
 		case opcode_LBLE_rel:
             if ([self bitSet:regCC :kCC_z])
             {
@@ -1772,54 +1773,54 @@
                 regPC += (short)([ram peek:regPC] * 256 + [ram peek:(regPC + 1)]);
             }
             break;
-			
+
 		case opcode_SWI2:
             // SoftWare Interrupt 2
             // Set e to 1 then push every register to the hardware stack
-            
+
             regCC = [self setBit:regCC :kCC_e];
             [self push:YES :kPushPullRegEvery];
             waitForInterruptFlag = NO;
-            
+
             // Set PC to the interrupt vector
             regPC = [ram peek:kInterruptVectorTwo] * 256 + [ram peek:kInterruptVectorTwo + 1];
             break;
-			
+
 		case opcode_CMPD_immed:
             [self compare16bit:(regA * 256 + regB) :([ram peek:regPC] * 256 + [ram peek:(regPC + 1)])];
             regPC += 2;
 			break;
-			
+
 		case opcode_CMPY_immed:
 			[self compare16bit:regY :([ram peek:regPC] * 256 + [ram peek:(regPC + 1)])];
             regPC += 2;
             break;
-			
+
 		case opcode_LDY_immed:
 			regY = [ram peek:regPC] * 256 + [ram peek:regPC + 1];
 			regPC += 2;
 			[self load16bit:regY];
 			break;
-			
+
 		case opcode_CMPD_direct:
             i = [self addressFromDPR:0];
             [self compare16bit:(regA * 256 + regB) :([ram peek:i] * 256 + [ram peek:(i + 1)])];
             regPC += 2;
 			break;
-			
+
 		case opcode_CMPY_direct:
             i = [self addressFromDPR:0];
             [self compare16bit:regY :([ram peek:i] * 256 + [ram peek:(i + 1)])];
             regPC += 2;
             break;
-			
+
 		case opcode_LDY_direct:
 			i = [self addressFromDPR:0];
 			regY = [ram peek:i] * 256 + [ram peek:i + 1];
 			[self load16bit:regY];
 			regPC++;
 			break;
-			
+
 		case opcode_STY_direct:
             i = [self addressFromDPR:0];
             [self store16bit:regY];
@@ -1827,45 +1828,45 @@
             [ram poke:(i + 1) :(regY & 0xFF)];
             regPC++;
             break;
-			
+
 		case opcode_CMPD_indexed:
 			break;
-			
+
 		case opcode_CMPY_indexed:
 			break;
-			
+
 		case opcode_LDY_indexed:
 			break;
-			
+
 		case opcode_STY_indexed:
 			break;
-			
+
 		case opcode_CMPD_extended:
 			break;
-			
+
 		case opcode_CMPY_extended:
 			break;
-			
+
 		case opcode_LDY_extended:
 			break;
-			
+
 		case opcode_STY_extended:
 			break;
-			
+
 		case opcode_LDS_immed:
             msb = [self loadFromRam];
             lsb = [self loadFromRam];
             regHSP = (msb << 8) + lsb;
             [self load16bit:regHSP];
             break;
-			
+
 		case opcode_LDS_direct:
             operand = [self addressFromDPR:0];
             regHSP = [ram peek:operand] * 256 + [ram peek:operand + 1];
             [self load16bit:regHSP];
             [self incrementPC:1];
             break;
-			
+
 		case opcode_STS_direct:
             operand = [self addressFromDPR:0];
             [self store16bit:regHSP];
@@ -1873,71 +1874,71 @@
             [ram poke:(operand + 1) :(regHSP & 0xFF)];
             [self incrementPC:1];
             break;
-			
+
 		case opcode_LDS_indexed:
 			break;
-			
+
 		case opcode_STS_indexed:
 			break;
-			
+
 		case opcode_LDS_extended:
 			break;
-			
+
 		case opcode_STS_extended:
 			break;
-			
+
 		// Second Extended Instructions Begin Here
-			
+
 		case opcode_SWI3:
             // SoftWare Interrupt 3
             // Set e to 1 then push every register to the hardware stack
-            
+
             regCC = [self setBit:regCC :kCC_e];
             [self push:YES :kPushPullRegEvery];
             waitForInterruptFlag = NO;
-            
+
             // Set the PC to the interrupt vector
             regPC = [ram peek:kInterruptVectorThree] * 256 + [ram peek:kInterruptVectorThree + 1];
             break;
-			
+
 		case opcode_CMPU_immed:
             [self compare16bit:regUSP :([ram peek:regPC] * 256 + [ram peek:(regPC + 1)])];
             regPC += 2;
             break;
-			
+
 		case opcode_CMPS_immed:
             [self compare16bit:regHSP :([ram peek:regPC] * 256 + [ram peek:(regPC + 1)])];
             regPC += 2;
             break;
-			
+
 		case opcode_CMPU_direct:
             i = [self addressFromDPR:0];
             [self compare16bit:regUSP :([ram peek:i] * 256 + [ram peek:(i + 1)])];
             regPC += 2;
             break;
-			
+
 		case opcode_CMPS_direct:
             i = [self addressFromDPR:0];
             [self compare16bit:regHSP :([ram peek:i] * 256 + [ram peek:(i + 1)])];
             regPC += 2;
             break;
-			
+
 		case opcode_CMPU_indexed:
             [self compare16bit:regUSP :[self indexedAddressing:[ram peek:regPC]]];
             regPC++;
             break;
-			
+
 		case opcode_CMPS_indexed:
             [self compare16bit:regHSP :[self indexedAddressing:[ram peek:regPC]]];
             regPC++;
             break;
-			
+
 		case opcode_CMPU_extended:
 			break;
-			
+
 		case opcode_CMPS_extended:
 			break;
-			
+
 		default:
 			break;
     }
@@ -1958,7 +1959,7 @@
     [self clrCCN];
     [self clrCCZ];
 
-	NSUInteger answer = [self alu:value :amount :NO];
+    NSUInteger answer = [self alu:value :amount :NO];
 	if (answer == 0) [self setCCZ];
 	if ([self bitSet:answer :kSignBit]) [self setCCN];
 	return answer;
@@ -2041,14 +2042,14 @@
 {
     // Arithmetic shift right
     // Affects n, z, c
-    
+
     [self clrCCN];
     [self clrCCZ];
     [self clrCCC];
     [self decimalToBits:value];
-    
+
     if (bit[0] == 1) [self setCCC];
-    
+
     bit[0] = bit[1];
     bit[1] = bit[2];
     bit[2] = bit[3];
@@ -2056,7 +2057,7 @@
     bit[4] = bit[5];
     bit[5] = bit[6];
     bit[6] = bit[7];
-    
+
     value = [self bitsToDecimal];
     if (value == 0) [self setCCZ];
     if ([self bitSet:value :kSignBit]) [self setCCN];
@@ -2069,7 +2070,7 @@
 {
 	// Does not affect the operands, only the CC register, so ignore the result
     // CC register set in 'and:'
-    
+
     [self and:value with:amount];
 }
 
@@ -2079,7 +2080,7 @@
 {
     // Sets n, z, v, c generically for any clear operation, eg. CLRA, CLRB, CLR 0x0000
     // Values are fixed
-    
+
     [self clrCCN];
     [self setCCZ];
     [self clrCCV];
@@ -2092,7 +2093,7 @@
 {
     // Compare two values by subtracting the second from the first. Result is discarded
     // Affects n, z, v, c - c, v set by 'alu:' via 'sub:'
-    
+
     [self clrCCN];
     [self clrCCZ];
     [self clrCCV];
@@ -2116,11 +2117,11 @@
 {
     // One's complement the passed value
     // Affects n, z, v, c - v and c take fixed values (0, 1)
-    
+
     [self decimalToBits:value];
-    
+
     for (NSInteger i = 0 ; i < 8 ; i++) bit[i] = bit[i] == 1 ? 0 : 1;
-    
+
     value = [self bitsToDecimal];
 
     [self clrCCN];
@@ -2138,22 +2139,22 @@
 - (void)decimalAdjustA
 {
     unsigned char lsnb, msnb, carry, correction;
-    
+
     carry = [self bitSet:regCC :kCC_c];
     [self decimalToBits:regA];
-    
+
     // Calculate decimal values of Most Significant Nibble and Least Significant Nibble
-    
+
     lsnb = bit[0] + (0x02 * bit[1]) + (0x04 * bit[2]) + (0x08 * bit[3]);
     msnb = (0x10 * bit[4]) + (0x20 * bit[5]) + (0x40 * bit[6]) + (0x80 * bit[7]);
-    
+
     // Set Least Significant Conversion Factor, which will be either 0 or 6
-    
+
     correction = 0;
     if ([self bitSet:regCC :kCC_h] || lsnb > 9) correction = 6;
-    
+
     // Set Most Significant Conversion Factor, which will be either 0 or 6
-   
+
     if ([self bitSet:regCC :kCC_c] || msnb > 9 || (msnb > 8 && lsnb > 9)) correction = 6;
 
     [self clrCCN];
@@ -2179,13 +2180,13 @@
 {
     // Subtract 1 from the operand
     // Affects n, z, v - v set only if original operand was $80, cleared otherwise
-    
+
     [self clrCCN];
     [self clrCCZ];
     [self clrCCV];
 
     if (value == 0x80) [self setCCV];     // See 'Programming the 6809' p 155
-    
+
     NSInteger answer = value - 1;
     if (answer == 0) [self setCCZ];
     if (answer < 0)
@@ -2203,13 +2204,13 @@
 {
     // Add 1 to the operand
     // Affects n, z, v
-    
+
     [self clrCCN];
     [self clrCCZ];
     [self clrCCV];
-    
+
     if (value == 0x7F) [self setCCV];     // See 'Programming the 6809' p 158
-    
+
     NSUInteger answer = (value + 1) & 0xFF;
     if (answer == 0) [self setCCZ];
     if ([self bitSet:answer :kSignBit]) [self setCCN];
@@ -2222,11 +2223,11 @@
 {
 	// Perform an exclusive OR
     // Affects n, z ,v - v always cleared
-    
+
     [self clrCCN];
     [self clrCCZ];
     [self clrCCV];
-    
+
     NSUInteger answer = value ^ amount;
 	if (answer == 0) [self setCCZ];
 	if ([self bitSet:answer :kSignBit]) [self setCCN];
@@ -2239,9 +2240,9 @@
 {
     // Returns the value *from* the register identified by regCode
     // after placing the passed value into that register
-    
+
     NSUInteger returnValue = 0x00;
-    
+
     switch (regCode)    // This is the DESTINATION register
     {
         case 0x08:
@@ -2249,31 +2250,31 @@
             returnValue = regA;
             regA = value;
             break;
-            
+
         case 0x09:
             // B
             returnValue = regB;
             regB = value;
             break;
-            
+
         case 0x0A:
             // CC
             returnValue = regCC;
             regCC = value;
             break;
-            
+
         case 0x0B:
             // DPR
             returnValue = regDP;
             regDP = value;
             break;
-            
+
         default:
             // Incorrect Register - signal error
             // [self halt:@"Incorrect register in 8-bit swap"];
             returnValue = 0xFF;
     }
-    
+
     return returnValue;
 }
 
@@ -2283,9 +2284,9 @@
 {
     // Returns the value *from* the register identified by regCode
     // after placing the passed value into that register
-    
+
     NSUInteger returnValue = 0x0000;
-    
+
     switch (regCode)  // This is the *destination* register
     {
         case 0x00:
@@ -2294,43 +2295,43 @@
             regA = (value >> 8) & 0xFF;
             regB = value & 0xFF;
             break;
-            
+
         case 0x01:
             // X
             returnValue = regX;
             regX = value;
             break;
-            
+
         case 0x02:
             // Y
             returnValue = regY;
             regY = value;
             break;
-            
+
         case 0x03:
             // U
             returnValue = regUSP;
             regUSP = value;
             break;
-            
+
         case 0x04:
             // S
             returnValue = regHSP;
             regHSP = value;
             break;
-            
+
         case 0x05:
             // PC
             returnValue = regPC;
             regPC = value;
             break;
-            
+
         default:
             // Incorrect Register - signal error
             // [self halt:@"Incorrect register in 8-bit swap"];
             returnValue = 0xFFFF;
     }
-    
+
     return returnValue;
 }
 
@@ -2340,18 +2341,18 @@
 {
 	// Put passed value into an 8-bit register
     // Affects n, z, v - v is always cleared
-    
+
     [self clrCCN];
     [self clrCCZ];
     [self clrCCV];
-    
+
     switch (regCode)
     {
         case 0x08:
             // A
             regA = value;
             break;
-            
+
         case 0x09:
             // B
             regB = value;
@@ -2361,18 +2362,18 @@
     if (value == 0) [self setCCZ];
 	if ([self bitSet:value :kSignBit]) [self setCCN];
 }
-	
+
 
 
 - (void)load16bit:(NSUInteger)value
 {
     // Sets CC after a 16-bit load
     // Affects n, z, v - v is always cleared
-    
+
     [self clrCCN];
     [self clrCCZ];
     [self clrCCV];
-    
+
     if (value == 0) [self setCCZ];
 	if ([self bitSet:value :15]) [self setCCN];
 }
@@ -2383,7 +2384,7 @@
 {
     // Put passed value into an 8-bit register
     // Affects z, but only for X and Y registers
-    
+
     switch (regCode)
     {
         case 0x01:
@@ -2391,18 +2392,18 @@
             regX = amount;
             if (amount == 0) [self setCCZ];
             break;
-            
+
         case 0x02:
             // Y
             regY = amount;
             if (amount == 0) [self setCCZ];
             break;
-            
+
         case 0x03:
             // U
             regUSP = amount;
             break;
-            
+
         case 0x04:
             // S
             regHSP = amount;
@@ -2416,14 +2417,14 @@
 {
     // Logical shift right
     // Affects n, z, v - n is alwasy cleared
-    
+
     [self clrCCN];
     [self clrCCZ];
     [self clrCCV];
-    
+
     [self decimalToBits:value];
     if (bit[0] == 1) [self setCCC];
-    
+
     bit[0] = bit[1];
     bit[1] = bit[2];
     bit[2] = bit[3];
@@ -2432,7 +2433,7 @@
     bit[5] = bit[6];
     bit[6] = bit[7];
     bit[7] = 0;
-    
+
     value = [self bitsToDecimal];
     if (value == 0) [self setCCZ];
     return value;
@@ -2444,17 +2445,17 @@
 {
     // Logical shift left
     // Affects n, z, v, c
-    
+
     [self clrCCN];
     [self clrCCZ];
     [self clrCCV];
     [self clrCCC];
-    
+
     [self decimalToBits:value];
-    
+
     if (bit[7] == 1) [self setCCC];
     if (bit[7] != bit[6]) [self setCCV];
-    
+
     bit[7] = bit[6];
     bit[6] = bit[5];
     bit[5] = bit[4];
@@ -2463,7 +2464,7 @@
     bit[2] = bit[1];
     bit[1] = bit[0];
     bit[0] = 0;
-    
+
     value = [self bitsToDecimal];
     if (value == 0) [self setCCZ];
     if ([self bitSet:value :kSignBit]) [self setCCN];
@@ -2476,14 +2477,14 @@
 {
     // Multiple A and B and put the result in D (ie. A and B)
     // Affects z, c
-    
+
     [self clrCCZ];
     [self clrCCC];
-    
+
     NSUInteger d = regA * regB;
     if ([self bitSet:d :7]) [self setCCC];
     if (d == 0) [self setCCZ];
-    
+
     regA = (d >> 8) & 0xFF;
     regB = d & 0xFF;
 }
@@ -2497,21 +2498,21 @@
     // If value is 0x80, v is set
 
     [self decimalToBits:value];
-    
+
     // Flip value's bits to make the 1s complenent
-    
+
     for (NSUInteger i = 0 ; i < 8 ; i++) bit[i] = bit[i] == 1 ? 0 : 1;
-    
+
     // Add 1 to the bits to get the 2s complement
-    
+
     NSUInteger answer = [self alu:[self bitsToDecimal] :1 :NO];
-    
+
     [self clrCCN];
     if ([self bitSet:answer :kSignBit]) [self setCCN];
-    
+
     [self clrCCZ];
     if (answer == 0) [self setCCZ];
-	
+
 	[self clrCCV];
 	if (value == 0x80) [self setCCV];
 
@@ -2524,11 +2525,11 @@
 {
     // OR
     // Affects n, z, v - v is always cleared
-    
+
     [self clrCCN];
     [self clrCCZ];
     [self clrCCV];
-    
+
     NSUInteger answer = value | amount;
     if (answer == 0) [self setCCZ];
     if ([self bitSet:answer :kSignBit]) [self setCCN];
@@ -2541,7 +2542,7 @@
 {
     // OR the contents of CC with the supplied 8-bit value
     // Affects all CC bits
-    
+
     regCC = (regCC | value) & 0xFF;
 }
 
@@ -2552,18 +2553,18 @@
     // Push the specified registers (in 'postByte') to the hardware or user stack
     // 'toHardwareStack' should be YES for S, NO for U
     // See 'Programming the 6809' p.171-2
-    
+
     NSUInteger source = regHSP;
     NSUInteger dest = regUSP;
-    
+
     if (toHardwareStack)
     {
         source = regUSP;
         dest = regHSP;
     }
-    
+
     [self decimalToBits:postbyte];
-    
+
     if (bit[7] == 1)
     {
         // Push PC
@@ -2574,7 +2575,7 @@
         if (dest == -1) dest = 0xFFFF;
         [ram poke:dest :(regPC >> 8) & 0xFF];
     }
-    
+
     if (bit[6] == 1)
     {
         // Push U/S
@@ -2585,7 +2586,7 @@
         if (dest == -1) dest = 0xFFFF;
         [ram poke:dest :(source >> 8) & 0xFF];
     }
-    
+
     if (bit[5] == 1)
     {
         // Push Y
@@ -2596,7 +2597,7 @@
         if (dest == -1) dest = 0xFFFF;
         [ram poke:dest :(regY >> 8) & 0xFF];
     }
-    
+
     if (bit[4] == 1)
     {
         // Push X
@@ -2607,7 +2608,7 @@
         if (dest == -1) dest = 0xFFFF;
         [ram poke:dest :(regX >> 8) & 0xFF];
     }
-    
+
     if (bit[3] == 1)
     {
         // Push DP
@@ -2615,7 +2616,7 @@
         if (dest == -1) dest = 0xFFFF;
         [ram poke:dest :regDP];
     }
-    
+
     if (bit[2] == 1)
     {
         // Push B
@@ -2623,7 +2624,7 @@
         if (dest == -1) dest = 0xFFFF;
         [ram poke:dest :regB];
     }
-    
+
     if (bit[1] == 1)
     {
         // Push A
@@ -2631,7 +2632,7 @@
         if (dest == -1) dest = 0xFFFF;
         [ram poke:dest :regA];
     }
-    
+
     if (bit[0] == 1)
     {
         // Push CC
@@ -2639,7 +2640,7 @@
         if (dest == -1) dest = 0xFFFF;
         [ram poke:dest :regCC];
     }
-    
+
     if (toHardwareStack)
     {
         regHSP = dest;
@@ -2657,18 +2658,18 @@
     // Pull the specified registers (in 'postByte') from the hardware or user stack
     // 'fromHardwareStack' should be YES for S, NO for U
     // See 'Programming the 6809' p.173-4
-    
+
     NSUInteger source = regUSP;
     NSUInteger dest = regHSP;
-    
+
     if (fromHardwareStack)
     {
         source = regHSP;
         dest = regUSP;
     }
-    
+
     [self decimalToBits:postbyte];
-    
+
     if (bit[0] == 1)
     {
         // Pull CC
@@ -2676,7 +2677,7 @@
         source++;
         if (source > 0xFFFF) source = 0x00;
     }
-    
+
     if (bit[1] == 1)
     {
         // Pull A
@@ -2684,7 +2685,7 @@
         source++;
         if (source > 0xFFFF) source = 0x00;
     }
-    
+
     if (bit[2] == 1)
     {
         // Pull B
@@ -2692,7 +2693,7 @@
         source++;
         if (source > 0xFFFF) source = 0x00;
     }
-    
+
     if (bit[3] == 1)
     {
         // Pull DP
@@ -2700,7 +2701,7 @@
         source++;
         if (source > 0xFFFF) source = 0x00;
     }
-    
+
     if (bit[4] == 1)
     {
         // Pull X
@@ -2711,7 +2712,7 @@
         source++;
         if (source > 0xFFFF) source = 0x00;
     }
-    
+
     if (bit[5] == 1)
     {
         // Pull Y
@@ -2722,7 +2723,7 @@
         source++;
         if (source > 0xFFFF) source = 0x00;
     }
-    
+
     if (bit[6] == 1)
     {
         // Pull S or U
@@ -2733,7 +2734,7 @@
         source++;
         if (source > 0xFFFF) source = 0x00;
     }
-    
+
     if (bit[7] == 1)
     {
         // Pull PC
@@ -2744,7 +2745,7 @@
         source++;
         if (source > 0xFFFF) source = 0x00;
     }
-    
+
     if (fromHardwareStack)
     {
         regHSP = source;
@@ -2763,19 +2764,19 @@
 {
     // Rotate left
     // Affects n, z, v, c
-    
+
     NSUInteger carry = [self bitSet:regCC :kCC_c] ? 1 : 0;
-    
+
     [self decimalToBits:value];
-    
+
     // c becomes bit 7 of original operand
     [self clrCCC];
     if (bit[7] == 1) [self setCCC];
-    
+
     // n is bit 7 XOR bit 6 of value
     [self clrCCV];
     if (bit[7] != bit[6]) [self setCCV];
-    
+
     bit[7] = bit[6];
     bit[6] = bit[5];
     bit[5] = bit[4];
@@ -2784,10 +2785,10 @@
     bit[2] = bit[1];
     bit[1] = bit[0];
     bit[0] = carry;
-    
+
     [self clrCCN];
     if (bit[7] == 1) [self setCCN];
-    
+
     [self clrCCZ];
     value = [self bitsToDecimal];
     if (value == 0) [self setCCZ];
@@ -2800,15 +2801,15 @@
 {
 	// Rotate right
 	// Affects n, z, c
-	
+
     NSUInteger carry = [self bitSet:regCC :kCC_c] ? 1 : 0;
-    
+
     [self decimalToBits:value];
-	
+
     // c is bit 0 of original operand
     [self clrCCC];
     if (bit[0] == 1) [self setCCC];
-    
+
     bit[0] = bit[1];
     bit[1] = bit[2];
     bit[2] = bit[3];
@@ -2817,14 +2818,35 @@
     bit[5] = bit[6];
     bit[6] = bit[7];
     bit[7] = carry;
-    
+
     [self clrCCN];
     if (bit[7] == 1) [self setCCN];
-    
+
     [self clrCCZ];
     value = [self bitsToDecimal];
     if (value == 0) [self setCCZ];
-    return value;   
+    return value;
+}
+
+
+
+- (void)sex
+{
+    // Sign-extend B to D (A:B)
+    // Affects n, z
+
+    [self clrCCN];
+    [self clrCCZ];
+
+    regA = 0x00;
+
+    if ([self bitSet:regB :kSignBit])
+    {
+        regA = 0xFF;
+        [self setCCN];
+    }
+
+    if (regB == 0) [self setCCZ]; // ***CHECK***
 }
 
 
@@ -2833,11 +2855,11 @@
 {
 	// Sets CC after an 8-bit store
 	// Affects n, z, v - v is always cleared
-	
+
     [self clrCCN];
     [self clrCCZ];
     [self clrCCV];
-    
+
 	if (value == 0) [self setCCZ];
 	if ([self bitSet:value :kSignBit]) [self setCCN];
 }
@@ -2848,11 +2870,11 @@
 {
 	// Sets CC after a 16-bit store
 	// Affects n, z, v - v is always cleared
-	
+
     [self clrCCN];
     [self clrCCZ];
     [self clrCCV];
-	
+
 	if (value == 0) [self setCCZ];
 	if ([self bitSet:value :15]) [self setCCN];
 }
@@ -2867,16 +2889,16 @@
     [self clrCCN];
     [self clrCCV];
     [self clrCCZ];
-	
+
 	NSUInteger comp = [self negate:amount];
 	NSUInteger answer = [self alu:value :comp :NO];
-	
+
 	if (answer == 0) [self setCCZ];
 	if ([self bitSet:value :kSignBit]) [self setCCN];
-	
+
     // c represents a borrow and is set to the complement of the carry
     // of the internal binary addition
-    
+
     if ([self bitSet:regCC :kCC_c])
 	{
         [self clrCCC];
@@ -2894,17 +2916,17 @@
 {
     // Subtract with Carry (borrow)
     // Affects n, z, v, c - v and c set by 'alu:'
-    
+
     [self clrCCN];
     [self clrCCZ];
     [self clrCCV];
-    
+
 	NSUInteger comp = [self negate:amount];
 	NSUInteger answer = [self alu:value :comp :YES];
-	
+
 	if (answer == 0) [self setCCZ];
 	if ([self bitSet:answer :kSignBit]) [self setCCN];
-	
+
 	if ([self bitSet:regCC :kCC_c])
 	{
 		[self clrCCC];
@@ -2923,14 +2945,14 @@
 {
     // Subtract amount from value
     // Affects n, z, v, c - v, c are set by 'alu:'
-    
+
     [self clrCCN];
     [self clrCCV];
     [self clrCCZ];
-    
+
     NSUInteger comp = [self negate:amount] & 0xFFFF;
     NSUInteger answer = [self alu:value :comp :YES];
-	
+
     if (answer == 0) [self setCCZ];
     if ([self bitSet:answer :15]) [self setCCN];
 
@@ -2943,7 +2965,7 @@
 {
     // Subtract amount from D
     // Affects n, z, v, c - all are set by 'sub16bit:'
-    
+
     [self clrCCN];
     [self clrCCV];
     [self clrCCZ];
@@ -2961,11 +2983,11 @@
 {
 	// Tests value for zero or negative
 	// Affects n, z, v - v is alwasy cleared
-	
+
     [self clrCCN];
     [self clrCCZ];
     [self clrCCV];
-    
+
 	if (value == 0) [self setCCZ];
 	if ([self bitSet:value :kSignBit]) [self setCCN];
 }
@@ -2977,19 +2999,19 @@
     // regCode contains an 8-bit number that identifies the two registers to be swapped
     // first four bits give source, second four bits give destination. So convert regCode
     // into an array of eight ints representing each bit
-    
+
     NSUInteger sourceReg, destReg, d;
-    
+
     [self decimalToBits:regCode];
-    
+
     // Get value of first four bits - the source
-    
+
     sourceReg = (bit[7] * 8) + (bit[6] * 4) + (bit[5] * 2) + bit[4];
-    
+
     // Get value of second four bits - the destination
-    
+
     destReg = (bit[3] * 8) + (bit[2] * 4) + (bit[1] * 2) + bit[0];
-    
+
     switch (sourceReg)
     {
         case 0x00:
@@ -2999,15 +3021,15 @@
 			if (destReg > 0x05) return;
 
             d = [self exchange16bit:((regA * 256) + regB) :destReg];
-            
+
             if (swapOp)
             {
                 regA = (d >> 8) & 0xFF;
                 regB = d & 0xFF;
             }
-            
+
             break;
-            
+
         case 0x01:
 
 			// X - can only swap to D, Y, U, S, PC
@@ -3018,11 +3040,11 @@
             {
                 regX = [self exchange16bit:regX :destReg];
             }
-            else 
+            else
             {
                 [self exchange16bit:regX :destReg];
             }
-            
+
             break;
 
         case 0x02:
@@ -3035,11 +3057,11 @@
             {
                 regY = [self exchange16bit:regY :destReg];
             }
-            else 
+            else
             {
                 [self exchange16bit:regY :destReg];
             }
-            
+
             break;
 
         case 0x03:
@@ -3052,11 +3074,11 @@
             {
                 regUSP = [self exchange16bit:regUSP :destReg];
             }
-            else 
+            else
             {
                 [self exchange16bit:regUSP :destReg];
             }
-            
+
             break;
 
         case 0x04:
@@ -3069,13 +3091,13 @@
             {
                 regHSP = [self exchange16bit:regHSP :destReg];
             }
-            else 
+            else
             {
                 [self exchange16bit:regHSP :destReg];
             }
-            
+
             break;
-            
+
         case 0x05:
 
 			// PC - can only swap to D, X, Y, U, S
@@ -3086,11 +3108,11 @@
             {
                 regPC = [self exchange16bit:regPC :destReg];
             }
-            else 
+            else
             {
                 [self exchange16bit:regPC :destReg];
             }
-            
+
             break;
 
         case 0x08:
@@ -3103,13 +3125,13 @@
             {
                 regA = [self exchange:regA :destReg];
             }
-            else 
+            else
             {
                 [self exchange:regA :destReg];
             }
-            
+
             break;
-            
+
         case 0x09:
 
 			// B - can only swap to A, CC, DP
@@ -3120,13 +3142,13 @@
             {
                 regB = [self exchange:regB :destReg];
             }
-            else 
+            else
             {
                 [self exchange:regB :destReg];
             }
-            
+
             break;
-            
+
         case 0x0A:
 
 			// CC - can only swap to A, B, DP
@@ -3137,13 +3159,13 @@
             {
                 regCC = [self exchange:regCC :destReg];
             }
-            else 
+            else
             {
                 [self exchange:regCC :destReg];
             }
 
             break;
-            
+
         case 0x0B:
 
 			// DPR - can only swap to A, B, CC
@@ -3154,7 +3176,7 @@
             {
                 regDP = [self exchange:regDP :destReg];
             }
-            else 
+            else
             {
                 [self exchange:regDP :destReg];
             }
@@ -3170,13 +3192,13 @@
 {
     // This method increases the PC
 
-    NSUInteger sourceReg, opcode, value, msb, lsb;
-    NSInteger address;
-    
+    NSUInteger sourceReg, opcode, value, msb, lsb, address;
+    unsigned short subAddress;
+
     // Decode the indexed addressing postbyte and use, in conjunction where appropriate, with the two
     // offset bytes, to calculate the Effective Address, which is returned.
-    
-    // For indirect addressing modes, we use the initial EA to look up the final EA from memory and 
+
+    // For indirect addressing modes, we use the initial EA to look up the final EA from memory and
     // return the final EA
 
     [self decimalToBits:postByte];
@@ -3187,202 +3209,205 @@
 
     // Get bits 5 and 6 to calculate source register
     // x = 0 ; y = 1 ; u = 2 ; s = 3
-    
+
     sourceReg = (bit[6] * 2) + bit[5];
-    
+
     // Set 'returnValue' to the contents of the source register
-    
+
     address = [self registerValue:sourceReg];
-    
+
     // Process the opcode encoded in the first five bits of the postbyte
-    
+
     opcode = bit[0] + (0x02 * bit[1]) + (0x04 * bit[2]) + (0x08 * bit[3]) + (0x0A * bit[4]);
-    
+
     if (bit[7] == 0)
     {
         // 5-bit non-indirect offset
-        
-        NSUInteger offset = opcode + (bit[5] * 0x20);
-        address += [self bitSet:offset :5] ? offset - 16 : offset;
-        address = [self checkRange:address];
+
+        char offset = (char)(opcode + (bit[5] * 0x20));
+        subAddress = (unsigned short)address;
+        subAddress += offset;
+        address = (NSUInteger)subAddress;
     }
-    else 
+    else
     {
         // All other opcodes have bit 7 set to 1
-        
+
         switch (opcode)
         {
             case 0:
                 // Auto-increment (,R+)
+                address = [self registerValue:sourceReg];
                 [self incrementRegister:sourceReg :1];
                 break;
-                
+
             case 1:
                 // Auto-increment (,R++)
+                address = [self registerValue:sourceReg];
                 [self incrementRegister:sourceReg :2];
                 break;
-                
+
             case 2:
                 // Auto-decrement (,-R)
                 [self incrementRegister:sourceReg :-1];
-                
+
                 // Reacquire 'address' as decrement must here be performed FIRST
                 address = [self registerValue:sourceReg];
                 break;
-                
+
             case 3:
                 // Auto-decrement (,--R)
                 [self incrementRegister:sourceReg :-2];
-                
+
                 // Reacquire 'address' as decrement must here be performed FIRST
                 address = [self registerValue:sourceReg];
                 break;
-                
+
             case 4:
-                // No offset (,R)
+                // No offset (,R) - 'address' already set
                 break;
-                
+
             case 5:
-                // Accumulator offset B
+                // Accumulator offset B; B is a 2s-comp offset
                 address += [self bitSet:regB :kSignBit] ? regB - 256 : regB;
-                address = [self checkRange:address];
                 break;
-                
+
             case 6:
-                // Accumulator offset A
+                // Accumulator offset A; A is a 2s-comp offset
                 address += [self bitSet:regA :kSignBit] ? regA - 256 : regA;
-                address = [self checkRange:address];
                 break;
-                
+
             case 8:
-                // 8-bit constant offset
+                // 8-bit constant offset; offset is 2s-comp
                 value = [self loadFromRam];
                 address += [self bitSet:value :kSignBit] ? value - 256 : value;
-                address = [self checkRange:address];
                 break;
-                
+
             case 9:
-                // 16-bit constant offset
+                // 16-bit constant offset; offset is 2s-comp
                 msb = [self loadFromRam];
                 lsb = [self loadFromRam];
                 value = (msb << 8) + lsb;
                 address += [self bitSet:value :15] ? value - 65536 : value;
-                address = [self checkRange:address];
                 break;
-                
+
             case 11:
-                // Accumulator offset D
+                // Accumulator offset D; D is a 2s-comp offset
                 value = (regA << 8) + regB;
                 address += [self bitSet:value :15] ? value - 65536 : value;
-                address = [self checkRange:address];
                 break;
-                
+
             case 12:
-                // PC relative 8-bit offset
+                // PC relative 8-bit offset; offset is 2s-comp
                 value = [self loadFromRam];
                 address = regPC + ([self bitSet:value :kSignBit] ? value - 256 : value);
-                address = [self checkRange:address];
                 break;
-                
+
             case 13:
-                // regPC relative 16-bit offset
+                // regPC relative 16-bit offset; offset is 2s-comp
                 msb = [self loadFromRam];
                 lsb = [self loadFromRam];
                 value = (msb << 8) + lsb;
                 address = regPC + ([self bitSet:value :15] ? value - 65536 : value);
-                address = [self checkRange:address];
                 break;
-                
+
                 // From here on, the addressing is indirect: the Effective Address is a handle not a pointer
                 // So we need to add a second memoryMap[] lookup to return the ultimate address we are pointing to
-                
+
             case 17:
                 // Indirect auto-increment + 2
                 [self incrementRegister:sourceReg :2];
-                address = [ram peek:address];
                 break;
-                
+
             case 19:
                 // Indirect auto-decrement - 2
                 [self incrementRegister:sourceReg :-2];
-                
+
                 // Reacquire returnValue as decrement is performed FIRST
                 address = [self registerValue:sourceReg];
-                address = [ram peek:address];
                 break;
-                
+
             case 20:
                 // Indirect constant zero offset
-                address = [ram peek:address];
+                // address = [ram peek:address];
                 break;
-                
+
             case 21:
                 // Indirect Accumulator offset B
+                // eg. LDA [B,X]
                 address += ([self bitSet:regB :kSignBit] ? regB - 256 : regB);
-                address = [ram peek:address];
                 break;
-                
+
             case 22:
                 // Indirect Accumulator offset A
+                // eg. LDA [A,Y]
                 address += ([self bitSet:regA :kSignBit] ? regA - 256 : regA);
-                address = [ram peek:address];
                 break;
-                
+
             case 24:
                 // Indirect constant 8-bit offset
+                // eg. LDA [n,X]
                 value = [self loadFromRam];
                 address += [self bitSet:value :kSignBit] ? value - 256 : value;
-                address = [self checkRange:address];
-                address = [ram peek:address];
                 break;
-                
+
             case 25:
                 // Indirect constant 16-bit offset
+                // eg. LDA [n,X]
                 msb = [self loadFromRam];
                 lsb = [self loadFromRam];
                 value = (msb << 8) + lsb;
                 address += [self bitSet:value :15] ? value - 65536 : value;
-                address = [self checkRange:address];
-                address = [ram peek:address];
                 break;
-                
+
             case 27:
                 // Indirect Accumulator offset D
+                // eg. LDA [D,X]
                 value = (regA << 8) + regB;
                 address += [self bitSet:value :15] ? value - 65536 : value;
-                address = [self checkRange:address];
-                address = [ram peek:address];
                 break;
-                
+
             case 28:
                 // Indirect regPC relative 8-bit offset
+                // eg. LDA [n,PCR]
                 value = [self loadFromRam];
                 address = regPC + ([self bitSet:value :kSignBit] ? value - 256 : value);
-                address = [self checkRange:address];
-                address = [ram peek:address];
                 break;
-                
+
             case 29:
                 // Indirect regPC relative 16-bit offset
+                // eg. LDX [n,PCR]
                 msb = [self loadFromRam];
                 lsb = [self loadFromRam];
                 value = (msb << 8) + lsb;
                 address = regPC + ([self bitSet:value :15] ? value - 65536 : value);
-                address = [self checkRange:address];
-                address = [ram peek:address];
                 break;
-                
+
             case 31:
                 // Extended indirect
+                // eg. LDA [n]
                 msb = [self loadFromRam];
                 lsb = [self loadFromRam];
                 address = (msb << 8) + lsb;
-                address = [ram peek:address];
                 break;
         }
     }
-    
-    return (NSUInteger)address;
+
+    // Ensure address aligns to 16-bit range
+
+    address = [self checkRange:address];
+
+    // For indirect address, use 'address' as a handle
+
+    if (opcode > 16)
+    {
+        NSUInteger pc = regPC;
+        regPC = address;
+        address = [self addressFromNextTwoBytes];
+        regPC = pc;
+    }
+
+    return address;
 }
 
 
@@ -3391,7 +3416,7 @@
 {
     // Return the value of the appropriate index register
     // x = 0 ; y = 1 ; u = 2 ; s = 3
-    
+
     if (sourceRegister == 0) return regX;
     if (sourceRegister == 1) return regY;
     if (sourceRegister == 2) return regUSP;
@@ -3400,14 +3425,18 @@
 
 
 
-- (void)incrementRegister:(NSUInteger)sourceRegister :(NSUInteger)value
+- (void)incrementRegister:(NSUInteger)sourceRegister :(NSInteger)amount
 {
     // Calculate the offset from the Two's Complement of the 8- or 16-bit value
-    
-    if (sourceRegister == 0) regX += value;
-    if (sourceRegister == 1) regY += value;
-    if (sourceRegister == 2) regUSP += value;
-    if (sourceRegister == 3) regHSP += value;
+
+    NSUInteger *regPtr = &regX;
+    if (sourceRegister == 1) regPtr = &regY;
+    if (sourceRegister == 2) regPtr = &regUSP;
+    if (sourceRegister == 3) regPtr = &regHSP;
+
+    unsigned short newValue = (unsigned short)*regPtr;
+    newValue += (short)amount;
+    *regPtr = (NSUInteger)newValue;
 }
 
 

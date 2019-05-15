@@ -62,6 +62,10 @@
     cpu.regPC = 0xFFFF;
     NSUInteger l = [cpu loadFromRam];
     NSLog(@"%lu", (unsigned long)cpu.regPC);
+
+    UInt8 testy = 0xFF;
+    testy++;
+    NSLog(@"%hhu", testy);
 }
 
 
