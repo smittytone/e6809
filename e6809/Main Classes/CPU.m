@@ -76,6 +76,8 @@
 
 - (NSUInteger)addressFromDPR
 {
+    // Convenience method that calls 'addressFromDPR:' with no offset
+
     return [self addressFromDPR:0];
 }
 
@@ -86,7 +88,9 @@
     // regPC (LSB) plus any supplied offset
     // Does not increment regPC
     // TODO Should we increment regPC?
-    return (regDP * 256) + [ram peek:(regPC + offset)];
+
+    NSUInteger address = (regPC + offset) & 0xFFFF;
+    return (regDP << 8) + [self contentsOfMemory:address];
 }
 
 
@@ -292,6 +296,7 @@
 }
 
 
+
 - (NSUInteger)alu:(NSUInteger)value1 :(NSUInteger)value2 :(BOOL)useCarry
 {
     // Simulates addition of two unsigned 8-bit values in a binary ALU
@@ -389,6 +394,7 @@
 	// ie. previous operations will have moved PC on sufficiently
 	
 	NSUInteger i, operand, opcode, address, msb, lsb;
+    NSInteger offset;
 
     // Are we awaiting an interrupt? If so check/handle then bail
     
@@ -420,75 +426,85 @@
     switch (opcode)
     {
 		case opcode_NEG_direct:
+            // 0x00 - NEG M
 			address = [self addressFromDPR];
-            [self setContentsOfMemory:address :[self negate:[ram peek:address]]];
+            [self setContentsOfMemory:address :[self negate:[self contentsOfMemory:address]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_COM_direct:
-			address = [self addressFromDPR];
-			[ram poke:operand :[self complement:[ram peek:operand]]];
+            // 0x03 - COM M
+            address = [self addressFromDPR];
+			[self setContentsOfMemory:address :[self complement:[self contentsOfMemory:address]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_LSR_direct:
+            // 0x04 - LSR M
 			address = [self addressFromDPR];
-			[ram poke:operand :[self lShiftRight:[ram peek:operand]]];
+			[self setContentsOfMemory:address :[self lShiftRight:[self contentsOfMemory:address]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_ROR_direct:
-			address = [self addressFromDPR];
-			[ram poke:operand :[self rotateRight:[ram peek:operand]]];
+            // 0x06 - ROR M
+            address = [self addressFromDPR];
+			[self setContentsOfMemory:address :[self rotateRight:[self contentsOfMemory:address]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_ASR_direct:
-			address = [self addressFromDPR];
-			[ram poke:operand :[self aShiftRight:[ram peek:operand]]];
+            // 0x07 - ASR M
+            address = [self addressFromDPR];
+			[self setContentsOfMemory:address :[self aShiftRight:[self contentsOfMemory:address]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_ASL_direct:
+            // 0x08 - ASL M
 			address = [self addressFromDPR];
-			[ram poke:operand :[self aShiftLeft:[ram peek:operand]]];
+			[self setContentsOfMemory:address :[self aShiftLeft:[self contentsOfMemory:address]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_ROL_direct:
-			address = [self addressFromDPR];
-			[ram poke:operand :[self rotateLeft:[ram peek:operand]]];
+            // 0x09 - ROL M
+            address = [self addressFromDPR];
+			[self setContentsOfMemory:address :[self rotateLeft:[self contentsOfMemory:address]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_DEC_direct:
+            // 0x0A - DEC M
 			address = [self addressFromDPR];
-			[ram poke:operand :[self decrement:[ram peek:operand]]];
+			[self setContentsOfMemory:address :[self decrement:[self contentsOfMemory:address]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_INC_direct:
-			address = [self addressFromDPR];
-			[ram poke:operand :[self increment:[ram peek:operand]]];
+            // 0x0C - INC M
+            address = [self addressFromDPR];
+			[self setContentsOfMemory:address :[self increment:[self contentsOfMemory:address]]];
 			[self incrementPC:1];
 			break;
 
 		case opcode_TST_direct:
+            // 0x0D - TST M
 			address = [self addressFromDPR];
-			[self test:[ram peek:operand]];
+			[self test:[self contentsOfMemory:address]];
 			[self incrementPC:1];
 			break;
 
-// JMP UNTESTED
-
 		case opcode_JMP_direct:
-			regPC = [self addressFromDPR:0];
+            // 0x0E - JMP M
+            regPC = [self addressFromDPR];
 			break;
 
 		case opcode_CLR_direct:
-			operand = [self addressFromDPR:0];
-			[ram poke:operand :0];
-			[self clear];
+            // 0x0F - CLR M
+            address = [self addressFromDPR];
+			[self setContentsOfMemory:address :0];
+			[self setCCAfterClear];
 			[self incrementPC:1];
 			break;
 
@@ -497,9 +513,7 @@
             // NOTE We may need to add a 2 x CPU cycle delay here
             break;
 
-// SYNC UNTESTED
-
-		case opcode_SYNC:
+        case opcode_SYNC:
 
 			/*
 			 The processor halts and waits for an interrupt to occur. If the interrupt is masked (disabled) or is shorter than 3 cycles,
@@ -513,7 +527,14 @@
 			break;
 
 		case opcode_LBRA_rel:
-			regPC += (short)([ram peek:regPC] * 256 + [ram peek:regPC + 1]);
+            // 0x16 LBRA M
+            // NOTE 'offset' is an int16
+            offset = ([self contentsOfMemory:regPC] << 8);
+            [self incrementPC:1];
+            offset += [self contentsOfMemory:regPC];
+            offset = ((offset << 48) >> 48);
+            regPC += offset;
+            regPC = (regPC & 0xFFFF);
 			break;
 
 		case opcode_LBSR_rel:
@@ -797,7 +818,7 @@
 
 		case opcode_CLRA:
 			regA = 0;
-			[self clear];
+			[self setCCAfterClear];
 			break;
 			
 		case opcode_NEGB:
@@ -842,7 +863,7 @@
 
 		case opcode_CLRB:
 			regB = 0;
-			[self clear];
+			[self setCCAfterClear];
 			break;
 
 		case opcode_NEG_indexed:
@@ -898,7 +919,7 @@
 		case opcode_CLR_indexed:
 			address = [self indexedAddressing:[ram peek:regPC]];
 			[ram poke:address :0];
-			[self clear];
+			[self setCCAfterClear];
 			break;
 			
 		case opcode_NEG_extended:
@@ -959,7 +980,7 @@
 		case opcode_CLR_extended:
 			address = [self addressFromNextTwoBytes];
 			[ram poke:address :0];
-			[self clear];
+			[self setCCAfterClear];
 			break;
 
 		case opcode_SUBA_immed:
@@ -2054,7 +2075,7 @@
 
 
 
-- (void)clear
+- (void)setCCAfterClear
 {
     // Sets n, z, v, c generically for any clear operation, eg. CLRA, CLRB, CLR 0x0000
     // Values are fixed

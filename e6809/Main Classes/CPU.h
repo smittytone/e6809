@@ -63,7 +63,7 @@
 - (NSUInteger)aShiftRight:(NSUInteger)value;
 
 - (void)bitTest:(NSUInteger)value with:(NSUInteger)amount;
-- (void)clear;
+- (void)setCCAfterClear;
 
 - (void)compare:(NSUInteger)value :(NSUInteger)amount;
 - (void)compare16bit:(NSUInteger)value :(NSUInteger)amount; // TBD
