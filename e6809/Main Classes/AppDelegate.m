@@ -28,9 +28,9 @@
 	cpu.regB = b;
 	[cpu transferDecode:0x89 :YES];
     
-    NSLog(@"A: %u DP: %u A: %u DP: %u" , a, b, cpu.regA, cpu.regB);
+    NSLog(@"A: %u DP: %u A: %lu DP: %lu" , a, b, (unsigned long)cpu.regA, (unsigned long)cpu.regB);
 
-    a = [cpu add:0x40 :0x40];
+    a = [cpu doAdd:0x40 :0x40];
     if ([cpu bitSet:cpu.regCC :kCC_c]) { NSLog(@"Carry set"); } else { NSLog(@"Carry not set"); }
     if ([cpu bitSet:cpu.regCC :kCC_v]) { NSLog(@"Overflow set"); } else { NSLog(@"Overflow not set"); }
 
@@ -96,7 +96,7 @@
                   
         for (NSInteger j = 0 ; j < 8 ; j++)
         {
-            unsigned char value = [cpu contentsOfMemory:(short)i + j];
+            unsigned char value = [cpu fromRam:(short)i + j];
             string = [string stringByAppendingFormat:@"0x%02X ", value];
         }
         string = [string stringByAppendingString:@"\n"];
@@ -244,11 +244,11 @@
                     unsigned int val;
                     NSScanner* scanner = [NSScanner scannerWithString:aString];
                     [scanner scanHexInt:&val];
-                    [cpu setContentsOfMemory:(unsigned short)(memStartAdddress + count) :(unsigned char)val];
+                    [cpu toRam:(unsigned short)(memStartAdddress + count) :(unsigned char)val];
                 }
                 else
                 {
-                    [cpu setContentsOfMemory:(unsigned short)(memStartAdddress + count) :(unsigned char)[aString integerValue]];
+                    [cpu toRam:(unsigned short)(memStartAdddress + count) :(unsigned char)[aString integerValue]];
                 }
                 count++;
             }

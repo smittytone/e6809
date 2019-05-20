@@ -32,7 +32,7 @@
     {
         for (NSUInteger col = 0 ; col < 32 ; col++)
         {
-            NSInteger a = (NSInteger)[cpu contentsOfMemory:(1024 + col + (row * 32))];
+            NSInteger a = (NSInteger)[cpu fromRam:(1024 + col + (row * 32))];
 
             NSUInteger cy = a / 32;
             NSUInteger cx = a - (32 * cy);
