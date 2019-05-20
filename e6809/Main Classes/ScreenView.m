@@ -39,7 +39,7 @@
 
             [charset drawAtPoint: NSMakePoint(col * 16, 360 - (row * 24))
                         fromRect: NSMakeRect(cx * 16, 168 - (cy * 24), 16, 24)
-                       operation: NSCompositeCopy
+                       operation: NSCompositingOperationCopy
                         fraction: 1.0];
         }
     }

@@ -41,7 +41,7 @@
 
     for (NSUInteger i = 1024 ; i < 1536 ; i++)
     {
-        [cpu setContentsOfMemory:i :0];
+        [cpu toRam:i :0];
     }
 
 	// Every second, display the registers' values
@@ -60,7 +60,7 @@
     NSLog(@"%lu", (unsigned long)testAddress);
 
     cpu.regPC = 0xFFFF;
-    NSUInteger l = [cpu loadFromRam];
+    [cpu loadFromRam];
     NSLog(@"%lu", (unsigned long)cpu.regPC);
 
     UInt8 testy = 0xFF;
@@ -148,9 +148,9 @@
 
 - (void)showRegisters
 {
-	aField.stringValue = [NSString stringWithFormat:@"%u", cpu.regA];
-	bField.stringValue = [NSString stringWithFormat:@"%u", cpu.regB];
-	dpField.stringValue = [NSString stringWithFormat:@"%u", cpu.regDP];
+    aField.stringValue = [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regA];
+    bField.stringValue = [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regB];
+    dpField.stringValue = [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regDP];
     ccField.stringValue = [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regCC];
 
 	xField.stringValue = [NSString stringWithFormat:@"%u", cpu.regX];
