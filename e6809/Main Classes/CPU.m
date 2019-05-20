@@ -24,12 +24,16 @@
     {
         // Extra init code here
 
+        regA = 0;
+        regB = 0;
         regPC = 0;
         regHSP = 0;
         regUSP = 0;
         regCC = 0;
-
-		[self configMemory:65535];
+        
+        // Set to full 64KB of RAM
+		
+        [self configMemory:65535];
    	}
 
     return self;
@@ -39,9 +43,9 @@
 
 - (void)configMemory:(NSUInteger)memSizeInBytes
 {
-	// Impose a minimum RAM of 1KB
+	// Impose a minimum RAM of 1KB and a maximum of 64KB
 
-    if (memSizeInBytes == 0) memSizeInBytes = 1024;
+    if (memSizeInBytes == 0) memSizeInBytes = 1023;
 	if (memSizeInBytes > 65535) memSizeInBytes = 65535;
 
 	topAddress = memSizeInBytes;
@@ -54,7 +58,7 @@
 
 	for (NSUInteger i = kRamBasicSubroutineVectorsStart ; i < (kRamBasicSubroutineVectorsEnd + 1) ; i++)
 	{
-		[ram poke:i :opcode_RTS];
+		[self toRam:i :opcode_RTS];
 	}
 }
 
@@ -74,7 +78,9 @@
 
 - (void)toRam:(NSUInteger)address :(NSUInteger)value
 {
-	[ram poke:(address & 0xFFFF) :(value & 0xFF)];
+    // Pokes in the 8-but 'value' at the the 16-bit 'address'
+    
+    [ram poke:(address & 0xFFFF) :(value & 0xFF)];
 }
 
 
@@ -93,16 +99,16 @@
 
 - (void)incrementPC:(NSInteger)amount
 {
-    unsigned short address = (unsigned short)regPC;
+    unsigned short address = regPC;
     address += (short)amount;
-    regPC = (NSUInteger)address;
+    regPC = address;
 }
 
 
 
 - (NSInteger)checkRange:(NSInteger)address
 {
-    // Handle RAM address rollover
+    // Handle RAM address rollover MAY BE REDUNDANT
 
     if (address < 0) return ram.topAddress - address;
     if (address > ram.topAddress) return address & ram.topAddress;
@@ -111,11 +117,7 @@
 
 
 
-
-
-
-
-#pragma mark - Utilities
+#pragma mark - Bit Handling Methods
 
 
 - (void)clearBits
@@ -124,6 +126,7 @@
 
     for (NSUInteger i = 0 ; i < 16 ; i++) bit[i] = 0;
 }
+
 
 
 - (void)decimalToBits:(NSUInteger)value
@@ -148,7 +151,8 @@
 }
 
 
-- (void)decimal16ToBits:(NSUInteger)value
+
+- (void)decimalToBits16:(NSUInteger)value
 {
     // Convert the 16-bit byte 'value' into its binary equivalent stored as individual bits
 
@@ -168,6 +172,7 @@
 }
 
 
+
 - (NSUInteger)bitsToDecimal
 {
     // Reads the first eight bits of the 'bit' array and returns them as a decimal value
@@ -178,7 +183,7 @@
 }
 
 
-- (NSUInteger)bits16ToDecimal
+- (NSUInteger)bitsToDecimal16
 {
     // Reads the full 16 bits of the 'bit' array and returns them as a decimal value
 
@@ -188,85 +193,46 @@
 }
 
 
+
 - (BOOL)bitSet:(NSUInteger)value :(NSUInteger)bit
 {
-    // Set bit 'bit' of the byte or word 'value'
-    // Doesn't yet check the value of bit
-
+    // Is bit 'bit' of the byte or word 'value' set?
+    // Return true if it is, otherwise false
+    
     return (((value >> bit) & 1) == 1);
 }
 
 
+
 - (NSUInteger)setBit:(NSUInteger)value :(NSUInteger)bit
 {
+    // Set bit 'bit' of the byte or word 'value' to 1
+    // Doesn't yet check the value of bit
+    
     return (value | (1 << bit));
 }
 
 
 - (NSUInteger)clrBit:(NSUInteger)value :(NSUInteger)bit
 {
+    // Set bit 'bit' of the byte or word 'value' to 0
+    // Doesn't yet check the value of bit
+    
     return (value & ~(1 << bit));
 }
 
 
-- (void)setCCV
-{
-    regCC = [self setBit:regCC :kCC_v];
-}
+// The follow methods are convenience methods for setting/clearing
+// specific CC register bits
 
-
-- (void)clrCCV
-{
-    regCC = [self clrBit:regCC :kCC_v];
-}
-
-
-- (void)setCCZ
-{
-    regCC = [self setBit:regCC :kCC_z];
-}
-
-
-- (void)clrCCZ
-{
-    regCC = [self clrBit:regCC :kCC_z];
-}
-
-
-- (void)setCCN
-{
-    regCC = [self setBit:regCC :kCC_n];
-}
-
-
-- (void)clrCCN
-{
-    regCC = [self clrBit:regCC :kCC_n];
-}
-
-
-- (void)setCCC
-{
-    regCC = [self setBit:regCC :kCC_c];
-}
-
-
-- (void)clrCCC
-{
-    regCC = [self clrBit:regCC :kCC_c];
-}
-
-
-- (NSInteger)unsign8ToSign8:(NSInteger)value
-{
-    // Set the signed value to the first seven bits of the unsigned value
-    NSInteger a = value & 0x7F;
-
-    // If the sign bit is set, multiply the signed value by -1
-    if ([self bitSet:value :7]) a = a * -1;
-
-    return a;
-}
+- (void)setCCV { regCC = [self setBit:regCC :kCC_v]; }
+- (void)clrCCV { regCC = [self clrBit:regCC :kCC_v]; }
+- (void)setCCZ { regCC = [self setBit:regCC :kCC_z]; }
+- (void)clrCCZ { regCC = [self clrBit:regCC :kCC_z]; }
+- (void)setCCN { regCC = [self setBit:regCC :kCC_n]; }
+- (void)clrCCN { regCC = [self clrBit:regCC :kCC_n]; }
+- (void)setCCC { regCC = [self setBit:regCC :kCC_c]; }
+- (void)clrCCC { regCC = [self clrBit:regCC :kCC_c]; }
 
 
 
@@ -663,7 +629,7 @@
 - (void)cmp:(NSUInteger)op :(NSUInteger)mode
 {
     // CMP: Compare M to A
-    //      Compare M to B
+    //              M to B
 
     NSUInteger address = [self addressFromMode:mode];
     [self compare:(op < 0xC1 ? regA : regB) :[self fromRam:address]];
@@ -673,7 +639,31 @@
 
 - (void)cmp16:(NSUInteger)op :(NSUInteger)mode :(NSUInteger)exOp
 {
-
+    // CMP: Compare M:M + 1 to D,
+    //              M:M + 1 to X,
+    //              M:M + 1 to Y,
+    //              M:M + 1 to S,
+    //              M:M + 1 to U
+    
+    // Get the effective address of the data
+    
+    unsigned short address = (unsigned short)[self addressFromMode:mode];
+    
+    // Set a pointer to the target register
+    
+    unsigned short d = (regA << 8) + regB;
+    unsigned short *regPtr = &d;
+    if (op == 0x83 && op == 0x10) regPtr = &regUSP;
+    if (op == 0x8C) regPtr = op == 0x10 ? &regY : (op == 0x11 ? &regHSP : &regX);
+    
+    // Get the data and subtract from the target register
+    
+    NSUInteger compValue = ([self fromRam:(NSUInteger)address] << 8) + [self fromRam:(NSUInteger)(address + 1)];
+    
+    // Subtract 'compValue' from the target register - this will set the CC register
+    // NOTE ignore the return value - we're just setting the CC bits
+    
+    [self subtract16:(NSUInteger)*regPtr :compValue];
 }
 
 
@@ -868,12 +858,12 @@
     if (op < 0xC6)
     {
         regA = [self fromRam:address];
-        [self setCCAfterLoad:regA];
+        [self setCCAfterLoad:regA :NO];
     }
     else
     {
         regB = [self fromRam:address];
-        [self setCCAfterLoad:regB];
+        [self setCCAfterLoad:regB :NO];
     }
 }
 
@@ -881,7 +871,37 @@
 
 - (void)ld16:(NSUInteger)op :(NSUInteger)mode :(NSUInteger)exOp
 {
-
+    // LD: M:M + 1 -> D,
+    //     M:M + 1 -> X,
+    //     M:M + 1 -> Y,
+    //     M:M + 1 -> S,
+    //     M:M + 1 -> U
+    
+    // Get the effective address of the data
+    
+    unsigned short address = (unsigned short)[self addressFromMode:mode];
+    
+    // Set a pointer to the target register
+    
+    unsigned short d = 0;
+    unsigned short *regPtr = &d;
+    if (op == 0xCE) regPtr = op == 0x10 ? &regHSP : &regUSP;
+    if (op == 0x8E) regPtr = op == 0x10 ? &regY : &regX;
+    
+    // Write the data into the target register
+    
+    *regPtr = ([self fromRam:(NSUInteger)address] << 8) + [self fromRam:(NSUInteger)(address + 1)];
+    
+    // Set the A and B registers if we're targeting D
+    
+    if (op == 0xCC) {
+        regA = (d >> 8) & 0xFF;
+        regB = d & 0xFF;
+    }
+    
+    // Update the CC register
+    
+    [self setCCAfterLoad:*regPtr :YES];
 }
 
 
@@ -893,7 +913,7 @@
     //      EA -> X,
     //      EA -> Y
 
-    [self loadEffective:[self indexedAddressing:[self loadFromRam]] :(op & 0x03)];
+    [self loadEffective:[self indexedAddress:[self loadFromRam]] :(op & 0x03)];
 }
 
 
@@ -1116,12 +1136,12 @@
     if (op < 0xD7)
     {
         [self toRam:address :regA];
-        [self setCCAfterStore:regA];
+        [self setCCAfterStore:regA :NO];
     }
     else
     {
         [self toRam:address :regB];
-        [self setCCAfterStore:regB];
+        [self setCCAfterStore:regB :NO];
     }
 }
 
@@ -1129,7 +1149,31 @@
 
 - (void)st16:(NSUInteger)op :(NSUInteger)mode :(NSUInteger)exOp
 {
-
+    // ST: D -> M:M + 1,
+    //     X -> M:M + 1,
+    //     Y -> M:M + 1,
+    //     S -> M:M + 1,
+    //     U -> M:M + 1
+    
+    // Get the effective address of the data
+    
+    unsigned short address = (unsigned short)[self addressFromMode:mode];
+    
+    // Set a pointer to the target register (assume D)
+    
+    unsigned short d = (regA << 8) + regB;
+    unsigned short *regPtr = &d;
+    if (op == 0xDF) regPtr = op == 0x10 ? &regHSP : &regUSP;
+    if (op == 0x9F) regPtr = op == 0x10 ? &regY : &regX;
+    
+    // Write the target register out
+    
+    [self toRam:address :((*regPtr >> 8) & 0xFF)];
+    [self toRam:address++ :(*regPtr & 0xFF)];
+    
+    // Update the CC register
+    
+    [self setCCAfterStore:*regPtr :YES];
 }
 
 
@@ -1167,8 +1211,8 @@
 
     // Complement the value at M:M + 1
 
-    NSUInteger msb = [self negate:[self fromRam:address]];
-    NSUInteger lsb = [self negate:[self fromRam:address + 1]];
+    NSUInteger msb = [self complement:[self fromRam:address]];
+    NSUInteger lsb = [self complement:[self fromRam:address + 1]];
 
     // Add 1 to form the 2's complement
 
@@ -1404,6 +1448,102 @@
 
 
 
+- (NSUInteger)subtract:(NSUInteger)value :(NSUInteger)amount
+{
+    // Subtract 'amount' from 'value' by adding 'value' to -'amount'
+    // Affects n, z, v, c - v, c are set by 'alu:'
+    
+    [self clrCCN];
+    [self clrCCV];
+    [self clrCCZ];
+    
+    NSUInteger comp = [self negate:amount];
+    NSUInteger answer = [self alu:value :comp :NO];
+    
+    if (answer == 0) [self setCCZ];
+    if ([self bitSet:value :kSignBit]) [self setCCN];
+    
+    // c represents a borrow and is set to the complement of the carry
+    // of the internal binary addition
+    
+    if ([self bitSet:regCC :kCC_c])
+    {
+        [self clrCCC];
+    }
+    else
+    {
+        [self setCCC];
+    }
+    
+    return answer;
+}
+
+
+
+- (NSUInteger)subtract16:(NSUInteger)value :(NSUInteger)amount
+{
+    // Subtract amount from value
+    // Affects n, z, v, c - v, c are set by 'alu:'
+    
+    [self clrCCN];
+    [self clrCCV];
+    [self clrCCZ];
+    
+    // Complement the value at M:M + 1
+    
+    NSUInteger msb = [self complement:((amount >> 8) & 0xFF)];
+    NSUInteger lsb = [self complement:(amount & 0xFF)];
+    
+    // Add 1 to form the 2's complement
+    
+    lsb = [self alu:lsb :1 :NO];
+    msb = [self alu:msb :0 :YES];
+    
+    // Add the register value
+    
+    lsb = [self alu:(value & 0xFF) :lsb :NO];
+    msb = [self alu:((value >> 8) & 0xFF) :msb :YES];
+    
+    // Convert the bytes back to a 16-bit value and set the CC
+    
+    NSUInteger answer = (msb << 8) + lsb;
+    if (answer == 0) [self setCCZ];
+    if ([self bitSet:answer :15]) [self setCCN];
+    
+    return answer;
+}
+
+
+
+- (NSUInteger)subWithCarry:(NSUInteger)value :(NSUInteger)amount
+{
+    // Subtract with Carry (borrow)
+    // Affects n, z, v, c - v and c set by 'alu:'
+    
+    [self clrCCN];
+    [self clrCCZ];
+    [self clrCCV];
+    
+    NSUInteger comp = [self negate:amount];
+    NSUInteger answer = [self alu:value :comp :YES];
+    
+    if (answer == 0) [self setCCZ];
+    if ([self bitSet:answer :kSignBit]) [self setCCN];
+    
+    if ([self bitSet:regCC :kCC_c])
+    {
+        [self clrCCC];
+    }
+    else
+    {
+        [self setCCC];
+    }
+    
+    return answer;
+}
+
+
+
 - (NSUInteger)doAnd:(NSUInteger)value :(NSUInteger)amount
 {
     // ANDs the two supplied values
@@ -1626,7 +1766,7 @@
 
 
 
-- (void)setCCAfterLoad:(NSUInteger)value
+- (void)setCCAfterLoad:(NSUInteger)value :(BOOL)is16
 {
     // Sets the CC after an 8-bit load
     // Affects n, z, v - v is always cleared
@@ -1636,12 +1776,12 @@
     [self clrCCV];
 
     if (value == 0) [self setCCZ];
-    if ([self bitSet:value :kSignBit]) [self setCCN];
+    if ([self bitSet:value :(is16 ? 15 : kSignBit)]) [self setCCN];
 }
 
 
 
-- (void)setCCAfterStore:(NSUInteger)value
+- (void)setCCAfterStore:(NSUInteger)value :(BOOL)is16
 {
     // Sets CC after an 8-bit store
     // Affects n, z, v - v is always cleared
@@ -1651,7 +1791,7 @@
     [self clrCCV];
 
     if (value == 0) [self setCCZ];
-    if ([self bitSet:value :kSignBit]) [self setCCN];
+    if ([self bitSet:value :(is16 ? 15 : kSignBit)]) [self setCCN];
 }
 
 
@@ -1976,26 +2116,22 @@
 
     switch (regCode)    // This is the DESTINATION register
     {
-        case 0x08:
-            // A
+        case 0x08: // A
             returnValue = regA;
             regA = value;
             break;
 
-        case 0x09:
-            // B
+        case 0x09: // B
             returnValue = regB;
             regB = value;
             break;
 
-        case 0x0A:
-            // CC
+        case 0x0A: // CC
             returnValue = regCC;
             regCC = value;
             break;
 
-        case 0x0B:
-            // DPR
+        case 0x0B: // DPR
             returnValue = regDP;
             regDP = value;
             break;
@@ -2011,48 +2147,42 @@
 
 
 
-- (NSUInteger)exchange16:(NSUInteger)value :(NSUInteger)regCode
+- (unsigned short)exchange16:(NSUInteger)value :(NSUInteger)regCode
 {
     // Returns the value *from* the register identified by regCode
     // after placing the passed value into that register
 
-    NSUInteger returnValue = 0x0000;
+    unsigned short returnValue = 0x0000;
 
     switch (regCode)  // This is the *destination* register
     {
-        case 0x00:
-            // D
-            returnValue = (regA * 256) + regB;
+        case 0x00: // D
+            returnValue = (regA << 8) + regB;
             regA = (value >> 8) & 0xFF;
             regB = value & 0xFF;
             break;
 
-        case 0x01:
-            // X
+        case 0x01: // X
             returnValue = regX;
             regX = value;
             break;
 
-        case 0x02:
-            // Y
+        case 0x02: // Y
             returnValue = regY;
             regY = value;
             break;
 
-        case 0x03:
-            // U
+        case 0x03: // U
             returnValue = regUSP;
             regUSP = value;
             break;
 
-        case 0x04:
-            // S
+        case 0x04: // S
             returnValue = regHSP;
             regHSP = value;
             break;
 
-        case 0x05:
-            // PC
+        case 0x05: // PC
             returnValue = regPC;
             regPC = value;
             break;
@@ -2064,21 +2194,6 @@
     }
 
     return returnValue;
-}
-
-
-
-- (void)load16bit:(NSUInteger)value
-{
-    // Sets CC after a 16-bit load
-    // Affects n, z, v - v is always cleared
-
-    [self clrCCN];
-    [self clrCCZ];
-    [self clrCCV];
-
-    if (value == 0) [self setCCZ];
-	if ([self bitSet:value :15]) [self setCCN];
 }
 
 
@@ -2323,120 +2438,6 @@
 
 
 
-
-- (void)store16bit:(NSUInteger)value
-{
-	// Sets CC after a 16-bit store
-	// Affects n, z, v - v is always cleared
-
-    [self clrCCN];
-    [self clrCCZ];
-    [self clrCCV];
-
-	if (value == 0) [self setCCZ];
-	if ([self bitSet:value :15]) [self setCCN];
-}
-
-
-
-- (NSUInteger)subtract:(NSUInteger)value :(NSUInteger)amount
-{
-    // Subtract 'amount' from 'value' by adding 'value' to -'amount'
-    // Affects n, z, v, c - v, c are set by 'alu:'
-
-    [self clrCCN];
-    [self clrCCV];
-    [self clrCCZ];
-
-	NSUInteger comp = [self negate:amount];
-	NSUInteger answer = [self alu:value :comp :NO];
-
-	if (answer == 0) [self setCCZ];
-	if ([self bitSet:value :kSignBit]) [self setCCN];
-
-    // c represents a borrow and is set to the complement of the carry
-    // of the internal binary addition
-
-    if ([self bitSet:regCC :kCC_c])
-	{
-        [self clrCCC];
-	}
-	else
-	{
-		[self setCCC];
-	}
-
-	return answer;
-}
-
-
-- (NSUInteger)subWithCarry:(NSUInteger)value :(NSUInteger)amount
-{
-    // Subtract with Carry (borrow)
-    // Affects n, z, v, c - v and c set by 'alu:'
-
-    [self clrCCN];
-    [self clrCCZ];
-    [self clrCCV];
-
-	NSUInteger comp = [self negate:amount];
-	NSUInteger answer = [self alu:value :comp :YES];
-
-	if (answer == 0) [self setCCZ];
-	if ([self bitSet:answer :kSignBit]) [self setCCN];
-
-	if ([self bitSet:regCC :kCC_c])
-	{
-		[self clrCCC];
-	}
-	else
-	{
-		[self setCCC];
-	}
-
-    return answer;
-}
-
-
-
-- (NSUInteger)sub16bit:(NSUInteger)value :(NSUInteger)amount
-{
-    // Subtract amount from value
-    // Affects n, z, v, c - v, c are set by 'alu:'
-
-    [self clrCCN];
-    [self clrCCV];
-    [self clrCCZ];
-
-    NSUInteger comp = [self negate:amount] & 0xFFFF;
-    NSUInteger answer = [self alu:value :comp :YES];
-
-    if (answer == 0) [self setCCZ];
-    if ([self bitSet:answer :15]) [self setCCN];
-
-    return answer;
-}
-
-
-
-- (void)subd:(NSUInteger)amount
-{
-    // Subtract amount from D
-    // Affects n, z, v, c - all are set by 'sub16bit:'
-
-    [self clrCCN];
-    [self clrCCV];
-    [self clrCCZ];
-	[self clrCCC];
-
-	NSUInteger d = (regA * 256) + regB;
-    d = [self sub16bit:d :amount];
-	regA = (d >> 8) & 0xFF;
-	regB = d & 0xFF;
-}
-
-
-
 - (void)test:(NSUInteger)value
 {
 	// Tests value for zero or negative
@@ -2457,6 +2458,10 @@
 
 - (NSUInteger)addressFromMode:(NSUInteger)mode
 {
+    // Calculate the intended 16-bit address based on the opcode's
+    // addressing mode
+    // NOTE All of the called methods update the PC register
+    
     NSUInteger address = 0;
 
     if (mode == kAddressModeImmediate)
@@ -2471,7 +2476,7 @@
     }
     else if (mode == kAddressModeIndexed)
     {
-        address = [self indexedAddressing:[self loadFromRam]];
+        address = [self indexedAddress:[self loadFromRam]];
     }
     else
     {
@@ -2518,7 +2523,7 @@
 
 
 
-- (NSUInteger)indexedAddressing:(NSUInteger)postByte
+- (NSUInteger)indexedAddress:(NSUInteger)postByte
 {
     // This method increases the PC
 
@@ -2755,18 +2760,18 @@
 
 
 
-- (void)incrementRegister:(NSUInteger)sourceRegister :(NSInteger)amount
+- (void)incrementRegister:(unsigned short)sourceRegister :(NSInteger)amount
 {
     // Calculate the offset from the Two's Complement of the 8- or 16-bit value
 
-    NSUInteger *regPtr = &regX;
+    unsigned short *regPtr = &regX;
     if (sourceRegister == 1) regPtr = &regY;
     if (sourceRegister == 2) regPtr = &regUSP;
     if (sourceRegister == 3) regPtr = &regHSP;
 
-    unsigned short newValue = (unsigned short)*regPtr;
+    unsigned short newValue = *regPtr;
     newValue += (short)amount;
-    *regPtr = (NSUInteger)newValue;
+    *regPtr = newValue;
 }
 
 
