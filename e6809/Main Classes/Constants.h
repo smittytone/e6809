@@ -314,6 +314,15 @@
 #define opcode_CMPU_extended                0x11B3
 #define opcode_CMPS_extended                0x11BC
 
+// Addressing Modes
+#define kAddressModeImmediate               0
+#define kAddressModeDirect                  1
+#define kAddressModeIndexed                 2
+#define kAddressModeExtended                3
+#define kAddressModeInherent                4
+#define kAddressModeBranch                  5
+
+
 // Colours
 
 #define kColourGreen                        0
