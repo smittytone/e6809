@@ -314,6 +314,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 10.12;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bps.e6809;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -332,6 +333,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 10.12;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bps.e6809;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
