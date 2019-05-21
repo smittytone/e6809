@@ -306,7 +306,7 @@
             if (opcodeLo == 0x06) [self push:NO  :[self loadFromRam]];
             if (opcodeLo == 0x05) [self pull:YES :[self loadFromRam]];
             if (opcodeLo == 0x07) [self pull:NO  :[self loadFromRam]];
-            if (opcodeLo == 0x0A) [self rts];
+            if (opcodeLo == 0x09) [self rts];
             if (opcodeLo == 0x0A) [self abx];
             if (opcodeLo == 0x0B) [self rti];
             if (opcodeLo == 0x0C) [self cwai];
@@ -333,53 +333,170 @@
         if (opcodeHi == 0x04 || opcodeHi == 0x05) addressMode = kAddressModeInherent;
 
         // Jump to specific ops or groups of ops
-
-        if (opcodeLo == 0x00 && opcodeHi > 0x07) [self sub:opcode :addressMode];
-        if (opcodeLo == 0x00) [self neg:opcode :addressMode];
-
+        
+        if (opcodeLo == 0x00)
+        {
+            if (opcodeHi > 0x07)
+            {
+                [self sub:opcode :addressMode];
+            }
+            else
+            {
+                [self neg:opcode :addressMode];
+            }
+        }
+        
         if (opcodeLo == 0x01) [self cmp:opcode :addressMode];
 
         if (opcodeLo == 0x02) [self sbc:opcode :addressMode];
 
-        if (opcodeLo == 0x03 && opcodeHi > 0x0B) [self add16:opcode :addressMode];
-        if (opcodeLo == 0x03 && opcodeHi > 0x07) [self sub16:opcode :addressMode];
-        if (opcodeLo == 0x03) [self com:opcode :addressMode];
-
-        if (opcodeLo == 0x04 && opcodeHi < 0x08) [self lsr:opcode :addressMode];
-        if (opcodeLo == 0x04) [self and:opcode :addressMode];
-
+        if (opcodeLo == 0x03)
+        {
+            if (opcodeHi > 0x0B)
+            {
+                [self add16:opcode :addressMode];
+            }
+            else if (opcodeHi > 0x07)
+            {
+                [self sub16:opcode :addressMode];
+            }
+            else
+            {
+                [self com:opcode :addressMode];
+            }
+        }
+        
+        if (opcodeLo == 0x04)
+        {
+            if (opcodeHi < 0x08)
+            {
+                [self lsr:opcode :addressMode];
+            }
+            else
+            {
+                [self and:opcode :addressMode];
+            }
+        }
+        
         if (opcodeLo == 0x05) [self bit:opcode :addressMode];
 
-        if (opcodeLo == 0x06 && opcodeHi < 0x08) [self ror:opcode :addressMode];
-        if (opcodeLo == 0x06) [self ld:opcode :addressMode];
-
-        if (opcodeLo == 0x07 && opcodeHi < 0x08) [self asr:opcode :addressMode];
-        if (opcodeLo == 0x07) [self st:opcode :addressMode];
-
-        if (opcodeLo == 0x08 && opcodeHi < 0x08) [self asl:opcode :addressMode];
-        if (opcodeLo == 0x08) [self eor:opcode: addressMode];
-
-        if (opcodeLo == 0x09 && opcodeHi < 0x08) [self rol:opcode :addressMode];
-        if (opcodeLo == 0x09) [self adc:opcode: addressMode];
-
-        if (opcodeLo == 0x0A && opcodeHi < 0x08) [self dec:opcode :addressMode];
-        if (opcodeLo == 0x0A) [self orr:opcode :addressMode];
-
+        if (opcodeLo == 0x06)
+        {
+            if (opcodeHi < 0x08)
+            {
+                [self ror:opcode :addressMode];
+            }
+            else
+            {
+                [self ld:opcode :addressMode];
+            }
+        }
+        
+        if (opcodeLo == 0x07)
+        {
+            if (opcodeHi < 0x08)
+            {
+                [self asr:opcode :addressMode];
+            }
+            else
+            {
+                [self st:opcode :addressMode];
+            }
+        }
+        
+        if (opcodeLo == 0x08)
+        {
+            if (opcodeHi < 0x08)
+            {
+                [self asl:opcode :addressMode];
+            }
+            else
+            {
+                [self eor:opcode: addressMode];
+            }
+        }
+        
+        if (opcodeLo == 0x09)
+        {
+            if (opcodeHi < 0x08)
+            {
+                [self rol:opcode :addressMode];
+            }
+            else
+            {
+                [self adc:opcode: addressMode];
+            }
+        }
+        
+        if (opcodeLo == 0x0A)
+        {
+            if (opcodeHi < 0x08)
+            {
+                [self dec:opcode :addressMode];
+            }
+            else
+            {
+                [self orr:opcode :addressMode];
+            }
+        }
+        
         if (opcodeLo == 0x0B) [self add:opcode :addressMode];
 
-        if (opcodeLo == 0x0C && opcodeHi < 0x08) [self inc:opcode :addressMode];
-        if (opcodeLo == 0x0C && opcodeHi > 0x0C) [self ld16:opcode :addressMode :extendedOpcode];   // LDD
-        if (opcodeLo == 0x0C) [self cmp16:opcode :addressMode :extendedOpcode];
+        if (opcodeLo == 0x0C)
+        {
+            if (opcodeHi < 0x08)
+            {
+                [self inc:opcode :addressMode];
+            }
+            else if (opcodeHi > 0x0C)
+            {
+                [self ld16:opcode :addressMode :extendedOpcode];   // LDD
+            }
+            else
+            {
+                [self cmp16:opcode :addressMode :extendedOpcode];
+            }
+        }
+        
+        if (opcodeLo == 0x0D)
+        {
+            if (opcodeHi < 0x08)
+            {
+                [self tst:opcode :addressMode];
+            }
+            else if (opcodeHi > 0x0C)
+            {
+                [self st16:opcode :addressMode :extendedOpcode];    // STD
+            }
+            else
+            {
+                [self jsr:addressMode];
+            }
+        }
 
-        if (opcodeLo == 0x0D && opcodeHi < 0x08) [self tst:opcode :addressMode];
-        if (opcodeLo == 0x0D && opcodeHi > 0x0C) [self st16:opcode :addressMode :extendedOpcode];   // STD
-        if (opcodeLo == 0x0D) [self jsr:addressMode];
-
-        if (opcodeLo == 0x0E && opcodeHi < 0x08) [self jmp:addressMode];
-        if (opcodeLo == 0x0E && opcodeHi > 0x07) [self ld16:opcode :addressMode :extendedOpcode];
-
-        if (opcodeLo == 0x0F && opcodeHi > 0x08) [self st16:opcode :addressMode :extendedOpcode];
-        if (opcodeLo == 0x0F) [self clr:opcode :addressMode];
+        if (opcodeLo == 0x0E)
+        {
+            if (opcodeHi < 0x08)
+            {
+                [self jmp:addressMode];
+            }
+            else
+            {
+                [self ld16:opcode :addressMode :extendedOpcode];
+            }
+        }
+        
+        if (opcodeLo == 0x0F)
+        {
+            if (opcodeHi < 0x08)
+            {
+                [self clr:opcode :addressMode];
+            }
+            else
+            {
+                [self st16:opcode :addressMode :extendedOpcode];
+            }
+        }
     }
 }
 
