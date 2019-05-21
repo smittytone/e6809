@@ -3,7 +3,7 @@
 //  e6809
 //
 //  Created by Tony Smith on 17/09/2014.
-//  Copyright (c) 2014 Tony Smith. All rights reserved.
+//  Copyright (c) 2014-19 Tony Smith. All rights reserved.
 //
 
 #import <Cocoa/Cocoa.h>
@@ -11,7 +11,9 @@
 #import "ScreenView.h"
 
 
-@interface AppDelegate : NSObject <NSApplicationDelegate, NSTextFieldDelegate>
+@interface AppDelegate : NSObject  <NSApplicationDelegate,
+                                    NSTextFieldDelegate,
+                                    NSOpenSavePanelDelegate>
 
 {
     IBOutlet NSTextField *aField;
@@ -54,6 +56,7 @@
     MC6809 *cpu;
 
     NSInteger memStartAdddress;
+    NSOpenPanel *openDialog;
 }
 
 
@@ -66,7 +69,9 @@
 - (IBAction)run:(id)sender;
 - (IBAction)pause:(id)sender;
 - (IBAction)step:(id)sender;
+- (IBAction)stop:(id)sender;
 - (void)oneStep;
+- (IBAction)getCode:(id)sender;
 
 
 @end

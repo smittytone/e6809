@@ -1,6 +1,6 @@
 
 //  Created by Tony Smith on 17/09/2014.
-//  Copyright (c) 2014 Tony Smith. All rights reserved.
+//  Copyright (c) 2014-19 Tony Smith. All rights reserved.
 
 
 #import "AppDelegate.h"
@@ -8,32 +8,19 @@
 @interface AppDelegate ()
 
 @property (weak) IBOutlet NSWindow *window;
+
 @end
 
 @implementation AppDelegate
 
+
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification
 {
-
-	unsigned char a, b;
-
-	cpu = [[MC6809 alloc] init];
+    cpu = [[MC6809 alloc] init];
     [vdu setMemory:cpu];
-    [self showMemoryContents:0x0000];
+    
     memoryStartField.stringValue = @"0x0000";
     
-	a =  0x00;
-	b = 0x42;
-	cpu.regA = a;
-	cpu.regB = b;
-	[cpu transferDecode:0x89 :YES];
-    
-    NSLog(@"A: %u DP: %u A: %lu DP: %lu" , a, b, (unsigned long)cpu.regA, (unsigned long)cpu.regB);
-
-    a = [cpu doAdd:0x40 :0x40];
-    if ([cpu bitSet:cpu.regCC :kCC_c]) { NSLog(@"Carry set"); } else { NSLog(@"Carry not set"); }
-    if ([cpu bitSet:cpu.regCC :kCC_v]) { NSLog(@"Overflow set"); } else { NSLog(@"Overflow not set"); }
-
     isPausedFlag = NO;
     isRunningFlag = NO;
     
@@ -45,27 +32,15 @@
     }
 
 	// Every second, display the registers' values
-
+    
 	[NSTimer scheduledTimerWithTimeInterval:1.0
 									 target:self
-								   selector:@selector(showRegisters)
+								   selector:@selector(doTextScreen)
 								   userInfo:nil
 									repeats:YES];
-
-
-    NSInteger testOffset = 5;
-    NSUInteger testAddress = 0xFFFF;
-    testAddress = testAddress + testOffset;
-    testAddress = testAddress & 0xFFFF;
-    NSLog(@"%lu", (unsigned long)testAddress);
-
-    cpu.regPC = 0xFFFF;
-    [cpu loadFromRam];
-    NSLog(@"%lu", (unsigned long)cpu.regPC);
-
-    UInt8 testy = 0xFF;
-    testy++;
-    NSLog(@"%hhu", testy);
+    
+    [self showMemoryContents:0x0000];
+    [self showRegisters];
 }
 
 
@@ -79,26 +54,18 @@
 - (void)showMemoryContents:(NSInteger)startAddress
 {
     NSString *string = @"";
-    NSInteger endAddress;
+    NSUInteger endAddress = (startAddress + 112 > 65535) ? 65423 : (startAddress + 112);
     
-    if (startAddress + 112 > 65535)
+    for (NSUInteger i = startAddress ; i < endAddress ; i += 8)
     {
-        endAddress = 65423;
-    }
-    else
-    {
-        endAddress = startAddress + 112;
-    }
-    
-    for (NSInteger i = startAddress ; i < endAddress ; i = i + 8)
-    {
-        string = [string stringByAppendingFormat:@"[0x%04X] ", (unsigned int)i];
+        string = [string stringByAppendingFormat:@"[%04X] ", (unsigned int)i];
                   
-        for (NSInteger j = 0 ; j < 8 ; j++)
+        for (NSUInteger j = 0 ; j < 8 ; j++)
         {
-            unsigned char value = [cpu fromRam:(short)i + j];
-            string = [string stringByAppendingFormat:@"0x%02X ", value];
+            unsigned char value = [cpu fromRam:(i + j)];
+            string = [string stringByAppendingFormat:@"%02X ", value];
         }
+        
         string = [string stringByAppendingString:@"\n"];
     }
     
@@ -107,19 +74,19 @@
 }
 
 
+
 - (IBAction)memDown:(id)sender
 {
-    memStartAdddress = memStartAdddress - 8;
+    memStartAdddress -= 8;
     if (memStartAdddress < 0) memStartAdddress = 0;
     [self showMemoryContents:memStartAdddress];
 }
 
 
 
-
 - (IBAction)memUp:(id)sender
 {
-    memStartAdddress = memStartAdddress + 8;
+    memStartAdddress += 8;
     if (memStartAdddress > 65423) memStartAdddress = 65423;
     [self showMemoryContents:memStartAdddress];
 }
@@ -135,29 +102,93 @@
 }
 
 
+
 - (IBAction)setRegister:(id)sender
 {
+    NSInteger a = 0;
+    BOOL changed = NO;
+    
     if (sender == aSetButton)
     {
-        NSInteger a = aField.integerValue;
+        a = aField.integerValue;
         if (a < -127 || a > 255) return;
+        cpu.regA = a;
+        changed = YES;
     }
+    
+    if (sender == bSetButton)
+    {
+        a = bField.integerValue;
+        if (a < -127 || a > 255) return;
+        cpu.regB = a;
+        changed = YES;
+    }
+    
+    if (sender == dpSetButton)
+    {
+        a = dpField.integerValue;
+        if (a < -128 || a > 255) return;
+        cpu.regDP = a;
+        changed = YES;
+    }
+    
+    if (sender == ccSetButton)
+    {
+        NSInteger a = ccField.integerValue;
+        if (a < -128 || a > 255) return;
+        cpu.regCC = a;
+        changed = YES;
+    }
+    
+    if (sender == xSetButton)
+    {
+        a = xField.integerValue;
+        if (a < -32768 || a > 65535) return;
+        cpu.regX = a;
+        changed = YES;
+    }
+    
+    if (sender == ySetButton)
+    {
+        a = yField.integerValue;
+        if (a < -32768 || a > 65535) return;
+        cpu.regY = a;
+        changed = YES;
+    }
+    
+    if (sender == sSetButton)
+    {
+        a = sField.integerValue;
+        if (a < -32768 || a > 65535) return;
+        cpu.regHSP = a;
+        changed = YES;
+    }
+    
+    if (sender == uSetButton)
+    {
+        a = uField.integerValue;
+        if (a < -32768 || a > 65535) return;
+        cpu.regUSP = a;
+        changed = YES;
+    }
+    
+    if (changed) [self showRegisters];
 }
 
 
 
 - (void)showRegisters
 {
-    aField.stringValue = [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regA];
-    bField.stringValue = [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regB];
-    dpField.stringValue = [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regDP];
-    ccField.stringValue = [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regCC];
+    aField.stringValue = [NSString stringWithFormat:@"%02lX", (unsigned long)cpu.regA];
+    bField.stringValue = [NSString stringWithFormat:@"%02lX", (unsigned long)cpu.regB];
+    dpField.stringValue = [NSString stringWithFormat:@"%02lX", (unsigned long)cpu.regDP];
+    ccField.stringValue = [NSString stringWithFormat:@"%02lX", (unsigned long)cpu.regCC];
 
-	xField.stringValue = [NSString stringWithFormat:@"%u", cpu.regX];
-	yField.stringValue = [NSString stringWithFormat:@"%u", cpu.regY];
-	uField.stringValue = [NSString stringWithFormat:@"%u", cpu.regUSP];
-	sField.stringValue = [NSString stringWithFormat:@"%u", cpu.regHSP];
-	pcField.stringValue = [NSString stringWithFormat:@"%u", cpu.regPC];
+	xField.stringValue = [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regX];
+	yField.stringValue = [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regY];
+	uField.stringValue = [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regUSP];
+	sField.stringValue = [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regHSP];
+	pcField.stringValue = [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regPC];
 
     if ([cpu bitSet:cpu.regCC :kCC_e]) { cceField.stringValue = @"1"; } else { cceField.stringValue = @"0"; }
 	if ([cpu bitSet:cpu.regCC :kCC_f]) { ccfField.stringValue = @"1"; } else { ccfField.stringValue = @"0"; }
@@ -175,8 +206,15 @@
 - (IBAction)run:(id)sender
 {
     if (isRunningFlag) return;
-
+    
     cpu.regPC = memStartAdddress;
+    cpu.regHSP = 0xFFFF;
+    
+    cpu.regHSP--;
+    [cpu toRam:cpu.regHSP :(cpu.regPC & 0xFF)];
+    cpu.regHSP--;
+    [cpu toRam:cpu.regHSP :((cpu.regPC >> 8) & 0xFF)];
+
     isRunningFlag = YES;
     [self oneStep];
 }
@@ -187,7 +225,9 @@
 {
     if (stepTimer) [stepTimer invalidate];
     [cpu processNextInstruction];
-    stepTimer = [NSTimer scheduledTimerWithTimeInterval:0.25 target:self selector:@selector(oneStep) userInfo:nil repeats:NO];
+    [self showRegisters];
+    [self showMemoryContents:memStartAdddress];
+    stepTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(oneStep) userInfo:nil repeats:NO];
 }
 
 
@@ -212,9 +252,33 @@
 
 - (IBAction)step:(id)sender
 {
-    if (!isRunningFlag) return;
-
+    if (!isRunningFlag)
+    {
+        cpu.regPC = memStartAdddress;
+        cpu.regHSP = 0xFFFF;
+        
+        cpu.regHSP--;
+        [cpu toRam:cpu.regHSP :(cpu.regPC & 0xFF)];
+        cpu.regHSP--;
+        [cpu toRam:cpu.regHSP :((cpu.regPC >> 8) & 0xFF)];
+        
+    }
+    
+    isRunningFlag = YES;
     [cpu processNextInstruction];
+    [self showRegisters];
+    [self showMemoryContents:memStartAdddress];
+}
+
+
+
+- (IBAction)stop:(id)sender
+{
+    if (isRunningFlag)
+    {
+        isRunningFlag = NO;
+        if (stepTimer) [stepTimer invalidate];
+    }
 }
 
 
@@ -236,20 +300,12 @@
         {
             if (i % 9 != 0)
             {
-                NSRange hRange;
                 NSString *aString = [values objectAtIndex:i];
-                hRange = [aString rangeOfString:@"0x" options:NSCaseInsensitiveSearch range:NSMakeRange(0, aString.length)];
-                if (hRange.location != NSNotFound)
-                {
-                    unsigned int val;
-                    NSScanner* scanner = [NSScanner scannerWithString:aString];
-                    [scanner scanHexInt:&val];
-                    [cpu toRam:(unsigned short)(memStartAdddress + count) :(unsigned char)val];
-                }
-                else
-                {
-                    [cpu toRam:(unsigned short)(memStartAdddress + count) :(unsigned char)[aString integerValue]];
-                }
+                //NSRange hRange = [aString rangeOfString:@"0x" options:NSCaseInsensitiveSearch range:NSMakeRange(0, aString.length)];
+                unsigned int val;
+                NSScanner *scanner = [NSScanner scannerWithString:aString];
+                [scanner scanHexInt:&val];
+                [cpu toRam:(memStartAdddress + count) :val];
                 count++;
             }
         }
@@ -258,6 +314,102 @@
     // NSLog(@"Selector = %@", NSStringFromSelector( commandSelector ) );
     
     return retval;  
+}
+
+
+
+- (IBAction)getCode:(id)sender
+{
+    // Open a code file
+    
+    if (openDialog == nil)
+    {
+        openDialog = [NSOpenPanel openPanel];
+        openDialog.message = @"Select a 6809 code file...";
+        openDialog.allowedFileTypes = [NSArray arrayWithObjects:@"6809", nil];
+        openDialog.allowsMultipleSelection = NO;
+        openDialog.canChooseFiles = YES;
+        openDialog.canChooseDirectories = NO;
+        openDialog.delegate = self;
+        openDialog.accessoryView = nil;
+        
+        // Start off at the working directory
+    
+        openDialog.directoryURL = [NSURL fileURLWithPath:[@"~" stringByExpandingTildeInPath] isDirectory:YES];
+    }
+    
+    // Run the NSOpenPanel
+    
+    [openDialog beginSheetModalForWindow:_window
+                       completionHandler:^(NSModalResponse result) {
+         
+                           
+                           [NSApp stopModal];
+                           [NSApp endSheet:self->openDialog];
+                           [self->openDialog orderOut:self];
+                           [self openFileHandler:result];
+    }
+     ];
+    
+    [NSApp runModalForWindow:openDialog];
+    [openDialog makeKeyWindow];
+}
+
+
+- (void)openFileHandler:(NSInteger)result
+{
+    // This is where we open/add all files selected by the open file dialog
+    // Multiple files may be passed in, as an array of URLs, and they will contain either
+    // project files OR source code files (as specified by 'openActionType'
+    
+    
+    
+    if (result == NSModalResponseOK)
+    {
+        NSArray *urls = openDialog.URLs;
+        
+        if (urls.count > 0)
+        {
+            NSFileManager *nsfm = NSFileManager.defaultManager;
+            
+            NSURL *url = [urls objectAtIndex:0];
+            NSString *filePath = [url path];
+            NSData *fileData = [nsfm contentsAtPath:filePath];
+            
+            if (fileData != nil && fileData.length > 0)
+            {
+                NSError *dataDecodeError = nil;
+                id parsedData = [NSJSONSerialization JSONObjectWithData:fileData options:kNilOptions error:&dataDecodeError];
+                
+                if (dataDecodeError == nil && parsedData != nil)
+                {
+                    NSDictionary *dict = (NSDictionary *)parsedData;
+                    NSString *strAddress = [dict valueForKey:@"address"];
+                    NSUInteger address = [strAddress intValue];
+                    NSString *code = [dict valueForKey:@"code"];
+                    const char *ccode = code.UTF8String;
+                    
+                    for (NSUInteger i = 0 ; i < code.length ; i++)
+                    {
+                        // Poke in the code
+                        
+                        unsigned char byte = ccode[i];
+                        [cpu toRam:(address + i) :(NSUInteger)byte];
+                    }
+                    
+                    [self showMemoryContents:address];
+                }
+            }
+        }
+        
+        openDialog = nil;
+    }
+}
+
+
+- (void)doTextScreen
+{
+    [vdu setNeedsDisplay:YES];
 }
 
 
