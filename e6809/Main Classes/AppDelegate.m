@@ -23,6 +23,9 @@
     
     isPausedFlag = NO;
     isRunningFlag = NO;
+    showHexFlag = YES;
+    runSpeed = 0.001;
+    vidSpeed = 0.03;
     
     // Insert code here to initialize your application
 
@@ -33,7 +36,7 @@
 
 	// Every second, display the registers' values
     
-	[NSTimer scheduledTimerWithTimeInterval:1.0
+	[NSTimer scheduledTimerWithTimeInterval:vidSpeed
 									 target:self
 								   selector:@selector(doTextScreen)
 								   userInfo:nil
@@ -179,16 +182,16 @@
 
 - (void)showRegisters
 {
-    aField.stringValue = [NSString stringWithFormat:@"%02lX", (unsigned long)cpu.regA];
-    bField.stringValue = [NSString stringWithFormat:@"%02lX", (unsigned long)cpu.regB];
-    dpField.stringValue = [NSString stringWithFormat:@"%02lX", (unsigned long)cpu.regDP];
-    ccField.stringValue = [NSString stringWithFormat:@"%02lX", (unsigned long)cpu.regCC];
+    aField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%02lX", (unsigned long)cpu.regA] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regA];
+    bField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%02lX", (unsigned long)cpu.regB] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regB];
+    dpField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%02lX", (unsigned long)cpu.regDP] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regDP];
+    ccField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%02lX", (unsigned long)cpu.regCC] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regCC];
 
-	xField.stringValue = [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regX];
-	yField.stringValue = [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regY];
-	uField.stringValue = [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regUSP];
-	sField.stringValue = [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regHSP];
-	pcField.stringValue = [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regPC];
+	xField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regX] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regX];
+	yField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regY] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regY];
+	uField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regUSP] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regUSP];
+	sField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regHSP] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regHSP];
+	pcField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regPC] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regPC];
 
     if ([cpu bitSet:cpu.regCC :kCC_e]) { cceField.stringValue = @"1"; } else { cceField.stringValue = @"0"; }
 	if ([cpu bitSet:cpu.regCC :kCC_f]) { ccfField.stringValue = @"1"; } else { ccfField.stringValue = @"0"; }
@@ -207,15 +210,19 @@
 {
     if (isRunningFlag) return;
     
+    // Set the start address and stack address
     cpu.regPC = memStartAdddress;
     cpu.regHSP = 0xFFFF;
     
+    // Push the PC onto the stack in case there's an RTS at the end of the code
     cpu.regHSP--;
     [cpu toRam:cpu.regHSP :(cpu.regPC & 0xFF)];
     cpu.regHSP--;
     [cpu toRam:cpu.regHSP :((cpu.regPC >> 8) & 0xFF)];
-
+    
+    // Start running
     isRunningFlag = YES;
+    
     [self oneStep];
 }
 
@@ -224,10 +231,16 @@
 - (void)oneStep
 {
     if (stepTimer) [stepTimer invalidate];
+    
     [cpu processNextInstruction];
     [self showRegisters];
     [self showMemoryContents:memStartAdddress];
-    stepTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(oneStep) userInfo:nil repeats:NO];
+    
+    stepTimer = [NSTimer scheduledTimerWithTimeInterval:runSpeed
+                                                 target:self
+                                               selector:@selector(oneStep)
+                                               userInfo:nil
+                                                repeats:NO];
 }
 
 
@@ -276,9 +289,37 @@
 {
     if (isRunningFlag)
     {
-        isRunningFlag = NO;
         if (stepTimer) [stepTimer invalidate];
+        isRunningFlag = NO;
+        cpu.regPC = memStartAdddress;
     }
+    
+    [self showRegisters];
+    [self showMemoryContents:memStartAdddress];
+}
+
+
+
+- (IBAction)setRegValueType:(id)sender
+{
+    if (sender == regValueHexButton)
+    {
+        if (regValueHexButton.state == NSOnState)
+        {
+            regValueDecButton.state = NSOffState;
+            showHexFlag = YES;
+        }
+    }
+    else
+    {
+        if (regValueDecButton.state == NSOnState)
+        {
+            regValueHexButton.state = NSOffState;
+            showHexFlag = NO;
+        }
+    }
+    
+    [self showRegisters];
 }
 
 
@@ -387,17 +428,23 @@
                     NSString *strAddress = [dict valueForKey:@"address"];
                     NSUInteger address = [strAddress intValue];
                     NSString *code = [dict valueForKey:@"code"];
-                    const char *ccode = code.UTF8String;
+                    NSScanner *scanner = nil;
                     
-                    for (NSUInteger i = 0 ; i < code.length ; i++)
+                    //const char *ccode = code.UTF8String;
+                    
+                    for (NSUInteger i = 0 ; i < code.length ; i += 2)
                     {
                         // Poke in the code
                         
-                        unsigned char byte = ccode[i];
-                        [cpu toRam:(address + i) :(NSUInteger)byte];
+                        NSString *hexChars = [code substringWithRange:NSMakeRange(i, 2)];
+                        unsigned int value;
+                        scanner = [NSScanner scannerWithString:hexChars];
+                        [scanner scanHexInt:&value];
+                        [cpu toRam:address :(NSUInteger)value];
+                        address++;
                     }
                     
-                    [self showMemoryContents:address];
+                    [self showMemoryContents:[strAddress intValue]];
                 }
             }
         }

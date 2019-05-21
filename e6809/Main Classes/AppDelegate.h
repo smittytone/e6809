@@ -16,46 +16,50 @@
                                     NSOpenSavePanelDelegate>
 
 {
-    IBOutlet NSTextField *aField;
-    IBOutlet NSTextField *bField;
-    IBOutlet NSTextField *dpField;
-    IBOutlet NSTextField *ccField;
-    IBOutlet NSTextField *xField;
-    IBOutlet NSTextField *yField;
-    IBOutlet NSTextField *uField;
-    IBOutlet NSTextField *sField;
-    IBOutlet NSTextField *pcField;
+    IBOutlet NSTextField    *aField;
+    IBOutlet NSTextField    *bField;
+    IBOutlet NSTextField    *dpField;
+    IBOutlet NSTextField    *ccField;
+    IBOutlet NSTextField    *xField;
+    IBOutlet NSTextField    *yField;
+    IBOutlet NSTextField    *uField;
+    IBOutlet NSTextField    *sField;
+    IBOutlet NSTextField    *pcField;
     
-    IBOutlet NSButton *aSetButton;
-    IBOutlet NSButton *bSetButton;
-    IBOutlet NSButton *dpSetButton;
-    IBOutlet NSButton *ccSetButton;
-    IBOutlet NSButton *xSetButton;
-    IBOutlet NSButton *ySetButton;
-    IBOutlet NSButton *uSetButton;
-    IBOutlet NSButton *sSetButton;
-    IBOutlet NSButton *pcSetButton;
+    IBOutlet NSButton       *aSetButton;
+    IBOutlet NSButton       *bSetButton;
+    IBOutlet NSButton       *dpSetButton;
+    IBOutlet NSButton       *ccSetButton;
+    IBOutlet NSButton       *xSetButton;
+    IBOutlet NSButton       *ySetButton;
+    IBOutlet NSButton       *uSetButton;
+    IBOutlet NSButton       *sSetButton;
+    IBOutlet NSButton       *pcSetButton;
 
-	IBOutlet NSTextField *cceField;
-	IBOutlet NSTextField *ccfField;
-	IBOutlet NSTextField *cchField;
-	IBOutlet NSTextField *cciField;
-	IBOutlet NSTextField *ccnField;
-	IBOutlet NSTextField *cczField;
-	IBOutlet NSTextField *ccvField;
-	IBOutlet NSTextField *cccField;
+	IBOutlet NSTextField    *cceField;
+	IBOutlet NSTextField    *ccfField;
+	IBOutlet NSTextField    *cchField;
+	IBOutlet NSTextField    *cciField;
+	IBOutlet NSTextField    *ccnField;
+	IBOutlet NSTextField    *cczField;
+	IBOutlet NSTextField    *ccvField;
+	IBOutlet NSTextField    *cccField;
 
-    IBOutlet NSTextField *memoryView;
-    IBOutlet NSTextField *memoryStartField;
+    IBOutlet NSTextField    *memoryView;
+    IBOutlet NSTextField    *memoryStartField;
+    
+    IBOutlet NSButton       *regValueHexButton;
+    IBOutlet NSButton       *regValueDecButton;
 
     IBOutlet ScreenView *vdu;
     
-    BOOL isPausedFlag, isRunningFlag;
+    BOOL isPausedFlag, isRunningFlag, showHexFlag;
     NSTimer *stepTimer;
     
     MC6809 *cpu;
 
     NSInteger memStartAdddress;
+    double runSpeed, vidSpeed;
     NSOpenPanel *openDialog;
 }
 
@@ -72,6 +76,6 @@
 - (IBAction)stop:(id)sender;
 - (void)oneStep;
 - (IBAction)getCode:(id)sender;
-
+- (IBAction)setRegValueType:(id)sender;
 
 @end
