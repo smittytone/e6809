@@ -116,7 +116,6 @@
 - (void)setCCAfterLoad:(NSUInteger)value :(BOOL)is16;
 - (void)setCCAfterStore:(NSUInteger)value :(BOOL)is16;
 - (void)compare:(NSUInteger)value :(NSUInteger)amount;
-- (void)compare16:(NSUInteger)value :(NSUInteger)amount; // NOT DONE
 - (NSUInteger)negate:(NSUInteger)value;
 - (NSUInteger)complement:(NSUInteger)value;
 - (NSUInteger)decrement:(NSUInteger)value;

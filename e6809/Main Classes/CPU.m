@@ -506,7 +506,19 @@
 {
     // Handler for multiple branch types
 
-    short offset = isLong ? [self addressFromNextTwoBytes]: [self loadFromRam];
+    NSInteger offset = 0;
+    
+    if (isLong)
+    {
+        offset = [self addressFromNextTwoBytes];
+        if ([self bitSet:offset :15]) offset -= 65536;
+    }
+    else
+    {
+        offset = [self loadFromRam];
+        if ([self bitSet:offset :kSignBit]) offset -= 256;
+    }
+    
     BOOL branch = NO;
 
     if (op == opcode_BRA_rel) branch = YES;
@@ -526,9 +538,11 @@
     if (op == opcode_BGE_rel && ([self bitSet:regCC :kCC_n] == [self bitSet:regCC :kCC_v])) branch = YES;
     if (op == opcode_BGT_rel && ![self bitSet:regCC :kCC_z] && [self bitSet:regCC :kCC_n] == [self bitSet:regCC :kCC_v]) branch = YES;
     if (op == opcode_BHI_rel && ![self bitSet:regCC :kCC_c] && ![self bitSet:regCC :kCC_z]) branch = YES;
+    
     if (op == opcode_BLE_rel && ([self bitSet:regCC :kCC_z] || (([self bitSet:regCC :kCC_n] || [self bitSet:regCC :kCC_v]) && [self bitSet:regCC :kCC_n] != [self bitSet:regCC :kCC_v]))) branch = YES;
-    if (op == opcode_BLS_rel && [self bitSet:regCC :kCC_c] && [self bitSet:regCC :kCC_z]) branch = YES;
-    if (op == opcode_BLT_rel && (([self bitSet:regCC :kCC_n] || [self bitSet:regCC :kCC_v]) && [self bitSet:regCC :kCC_n] != [self bitSet:regCC :kCC_v])) branch = YES;
+    
+    if (op == opcode_BLS_rel && ([self bitSet:regCC :kCC_c] || [self bitSet:regCC :kCC_z])) branch = YES;
+    if (op == opcode_BLT_rel && ([self bitSet:regCC :kCC_n] || [self bitSet:regCC :kCC_v]) && [self bitSet:regCC :kCC_n] != [self bitSet:regCC :kCC_v]) branch = YES;
 
     if (op == opcode_BSR_rel)
     {
@@ -541,7 +555,7 @@
         [self toRam:regHSP :((regPC >> 8) & 0xFF)];
     }
 
-    if (branch) regPC += offset;
+    if (branch) regPC += (short)offset;
 }
 
 
@@ -766,6 +780,10 @@
     
     unsigned short address = (unsigned short)[self addressFromMode:mode];
     
+    // 'addressFromMode:' assumes an 8-bit read, so we need to increase PC by 1
+    
+    regPC++;
+    
     // Set a pointer to the target register
     
     unsigned short d = (regA << 8) + regB;
@@ -921,7 +939,7 @@
 
     if (mode == kAddressModeInherent)
     {
-        if (op == 0x43)
+        if (op == 0x4C)
         {
             regA = [self increment:regA];
         }
@@ -997,6 +1015,10 @@
     // Get the effective address of the data
     
     unsigned short address = (unsigned short)[self addressFromMode:mode];
+    
+    // 'addressFromMode:' assumes an 8-bit read, so we need to increase PC by 1
+    
+    regPC++;
     
     // Set a pointer to the target register
     
@@ -1602,14 +1624,13 @@
     // Subtract amount from value
     // Affects n, z, v, c - v, c are set by 'alu:'
     
-    [self clrCCN];
-    [self clrCCV];
-    [self clrCCZ];
-    
     // Complement the value at M:M + 1
     
     NSUInteger msb = [self complement:((amount >> 8) & 0xFF)];
     NSUInteger lsb = [self complement:(amount & 0xFF)];
+    
+    [self clrCCN];
+    [self clrCCZ];
     
     // Add 1 to form the 2's complement
     
@@ -1926,13 +1947,6 @@
     NSUInteger answer = [self subtract:value :amount];
     if (answer == 0) [self setCCZ];
     if ([self bitSet:answer :kSignBit]) [self setCCN];
-}
-
-
-
-- (void)compare16:(NSUInteger)value :(NSUInteger)amount
-{
-    // TODO
 }
 
 
@@ -2657,7 +2671,7 @@
 
     // Point to the next byte, whatever it is
 
-    [self incrementPC:1];
+    //[self incrementPC:1];
 
     // Get bits 5 and 6 to calculate source register
     // x = 0 ; y = 1 ; u = 2 ; s = 3
