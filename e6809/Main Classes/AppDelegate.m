@@ -14,6 +14,9 @@
 @implementation AppDelegate
 
 
+#pragma mark - Initialization Methods
+
+
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification
 {
     cpu = [[MC6809 alloc] init];
@@ -38,7 +41,7 @@
     
 	[NSTimer scheduledTimerWithTimeInterval:vidSpeed
 									 target:self
-								   selector:@selector(doTextScreen)
+								   selector:@selector(refreshTextScreen)
 								   userInfo:nil
 									repeats:YES];
     
@@ -48,38 +51,13 @@
 
 
 
-- (void)applicationWillTerminate:(NSNotification *)aNotification {
-    // Insert code here to tear down your application
-}
-
-
-
-- (void)showMemoryContents:(NSInteger)startAddress
-{
-    NSString *string = @"";
-    NSUInteger endAddress = (startAddress + 112 > 65535) ? 65423 : (startAddress + 112);
-    
-    for (NSUInteger i = startAddress ; i < endAddress ; i += 8)
-    {
-        string = [string stringByAppendingFormat:@"[%04X] ", (unsigned int)i];
-                  
-        for (NSUInteger j = 0 ; j < 8 ; j++)
-        {
-            unsigned char value = [cpu fromRam:(i + j)];
-            string = [string stringByAppendingFormat:@"%02X ", value];
-        }
-        
-        string = [string stringByAppendingString:@"\n"];
-    }
-    
-    [memoryView setStringValue:string];
-    memStartAdddress = startAddress;
-}
-
+#pragma mark - Monitor Control Methods
 
 
 - (IBAction)memDown:(id)sender
 {
+    // Set the memory view to a lower address (8 bytes)
+
     memStartAdddress -= 8;
     if (memStartAdddress < 0) memStartAdddress = 0;
     [self showMemoryContents:memStartAdddress];
@@ -89,6 +67,8 @@
 
 - (IBAction)memUp:(id)sender
 {
+    // Set the memory view to a higher address (8 bytes)
+
     memStartAdddress += 8;
     if (memStartAdddress > 65423) memStartAdddress = 65423;
     [self showMemoryContents:memStartAdddress];
@@ -98,6 +78,8 @@
 
 - (IBAction)setMemoryStart:(id)sender
 {
+    // Set the memory view to the address specified in the text field
+
     unsigned int val;
     NSScanner* scanner = [NSScanner scannerWithString:memoryStartField.stringValue];
     [scanner scanHexInt:&val];
@@ -108,6 +90,9 @@
 
 - (IBAction)setRegister:(id)sender
 {
+    // Set the specified register to the value in the text field
+    // NOTE assumes decimal, but we should allow hex too
+
     NSInteger a = 0;
     BOOL changed = NO;
     
@@ -180,30 +165,34 @@
 
 
 
-- (void)showRegisters
+- (IBAction)setRegValueType:(id)sender
 {
-    aField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%02lX", (unsigned long)cpu.regA] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regA];
-    bField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%02lX", (unsigned long)cpu.regB] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regB];
-    dpField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%02lX", (unsigned long)cpu.regDP] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regDP];
-    ccField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%02lX", (unsigned long)cpu.regCC] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regCC];
+    // Manage the radio button to show either hex or decimal values
+    // in the register readouts
 
-	xField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regX] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regX];
-	yField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regY] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regY];
-	uField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regUSP] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regUSP];
-	sField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regHSP] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regHSP];
-	pcField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regPC] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regPC];
+    if (sender == regValueHexButton)
+    {
+        if (regValueHexButton.state == NSOnState)
+        {
+            regValueDecButton.state = NSOffState;
+            showHexFlag = YES;
+        }
+    }
+    else
+    {
+        if (regValueDecButton.state == NSOnState)
+        {
+            regValueHexButton.state = NSOffState;
+            showHexFlag = NO;
+        }
+    }
 
-    if ([cpu bitSet:cpu.regCC :kCC_e]) { cceField.stringValue = @"1"; } else { cceField.stringValue = @"0"; }
-	if ([cpu bitSet:cpu.regCC :kCC_f]) { ccfField.stringValue = @"1"; } else { ccfField.stringValue = @"0"; }
-	if ([cpu bitSet:cpu.regCC :kCC_h]) { cchField.stringValue = @"1"; } else { cchField.stringValue = @"0"; }
-	if ([cpu bitSet:cpu.regCC :kCC_i]) { cciField.stringValue = @"1"; } else { cciField.stringValue = @"0"; }
-	if ([cpu bitSet:cpu.regCC :kCC_n]) { ccnField.stringValue = @"1"; } else { ccnField.stringValue = @"0"; }
-	if ([cpu bitSet:cpu.regCC :kCC_z]) { cczField.stringValue = @"1"; } else { cczField.stringValue = @"0"; }
-	if ([cpu bitSet:cpu.regCC :kCC_v]) { ccvField.stringValue = @"1"; } else { ccvField.stringValue = @"0"; }
-	if ([cpu bitSet:cpu.regCC :kCC_c]) { cccField.stringValue = @"1"; } else { cccField.stringValue = @"0"; }
-
-    [vdu setNeedsDisplayInRect:(NSMakeRect(0, 0, 512, 384))];
+    [self showRegisters];
 }
+
+
+
+#pragma mark - Code Execution Methods
 
 
 - (IBAction)run:(id)sender
@@ -300,28 +289,7 @@
 
 
 
-- (IBAction)setRegValueType:(id)sender
-{
-    if (sender == regValueHexButton)
-    {
-        if (regValueHexButton.state == NSOnState)
-        {
-            regValueDecButton.state = NSOffState;
-            showHexFlag = YES;
-        }
-    }
-    else
-    {
-        if (regValueDecButton.state == NSOnState)
-        {
-            regValueHexButton.state = NSOffState;
-            showHexFlag = NO;
-        }
-    }
-    
-    [self showRegisters];
-}
-
+#pragma mark - NSTextFieldDelegate Methods
 
 
 - (BOOL)control:(NSControl *)control textView:(NSTextView *)fieldEditor doCommandBySelector:(SEL)commandSelector
@@ -359,6 +327,9 @@
 
 
 
+#pragma mark - File Handling Methods
+
+
 - (IBAction)getCode:(id)sender
 {
     // Open a code file
@@ -366,7 +337,7 @@
     if (openDialog == nil)
     {
         openDialog = [NSOpenPanel openPanel];
-        openDialog.message = @"Select a 6809 code file...";
+        openDialog.message = @"Select a .6809 code file...";
         openDialog.allowedFileTypes = [NSArray arrayWithObjects:@"6809", nil];
         openDialog.allowsMultipleSelection = NO;
         openDialog.canChooseFiles = YES;
@@ -383,59 +354,55 @@
     
     [openDialog beginSheetModalForWindow:_window
                        completionHandler:^(NSModalResponse result) {
-         
-                           
-                           [NSApp stopModal];
-                           [NSApp endSheet:self->openDialog];
-                           [self->openDialog orderOut:self];
-                           [self openFileHandler:result];
+           [NSApp stopModal];
+           [NSApp endSheet:self->openDialog];
+           [self->openDialog orderOut:self];
+           if (result == NSModalResponseOK) [self openFileHandler:self->openDialog.URLs];
     }
-     ];
+    ];
     
     [NSApp runModalForWindow:openDialog];
     [openDialog makeKeyWindow];
 }
 
 
-- (void)openFileHandler:(NSInteger)result
+
+- (void)openFileHandler:(NSArray *)urls
 {
-    // This is where we open/add all files selected by the open file dialog
-    // Multiple files may be passed in, as an array of URLs, and they will contain either
-    // project files OR source code files (as specified by 'openActionType'
-    
-    
-    
-    if (result == NSModalResponseOK)
+    // Open the selected file, read in the one or more chunks, and poke the data contents
+    // into emulator RAM. Set the monitor to display the start address of the first chunk
+
+    if (urls.count > 0)
     {
-        NSArray *urls = openDialog.URLs;
+        NSFileManager *nsfm = NSFileManager.defaultManager;
         
-        if (urls.count > 0)
+        NSURL *url = [urls objectAtIndex:0];
+        NSString *filePath = [url path];
+        NSData *fileData = [nsfm contentsAtPath:filePath];
+        
+        if (fileData != nil && fileData.length > 0)
         {
-            NSFileManager *nsfm = NSFileManager.defaultManager;
+            NSError *dataDecodeError = nil;
+            id parsedData = [NSJSONSerialization JSONObjectWithData:fileData options:kNilOptions error:&dataDecodeError];
             
-            NSURL *url = [urls objectAtIndex:0];
-            NSString *filePath = [url path];
-            NSData *fileData = [nsfm contentsAtPath:filePath];
-            
-            if (fileData != nil && fileData.length > 0)
+            if (dataDecodeError == nil && parsedData != nil)
             {
-                NSError *dataDecodeError = nil;
-                id parsedData = [NSJSONSerialization JSONObjectWithData:fileData options:kNilOptions error:&dataDecodeError];
-                
-                if (dataDecodeError == nil && parsedData != nil)
+                NSArray *dataArray = (NSArray *)parsedData;
+                NSString *startAddress = @"";
+
+                for (NSDictionary *dict in dataArray)
                 {
-                    NSDictionary *dict = (NSDictionary *)parsedData;
+                    if (startAddress.length == 0) startAddress = [dict valueForKey:@"address"];
                     NSString *strAddress = [dict valueForKey:@"address"];
                     NSUInteger address = [strAddress intValue];
                     NSString *code = [dict valueForKey:@"code"];
                     NSScanner *scanner = nil;
-                    
-                    //const char *ccode = code.UTF8String;
-                    
+
                     for (NSUInteger i = 0 ; i < code.length ; i += 2)
                     {
-                        // Poke in the code
-                        
+                        // Get a pair of hex characters and convert to an integer, then
+                        // poke the value into the emulator RAM
+
                         NSString *hexChars = [code substringWithRange:NSMakeRange(i, 2)];
                         unsigned int value;
                         scanner = [NSScanner scannerWithString:hexChars];
@@ -443,21 +410,85 @@
                         [cpu toRam:address :(NSUInteger)value];
                         address++;
                     }
-                    
-                    [self showMemoryContents:[strAddress intValue]];
                 }
+
+                // Set the monitor to show memory at the start of the first chunk
+
+                [self showMemoryContents:[startAddress intValue]];
             }
         }
-        
-        openDialog = nil;
     }
 }
 
 
-- (void)doTextScreen
+
+#pragma mark - Display Update Methods
+
+
+- (void)refreshTextScreen
 {
+    // Force the VDU to update - this is called by the timer set up in
+    // 'applicationDidFinishLaunching:'
+
     [vdu setNeedsDisplay:YES];
 }
+
+
+
+- (void)showMemoryContents:(NSInteger)startAddress
+{
+    // Update the memory readout
+
+    NSString *string = @"";
+    NSUInteger endAddress = (startAddress + 112 > 65535) ? 65423 : (startAddress + 112);
+
+    for (NSUInteger i = startAddress ; i < endAddress ; i += 8)
+    {
+        string = [string stringByAppendingFormat:@"[%04X] ", (unsigned int)i];
+
+        for (NSUInteger j = 0 ; j < 8 ; j++)
+        {
+            unsigned char value = [cpu fromRam:(i + j)];
+            string = [string stringByAppendingFormat:@"%02X ", value];
+        }
+
+        string = [string stringByAppendingString:@"\n"];
+    }
+
+    [memoryView setStringValue:string];
+    memStartAdddress = startAddress;
+}
+
+
+
+- (void)showRegisters
+{
+    // Update the Register value fields with the current values
+    // Display hex or decimal according to the radio selection
+
+    aField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%02lX", (unsigned long)cpu.regA] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regA];
+    bField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%02lX", (unsigned long)cpu.regB] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regB];
+    dpField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%02lX", (unsigned long)cpu.regDP] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regDP];
+    ccField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%02lX", (unsigned long)cpu.regCC] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regCC];
+
+    xField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regX] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regX];
+    yField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regY] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regY];
+    uField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regUSP] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regUSP];
+    sField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regHSP] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regHSP];
+    pcField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regPC] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regPC];
+
+    if ([cpu bitSet:cpu.regCC :kCC_e]) { cceField.stringValue = @"1"; } else { cceField.stringValue = @"0"; }
+    if ([cpu bitSet:cpu.regCC :kCC_f]) { ccfField.stringValue = @"1"; } else { ccfField.stringValue = @"0"; }
+    if ([cpu bitSet:cpu.regCC :kCC_h]) { cchField.stringValue = @"1"; } else { cchField.stringValue = @"0"; }
+    if ([cpu bitSet:cpu.regCC :kCC_i]) { cciField.stringValue = @"1"; } else { cciField.stringValue = @"0"; }
+    if ([cpu bitSet:cpu.regCC :kCC_n]) { ccnField.stringValue = @"1"; } else { ccnField.stringValue = @"0"; }
+    if ([cpu bitSet:cpu.regCC :kCC_z]) { cczField.stringValue = @"1"; } else { cczField.stringValue = @"0"; }
+    if ([cpu bitSet:cpu.regCC :kCC_v]) { ccvField.stringValue = @"1"; } else { ccvField.stringValue = @"0"; }
+    if ([cpu bitSet:cpu.regCC :kCC_c]) { cccField.stringValue = @"1"; } else { cccField.stringValue = @"0"; }
+
+    [vdu setNeedsDisplayInRect:(NSMakeRect(0, 0, 512, 384))];
+}
+
 
 
 @end
