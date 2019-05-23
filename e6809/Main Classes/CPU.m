@@ -973,12 +973,13 @@
     //      S = S- 1;
     //      PC MSB to stack;
     //      M -> PC
-
+    
+    NSUInteger address = [self addressFromMode:mode];
     regHSP--;
     [self toRam:regHSP :(regPC & 0xFF)];
     regHSP--;
     [self toRam:regHSP :((regPC >> 8) & 0xFF)];
-    regPC = [self addressFromMode:mode];
+    regPC = (unsigned short)address;
 }
 
 
@@ -1024,8 +1025,8 @@
     
     unsigned short d = 0;
     unsigned short *regPtr = &d;
-    if (op == 0xCE) regPtr = op == 0x10 ? &regHSP : &regUSP;
-    if (op == 0x8E) regPtr = op == 0x10 ? &regY : &regX;
+    if (op == 0xCE) regPtr = exOp == 0x10 ? &regHSP : &regUSP;
+    if (op == 0x8E) regPtr = exOp == 0x10 ? &regY : &regX;
     
     // Write the data into the target register
     
@@ -1509,7 +1510,7 @@
 
         if (i == 3 && bitCarry == YES) regCC = [self setBit:regCC :kCC_h];
 
-        // Record bit 6 carry for carry check
+        // Record bit 6 carry for overflow check
 
         if (i == 6) bit6Carry = bitCarry;
     }
@@ -1519,12 +1520,10 @@
     regCC = bitCarry ? [self setBit:regCC :kCC_c] : [self clrBit:regCC :kCC_c];
 
     // Check for an overflow:
-    // 1. Sum of two positive numbers yields sign bit set
-    // 2. Sum of two negative numbers yields sign bit unset
-
-    if (binary1[7] == 1 && binary2[7] == 1 && answer[7] == 0) [self setBit:regCC :kCC_v];
-    if (binary1[7] == 0 && binary2[7] == 0 && answer[7] == 1) [self setBit:regCC :kCC_v];
-
+    // v = 1 if c = 1 | c6 = 1 & c != c6
+    
+    regCC = ((bitCarry | bit6Carry) && (bitCarry != bit6Carry)) ? [self setBit:regCC :kCC_v] : [self clrBit:regCC :kCC_v];
+    
     // Copy answer into bits[] array for conversion to decimal
 
     for (NSUInteger i = 0 ; i < 8 ; i++) bit[i] = answer[i];
@@ -1605,14 +1604,7 @@
     // c represents a borrow and is set to the complement of the carry
     // of the internal binary addition
     
-    if ([self bitSet:regCC :kCC_c])
-    {
-        [self clrCCC];
-    }
-    else
-    {
-        [self setCCC];
-    }
+    regCC = [self bitSet:regCC :kCC_c] ? [self clrBit:regCC :kCC_c] : [self setBit:regCC :kCC_c];
     
     return answer;
 }
@@ -1648,6 +1640,11 @@
     if (answer == 0) [self setCCZ];
     if ([self bitSet:answer :15]) [self setCCN];
     
+    // c represents a borrow and is set to the complement of the carry
+    // of the internal binary addition
+    
+    regCC = [self bitSet:regCC :kCC_c] ? [self clrBit:regCC :kCC_c] : [self setBit:regCC :kCC_c];
+    
     return answer;
 }
 
@@ -1668,14 +1665,10 @@
     if (answer == 0) [self setCCZ];
     if ([self bitSet:answer :kSignBit]) [self setCCN];
     
-    if ([self bitSet:regCC :kCC_c])
-    {
-        [self clrCCC];
-    }
-    else
-    {
-        [self setCCC];
-    }
+    // c represents a borrow and is set to the complement of the carry
+    // of the internal binary addition
+    
+    regCC = [self bitSet:regCC :kCC_c] ? [self clrBit:regCC :kCC_c] : [self setBit:regCC :kCC_c];
     
     return answer;
 }
@@ -1975,6 +1968,11 @@
 
     [self clrCCV];
     if (value == 0x80) [self setCCV];
+    
+    // c represents a borrow and is set to the complement of the carry
+    // of the internal binary addition
+    
+    regCC = [self bitSet:regCC :kCC_c] ? [self clrBit:regCC :kCC_c] : [self setBit:regCC :kCC_c];
 
     return answer;
 }
@@ -2336,22 +2334,22 @@
 
     switch (regCode)
     {
-        case 0x01:
+        case 0x00:
             regX = amount;
             if (amount == 0) [self setCCZ];
             break;
 
-        case 0x02:
+        case 0x01:
             regY = amount;
             if (amount == 0) [self setCCZ];
             break;
 
-        case 0x03:
-            regUSP = amount;
+        case 0x02:
+            regHSP = amount;
             break;
 
-        case 0x04:
-            regHSP = amount;
+        case 0x03:
+            regUSP = amount;
     }
 }
 
@@ -2658,8 +2656,8 @@
 {
     // This method increases the PC
 
-    NSUInteger sourceReg, opcode, value, msb, lsb, address;
-    unsigned short subAddress;
+    NSUInteger sourceReg, opcode, value, msb, lsb;
+    unsigned short subAddress, address;
 
     // Decode the indexed addressing postbyte and use, in conjunction where appropriate, with the two
     // offset bytes, to calculate the Effective Address, which is returned.
@@ -2684,16 +2682,14 @@
 
     // Process the opcode encoded in the first five bits of the postbyte
 
-    opcode = bit[0] + (0x02 * bit[1]) + (0x04 * bit[2]) + (0x08 * bit[3]) + (0x0A * bit[4]);
+    opcode = bit[0] + (0x02 * bit[1]) + (0x04 * bit[2]) + (0x08 * bit[3]) + (0x10 * bit[4]);
 
     if (bit[7] == 0)
     {
         // 5-bit non-indirect offset
-
-        char offset = (char)(opcode + (bit[5] * 0x20));
-        subAddress = (unsigned short)address;
-        subAddress += offset;
-        address = (NSUInteger)subAddress;
+        
+        short offset = [self bitSet:opcode :4] ? opcode - 0x20 : opcode;
+        address += offset;
     }
     else
     {
@@ -2857,20 +2853,20 @@
                 address = (msb << 8) + lsb;
                 break;
         }
-    }
-
-    // Ensure address aligns to 16-bit range
-
-    address = [self checkRange:address];
-
-    // For indirect address, use 'address' as a handle
-
-    if (opcode > 16)
-    {
-        NSUInteger pc = regPC;
-        regPC = address;
-        address = [self addressFromNextTwoBytes];
-        regPC = pc;
+        
+        // Ensure address aligns to 16-bit range
+        
+        address = [self checkRange:address];
+        
+        // For indirect address, use 'address' as a handle
+        
+        if (opcode > 16)
+        {
+            NSUInteger pc = regPC;
+            regPC = address;
+            address = [self addressFromNextTwoBytes];
+            regPC = pc;
+        }
     }
 
     return address;
