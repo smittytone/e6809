@@ -24,12 +24,7 @@
     {
         // Extra init code here
 
-        regA = 0;
-        regB = 0;
-        regPC = 0;
-        regHSP = 0;
-        regUSP = 0;
-        regCC = 0;
+        [self reset];
         
         // Set to full 64KB of RAM
 		
@@ -37,6 +32,23 @@
    	}
 
     return self;
+}
+
+
+
+- (void)reset
+{
+    // Reset the registers to zero
+    
+    regA = 0;
+    regB = 0;
+    regPC = 0;
+    regCC = 0;
+    regDP = 0;
+    regHSP = 0;
+    regUSP = 0;
+    regX = 0;
+    regY = 0;
 }
 
 
