@@ -20,6 +20,7 @@
 
 
 // Setup Methods
+- (void)reset;
 - (void)configMemory:(NSUInteger)memSizeInBytes;
 
 // Memory Access Methods
