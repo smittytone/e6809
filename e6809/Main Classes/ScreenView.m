@@ -33,12 +33,11 @@
         for (NSUInteger col = 0 ; col < 32 ; col++)
         {
             NSInteger a = (NSInteger)[cpu fromRam:(1024 + col + (row * 32))];
-            if (a < 32) a = 32;
             NSUInteger cy = a / 32;
             NSUInteger cx = a - (32 * cy);
 
             [charset drawAtPoint: NSMakePoint(col * 16, 360 - (row * 24))
-                        fromRect: NSMakeRect(cx * 16, 192 - (cy * 24), 16, 24)
+                        fromRect: NSMakeRect(cx * 16, 168 - (cy * 24), 16, 24)
                        operation: NSCompositingOperationCopy
                         fraction: 1.0];
         }
