@@ -10,7 +10,6 @@
 #include "CPU.h"
 
 @interface ScreenView : NSView
-
 {
     NSImage *charset;
     MC6809 *cpu;
@@ -18,5 +17,6 @@
 
 
 - (void)setMemory:(MC6809 *)memoryObject;
+
 
 @end

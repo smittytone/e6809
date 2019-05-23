@@ -27,8 +27,9 @@
     isPausedFlag = NO;
     isRunningFlag = NO;
     showHexFlag = YES;
-    runSpeed = 0.001;
+    runSpeed = speedSlider.doubleValue;
     vidSpeed = 0.03;
+    memStartAdddress = 0x0000;
     
     // Insert code here to initialize your application
 
@@ -45,8 +46,21 @@
 								   userInfo:nil
 									repeats:YES];
     
-    [self showMemoryContents:0x0000];
+    [self showMemoryContents:memStartAdddress];
+    
     [self showRegisters];
+}
+
+
+
+#pragma mark - Application Quit Methods
+
+
+- (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)theApp
+{
+    // Return YES to quit app when user clicks on the close button
+    
+    return YES;
 }
 
 
@@ -192,12 +206,36 @@
 
 
 
+- (void)resetRegisters
+{
+    [cpu reset];
+    [self showRegisters];
+}
+
+
+- (IBAction)setSpeed:(id)sender
+{
+    double speed = speedSlider.doubleValue;
+    runSpeed = speed;
+}
+
+
+
 #pragma mark - Code Execution Methods
 
 
 - (IBAction)run:(id)sender
 {
+    if (isPausedFlag)
+    {
+        [self pause:self];
+        return;
+    }
+    
     if (isRunningFlag) return;
+    
+    [self resetRegisters];
+    [self cls];
     
     // Set the start address and stack address
     cpu.regPC = memStartAdddress;
@@ -285,6 +323,13 @@
     
     [self showRegisters];
     [self showMemoryContents:memStartAdddress];
+}
+
+
+
+- (IBAction)doReset:(id)sender
+{
+    [self resetRegisters];
 }
 
 
@@ -476,16 +521,30 @@
     uField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regUSP] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regUSP];
     sField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regHSP] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regHSP];
     pcField.stringValue = showHexFlag ? [NSString stringWithFormat:@"%04lX", (unsigned long)cpu.regPC] : [NSString stringWithFormat:@"%lu", (unsigned long)cpu.regPC];
+    
+    if ([cpu bitSet:cpu.regCC :kCC_e] != [cceField getState]) [cceField setLight:[cpu bitSet:cpu.regCC :kCC_e]];
+    if ([cpu bitSet:cpu.regCC :kCC_f] != [ccfField getState]) [ccfField setLight:[cpu bitSet:cpu.regCC :kCC_f]];
+    if ([cpu bitSet:cpu.regCC :kCC_h] != [cchField getState]) [cchField setLight:[cpu bitSet:cpu.regCC :kCC_h]];
+    if ([cpu bitSet:cpu.regCC :kCC_i] != [cciField getState]) [cciField setLight:[cpu bitSet:cpu.regCC :kCC_i]];
+    if ([cpu bitSet:cpu.regCC :kCC_n] != [ccnField getState]) [ccnField setLight:[cpu bitSet:cpu.regCC :kCC_n]];
+    if ([cpu bitSet:cpu.regCC :kCC_z] != [cczField getState]) [cczField setLight:[cpu bitSet:cpu.regCC :kCC_z]];
+    if ([cpu bitSet:cpu.regCC :kCC_v] != [ccvField getState]) [ccvField setLight:[cpu bitSet:cpu.regCC :kCC_v]];
+    if ([cpu bitSet:cpu.regCC :kCC_c] != [cccField getState]) [cccField setLight:[cpu bitSet:cpu.regCC :kCC_c]];
 
-    if ([cpu bitSet:cpu.regCC :kCC_e]) { cceField.stringValue = @"1"; } else { cceField.stringValue = @"0"; }
-    if ([cpu bitSet:cpu.regCC :kCC_f]) { ccfField.stringValue = @"1"; } else { ccfField.stringValue = @"0"; }
-    if ([cpu bitSet:cpu.regCC :kCC_h]) { cchField.stringValue = @"1"; } else { cchField.stringValue = @"0"; }
-    if ([cpu bitSet:cpu.regCC :kCC_i]) { cciField.stringValue = @"1"; } else { cciField.stringValue = @"0"; }
-    if ([cpu bitSet:cpu.regCC :kCC_n]) { ccnField.stringValue = @"1"; } else { ccnField.stringValue = @"0"; }
-    if ([cpu bitSet:cpu.regCC :kCC_z]) { cczField.stringValue = @"1"; } else { cczField.stringValue = @"0"; }
-    if ([cpu bitSet:cpu.regCC :kCC_v]) { ccvField.stringValue = @"1"; } else { ccvField.stringValue = @"0"; }
-    if ([cpu bitSet:cpu.regCC :kCC_c]) { cccField.stringValue = @"1"; } else { cccField.stringValue = @"0"; }
+    [vdu setNeedsDisplayInRect:(NSMakeRect(0, 0, 512, 384))];
+}
 
+
+
+- (void)cls
+{
+    if (isRunningFlag) return;
+    
+    for (NSUInteger i = 0x0400 ; i < 0x0600 ; i++)
+    {
+        [cpu toRam:i :0x00];
+    }
+    
     [vdu setNeedsDisplayInRect:(NSMakeRect(0, 0, 512, 384))];
 }
 

@@ -9,6 +9,7 @@
 #import <Cocoa/Cocoa.h>
 #import "CPU.h"
 #import "ScreenView.h"
+#import "LEDView.h"
 
 
 @interface AppDelegate : NSObject  <NSApplicationDelegate,
@@ -36,20 +37,22 @@
     IBOutlet NSButton       *sSetButton;
     IBOutlet NSButton       *pcSetButton;
 
-	IBOutlet NSTextField    *cceField;
-	IBOutlet NSTextField    *ccfField;
-	IBOutlet NSTextField    *cchField;
-	IBOutlet NSTextField    *cciField;
-	IBOutlet NSTextField    *ccnField;
-	IBOutlet NSTextField    *cczField;
-	IBOutlet NSTextField    *ccvField;
-	IBOutlet NSTextField    *cccField;
+	IBOutlet LEDView        *cceField;
+	IBOutlet LEDView        *ccfField;
+	IBOutlet LEDView        *cchField;
+	IBOutlet LEDView        *cciField;
+	IBOutlet LEDView        *ccnField;
+	IBOutlet LEDView        *cczField;
+	IBOutlet LEDView        *ccvField;
+	IBOutlet LEDView        *cccField;
 
     IBOutlet NSTextField    *memoryView;
     IBOutlet NSTextField    *memoryStartField;
     
     IBOutlet NSButton       *regValueHexButton;
     IBOutlet NSButton       *regValueDecButton;
+    
+    IBOutlet NSSlider       *speedSlider;
 
     IBOutlet ScreenView *vdu;
     
@@ -66,16 +69,18 @@
 
 - (IBAction)setRegister:(id)sender;
 - (IBAction)setMemoryStart:(id)sender;
-- (void)showRegisters;
 - (IBAction)memUp:(id)sender;
 - (IBAction)memDown:(id)sender;
+- (IBAction)getCode:(id)sender;
+- (IBAction)setRegValueType:(id)sender;
 
 - (IBAction)run:(id)sender;
 - (IBAction)pause:(id)sender;
 - (IBAction)step:(id)sender;
 - (IBAction)stop:(id)sender;
 - (void)oneStep;
-- (IBAction)getCode:(id)sender;
-- (IBAction)setRegValueType:(id)sender;
+
+- (void)showRegisters;
+- (void)cls;
 
 @end
