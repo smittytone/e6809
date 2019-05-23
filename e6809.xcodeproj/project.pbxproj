@@ -14,6 +14,7 @@
 		3B4FC6872286CF9A000273EA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3B4FC6862286CF9A000273EA /* Assets.xcassets */; };
 		3B4FC68A2286CF9A000273EA /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 3B4FC6882286CF9A000273EA /* MainMenu.xib */; };
 		3B4FC68D2286CF9A000273EA /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 3B4FC68C2286CF9A000273EA /* main.m */; };
+		3B82A1B62296D99B00986C19 /* LEDView.m in Sources */ = {isa = PBXBuildFile; fileRef = 3B82A1B52296D99B00986C19 /* LEDView.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,6 +33,8 @@
 		3B4FC68B2286CF9A000273EA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		3B4FC68C2286CF9A000273EA /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		3B4FC68E2286CF9A000273EA /* e6809.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = e6809.entitlements; path = "e6809/Bundled Entities/e6809.entitlements"; sourceTree = SOURCE_ROOT; };
+		3B82A1B42296D99B00986C19 /* LEDView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LEDView.h; sourceTree = "<group>"; };
+		3B82A1B52296D99B00986C19 /* LEDView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = LEDView.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -94,6 +97,8 @@
 				3B460E792286D1670023CE1B /* RAM.m */,
 				3B460E7B2286D1680023CE1B /* ScreenView.h */,
 				3B460E782286D1670023CE1B /* ScreenView.m */,
+				3B82A1B42296D99B00986C19 /* LEDView.h */,
+				3B82A1B52296D99B00986C19 /* LEDView.m */,
 			);
 			path = "Main Classes";
 			sourceTree = "<group>";
@@ -171,6 +176,7 @@
 				3B4FC68D2286CF9A000273EA /* main.m in Sources */,
 				3B4FC6852286CF98000273EA /* AppDelegate.m in Sources */,
 				3B460E7D2286D1680023CE1B /* ScreenView.m in Sources */,
+				3B82A1B62296D99B00986C19 /* LEDView.m in Sources */,
 				3B460E802286D1750023CE1B /* CPU.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
