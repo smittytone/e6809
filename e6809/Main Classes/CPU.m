@@ -293,7 +293,7 @@
             if (opcodeLo == 0x06) [self doBranch:opcode_BRA_rel :YES];  // Set correct op for LBRA handling
             if (opcodeLo == 0x07) [self doBranch:opcode_BSR_rel :YES];  // Set correct op for LBSR handling
             if (opcodeLo == 0x09) [self daa];
-            if (opcodeLo == 0x0A) [self  orcc:[self loadFromRam]];
+            if (opcodeLo == 0x0A) [self orcc:[self loadFromRam]];
             if (opcodeLo == 0x0C) [self andcc:[self loadFromRam]];
             if (opcodeLo == 0x0D) [self sex];
             if (opcodeLo == 0x0E) [self transferDecode:[self loadFromRam] :YES];
