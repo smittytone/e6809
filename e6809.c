@@ -343,6 +343,10 @@ void clr_cc_bit(uint8_t bit) {
     reg.cc = (reg.cc & ~(1 << bit));
 }
 
+void flp_cc_bit(uint8_t bit) {
+    reg.cc = (reg.cc ^ (1 << bit));
+}
+
 
 /*
  * Specific op functions
@@ -1033,6 +1037,240 @@ uint8_t alu(uint8_t value_1, uint8_t value_2, bool use_carry) {
 
     // Return the answer (condition codes already set elsewhere)
     return final;
+}
+
+
+uint16_t alu_16(uint16_t value_1, uint16_t value_2, bool use_carry) {
+    // Add the LSBs
+    uint8_t v_1 = value_1 & 0xFF;
+    uint8_t v_2 = value_2 & 0xFF;
+    uint8_t total = alu(v_1, v_2, use_carry);
+
+    // Now add the MSBs, using the carry (if any) from the LSB calculation
+    v_1 = (value_1 >> 8) & 0xFF;
+    v_2 = (value_2 >> 8) & 0xFF;
+    uint8_t subtotal = alu(v_1, v_2, true);
+    return ((subtotal << 8) + total);
+}
+
+
+uint8_t do_add(uint8_t value, uint8_t amount) {
+    // Adds two 8-bit values
+	// Affects z, n, h, v, c - 'alu:' sets h, v, c
+    clr_cc_bit(N_BIT);
+    clr_cc_bit(Z_BIT);
+
+    uint8_t answer = alu(value, amount, false);
+    if (answer == 0) set_cc_bit(Z_BIT);
+    if (is_bit_set(answer, SIGN_BIT_8)) set_cc_bit(N_BIT);
+    return answer;
+}
+
+
+uint8_t add_with_carry(uint8_t value, uint8_t amount) {
+    // Adds two 8-bit values plus CCR c
+    // Affects z, n, h, v, c - 'alu()' sets h, v, c
+    clr_cc_bit(N_BIT);
+    clr_cc_bit(Z_BIT);
+
+    uint8_t answer = alu(value, amount, true);
+    if (answer == 0) set_cc_bit(Z_BIT);
+    if (is_bit_set(answer, SIGN_BIT_8)) set_cc_bit(N_BIT);
+    return answer;
+}
+
+
+uint8_t subtract(uint8_t value, uint8_t amount) {
+    // Subtract 'amount' from 'value' by adding 'value' to -'amount'
+    // Affects n, z, v, c - 'alu()' sets v, c
+    clr_cc_bit(N_BIT);
+    clr_cc_bit(Z_BIT);
+    clr_cc_bit(V_BIT);
+
+    uint8_t comp = negate(amount);
+    uint8_t answer = alu(value, amount, false);
+    if (answer == 0) set_cc_bit(Z_BIT);
+    if (is_bit_set(answer, SIGN_BIT_8)) set_cc_bit(N_BIT);
+
+    // c represents a borrow and is set to the complement of the carry
+    // of the internal binary addition
+    flp_cc_bit(C_BIT);
+
+    return answer;
+}
+
+
+uint16_t subtract_16(uint16_t value_1, uint16_t value_2) {
+    // Subtract amount from value
+    // Affects n, z, v, c - v, c are set by 'alu:'
+
+    // Complement the value at M:M + 1
+    uint8_t msb = complement((amount >> 8) & 0xFF);
+    uint8_t lsb = complement(amount & 0xFF);
+
+    clr_cc_bit(N_BIT);
+    clr_cc_bit(Z_BIT);
+
+    // Add 1 to form the 2's complement
+    lsb = alu(lsb, 1, false);
+    msb = alu(msb, 0, true);
+
+    // Add the register value
+    lsb = alu(value & 0xFF, lsb, false);
+    msb = alu((value >> 8) & 0xFF, msb, true);
+
+    // Convert the bytes back to a 16-bit value and set the CC
+    uint16_t answer = (msb << 8) | lsb;
+    if (answer == 0) set_cc_bit(Z_BIT);
+    if (is_bit_set(answer, SIGN_BIT_16)) set_cc_bit(N_BIT);
+
+    // c represents a borrow and is set to the complement of the carry
+    // of the internal binary addition
+    flp_cc_bit(C_BIT);
+
+    return answer;
+}
+
+
+uint8_t sub_with_carry(uint8_t value, uint8_t amount) {
+    // Subtract with Carry (borrow)
+    // Affects n, z, v, c - 'alu()' sets v and c
+    clr_cc_bit(N_BIT);
+    clr_cc_bit(Z_BIT);
+    clr_cc_bit(V_BIT);
+
+    uint8_t comp = negate(amount);
+    uint8_t answer = alu(value, amount, true);
+    if (answer == 0) set_cc_bit(Z_BIT);
+    if (is_bit_set(answer, SIGN_BIT_8)) set_cc_bit(N_BIT);
+
+    // c represents a borrow and is set to the complement of the carry
+    // of the internal binary addition
+    flp_cc_bit(C_BIT);
+
+    return answer;
+}
+
+
+uint8_t do_and(uint8_t value, uint8_t amount) {
+    // ANDs the two supplied values
+    // Affects n, z, v - v is always 0
+    clr_cc_bit(N_BIT);
+    clr_cc_bit(Z_BIT);
+    clr_cc_bit(V_BIT);
+
+    uint8_t answer = value & amount;
+    if (answer == 0) set_cc_bit(Z_BIT);
+    if (is_bit_set(answer, SIGN_BIT_8)) set_cc_bit(N_BIT);
+    return answer;
+}
+
+
+uint8_t do_or(uint8_t value, uint8_t amount) {
+    // OR
+    // Affects n, z, v - v is always cleared
+    clr_cc_bit(N_BIT);
+    clr_cc_bit(Z_BIT);
+    clr_cc_bit(V_BIT);
+
+    uint8_t answer = value | amount;
+    if (answer == 0) set_cc_bit(Z_BIT);
+    if (is_bit_set(answer, SIGN_BIT_8)) set_cc_bit(N_BIT);
+    return answer;
+}
+
+
+uint8_t do_xor(uint8_t value, uint8_t amount) {
+    // Perform an exclusive OR
+    // Affects n, z ,v - v always cleared
+    clr_cc_bit(N_BIT);
+    clr_cc_bit(Z_BIT);
+    clr_cc_bit(V_BIT);
+
+    uint8_t answer = value ^ amount;
+    if (answer == 0) set_cc_bit(Z_BIT);
+    if (is_bit_set(answer, SIGN_BIT_8)) set_cc_bit(N_BIT);
+    return answer;
+}
+
+
+uint8_t arith_shift_right(uint8_t value) {
+    // Arithmetic shift right
+    // Affects n, z, c
+    clr_cc_bit(N_BIT);
+    clr_cc_bit(Z_BIT);
+    clr_cc_bit(V_BIT);
+
+    if (is_bit_set(value, 0)) {
+        set_cc_bit(C_BIT);
+    } else {
+        clr_cc_bit(C_BIT);
+    }
+
+    for (uint32_t i = 0 ; i < 7 ; i++) {
+        if (is_bit_set(value, i + 1)) {
+            value = value | (1 << i)
+        } else {
+            value = value & ~(1 << i)
+        }
+    }
+
+    if (value == 0) set_cc_bit(Z_BIT);
+    if (is_bit_set(value, SIGN_BIT_8)) set_cc_bit(N_BIT);
+    return value;
+}
+
+
+uint8_t logic_shift_right(uint8_t value) {
+    // Logical shift right
+    // Affects n, z, v - n is always cleared
+    clr_cc_bit(N_BIT);
+    clr_cc_bit(Z_BIT);
+    clr_cc_bit(V_BIT);
+
+    if (is_bit_set(value, 0)) {
+        set_cc_bit(C_BIT);
+    } else {
+        clr_cc_bit(C_BIT);
+    }
+
+    for (uint32_t i = 0 ; i < 7 ; i++) {
+        if (is_bit_set(value, i + 1)) {
+            value = value | (1 << i)
+        } else {
+            value = value & ~(1 << i)
+        }
+    }
+
+    value = value & ~(1 << 7);
+    if (value == 0) set_cc_bit(Z_BIT);
+    return value;
+}
+
+
+uint8_t logic_shift_left(uint8_t value) {
+    // Logical shift left
+    // Affects n, z, v, c
+    clr_cc_bit(N_BIT);
+    clr_cc_bit(Z_BIT);
+    clr_cc_bit(V_BIT);
+    clr_cc_bit(C_BIT);
+
+    if (is_bit_set(value, 7)) set_cc_bit(C_BIT);
+    if (is_bit_set(value, 7) != is_bit_set(value, 6)) set_cc_bit(V_BIT);
+
+    for (uint32_t i = 7 ; i > 0  ; i--) {
+        if (is_bit_set(value, i - 1)) {
+            value = value | (1 << i)
+        } else {
+            value = value & ~(1 << i)
+        }
+    }
+
+    value = value & ~1;
+    if (value == 0) set_cc_bit(Z_BIT);
+    if (is_bit_set(value, SIGN_BIT_8)) set_cc_bit(N_BIT);
+    return value;
 }
 
 
