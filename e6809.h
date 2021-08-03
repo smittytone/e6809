@@ -54,6 +54,10 @@
 #define PUSH_PULL_ALL_REGS  0xFE
 #define PUSH_PULL_EVERY_REG 0xFF
 
+#define INTERRUPT_VECTOR_1
+#define INTERRUPT_VECTOR_2
+#define INTERRUPT_VECTOR_3
+
 /*
  * STRUCTURES
  */
@@ -102,6 +106,6 @@ uint16_t *nibble_to_reg_16(uint8_t n);
  */
 REG_6809    reg_6809;
 uint8_t     mem_6809[KB64];
-
+bool        wait_for_interrupt;
 
 #endif // _E6809_HEADER_
