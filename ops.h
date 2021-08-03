@@ -19,6 +19,9 @@
 #define EXG                 0x1E
 #define TFR                 0x1F
 
+#define BRA                 0x20
+#define BSR                 0x21
+
 #define NEGA                0x40
 #define COMA                0x43
 #define CLRA                0x4F

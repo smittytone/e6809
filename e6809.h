@@ -35,15 +35,28 @@
 #define MODE_EXTENDED       4
 #define MODE_INHERENT       5
 
-#define C_BIT              0
-#define V_BIT              1
-#define Z_BIT              2
-#define N_BIT              3
-#define I_BIT              4
-#define H_BIT              5
-#define F_BIT              6
-#define E_BIT              7
+#define OPCODE_EXTENDED_1   0x10
+#define OPCODE_EXTENDED_2   0x11
 
+#define C_BIT               0
+#define V_BIT               1
+#define Z_BIT               2
+#define N_BIT               3
+#define I_BIT               4
+#define H_BIT               5
+#define F_BIT               6
+#define E_BIT               7
+
+#define SIGN_BIT_8          7
+#define SIGN_BIT_16         15
+
+#define PUSH_PULL_CC_REG    0x01
+#define PUSH_PULL_ALL_REGS  0xFE
+#define PUSH_PULL_EVERY_REG 0xFF
+
+/*
+ * STRUCTURES
+ */
 typedef struct {
     uint8_t  a;
     uint8_t  b;
@@ -59,8 +72,10 @@ typedef struct {
 /*
  * PROTOTYPES
  */
-void     loop();
-void     do_branch(uint8_t bop, bool is_long);
+void        loop();
+void        process_next_instruction();
+void        do_branch(uint8_t bop, bool is_long);
+
 void     do_op(uint8_t op, bool is_long);
 uint8_t  get_mode(uint8_t n);
 
