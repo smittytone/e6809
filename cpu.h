@@ -7,57 +7,54 @@
  * @licence     MIT
  *
  */
-#ifndef _E6809_HEADER_
-#define _E6809_HEADER_
+#ifndef _CPU_HEADER_
+#define _CPU_HEADER_
 
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include "pico/stdlib.h"
-#include "pico/binary_info.h"
-#include "hardware/gpio.h"
-#include "hardware/i2c.h"
-#include "hardware/adc.h"
-#include "ops.h"
-#include "cpu.h"
 
 /*
  * CONSTANTS
  */
-#define KB64                65536
-#define BRANCH_MARKER       0x20
+#define KB64                    65536
+#define BRANCH_MARKER           0x20
 
-#define MODE_UNKNOWN        0
-#define MODE_IMMEDIATE      1
-#define MODE_DIRECT         2
-#define MODE_INDEXED        3
-#define MODE_EXTENDED       4
-#define MODE_INHERENT       5
+#define MODE_UNKNOWN            0
+#define MODE_IMMEDIATE          1
+#define MODE_DIRECT             2
+#define MODE_INDEXED            3
+#define MODE_EXTENDED           4
+#define MODE_INHERENT           5
 
-#define OPCODE_EXTENDED_1   0x10
-#define OPCODE_EXTENDED_2   0x11
+#define OPCODE_EXTENDED_1       0x10
+#define OPCODE_EXTENDED_2       0x11
 
-#define C_BIT               0
-#define V_BIT               1
-#define Z_BIT               2
-#define N_BIT               3
-#define I_BIT               4
-#define H_BIT               5
-#define F_BIT               6
-#define E_BIT               7
+#define C_BIT                   0
+#define V_BIT                   1
+#define Z_BIT                   2
+#define N_BIT                   3
+#define I_BIT                   4
+#define H_BIT                   5
+#define F_BIT                   6
+#define E_BIT                   7
 
-#define SIGN_BIT_8          7
-#define SIGN_BIT_16         15
+#define SIGN_BIT_8              7
+#define SIGN_BIT_16             15
 
-#define PUSH_PULL_CC_REG    0x01
-#define PUSH_PULL_ALL_REGS  0xFE
-#define PUSH_PULL_EVERY_REG 0xFF
+#define MASK_ZC                 0xFA
+#define MASK_NZ                 0xF3
+#define MASK_NZC                0xF2
+#define MASK_NZV                0xF1
+#define MASK_NZVC               0xF0
 
-#define INTERRUPT_VECTOR_1
-#define INTERRUPT_VECTOR_2
-#define INTERRUPT_VECTOR_3
+#define PUSH_PULL_CC_REG        0x01
+#define PUSH_PULL_ALL_REGS      0xFE
+#define PUSH_PULL_EVERY_REG     0xFF
+
+#define PUSH_TO_HARD_STACK      true
+
+#define INTERRUPT_VECTOR_1      0xFFFA
+#define INTERRUPT_VECTOR_2      0xFFF4
+#define INTERRUPT_VECTOR_3      0xFFF2
+
 
 /*
  * STRUCTURES
@@ -73,6 +70,7 @@ typedef struct {
     uint8_t  cc;
     uint8_t  dp;
 } REG_6809;
+
 
 /*
  * PROTOTYPES
@@ -102,6 +100,7 @@ void     reg_transfer(bool is_exg);
 uint8_t  *nibble_to_reg_8(uint8_t n);
 uint16_t *nibble_to_reg_16(uint8_t n);
 
+
 /*
  * GLOBALS
  */
@@ -109,4 +108,5 @@ REG_6809    reg_6809;
 uint8_t     mem_6809[KB64];
 bool        wait_for_interrupt;
 
-#endif // _E6809_HEADER_
+
+#endif // _CPU_HEADER_
