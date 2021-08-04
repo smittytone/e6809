@@ -60,8 +60,8 @@ void process_next_instruction() {
             if (lsn == ORCC) orr(reg.cc, get_next_byte());
             if (lsn == ANDCC) and(reg.cc, get_next_byte());
             if (lsn == SEX) sex();
-            if (lsn == EXG) transfer_registers(true);
-            if (lsn == TFR) transfer_registers(false);
+            if (lsn == EXG) transfer_decode(get_next_byte(), true);
+            if (lsn == TFR) transfer_decode(get_next_byte(), false);
             return;
         }
 
@@ -346,6 +346,39 @@ void clr_cc_bit(uint8_t bit) {
 void flp_cc_bit(uint8_t bit) {
     reg.cc = (reg.cc ^ (1 << bit));
 }
+
+void clr_cc_nzv() {
+    // The N, V and Z bits are frequently cleared, so clear bits 1-3
+    reg.cc = reg.cc & 0xF1;
+}
+
+void set_cc_nz(uint16_t value, bool is_16_bit) {
+    // Set Z and N based on a single 8- or 16-bit input value
+    if (value == 0) set_cc_bit(Z_BIT);
+    if (is_bit_set(value, (is_16_bit ? SIGN_BIT_16 : SIGN_BIT_8))) set_cc_bit(N_BIT);
+}
+
+void set_cc_after_clr() {
+    // Clears N, Z, V, C generically, eg. for CLRA, CLRB, CLR M
+    clr_cc_nzv();
+    clr_cc_bit(C_BIT);
+}
+
+void set_cc_after_load(uint16_t value, bool is_16_bit) {
+    // Sets the CC after an 8- or 16-bit load
+    // Affects N, Z, V -- V is always cleared
+    clr_cc_nzv();
+    set_cc_nz(value, is_16_bit);
+}
+
+
+void set_cc_after_store(uint16_t value, bool is_16_bit) {
+    // Sets the CC after an 8- or 16-bit store
+    // Affects N, Z, V -- V is always cleared
+    set_cc_after_load(value, is_16_bit);
+}
+
+
 
 
 /*
@@ -897,9 +930,7 @@ void sub(uint8_t op, uint8_t mode) {
 
 void sub_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
     // SUBD: D - M:M + 1 -> D
-    clr_cc_bit(N_BIT);
-    clr_cc_bit(Z_BIT);
-    clr_cc_bit(V_BIT);
+    clr_cc_nzv();
 
     // Complement the value at M:M + 1
     uint16_t address = address_from_mode(mode);
@@ -916,8 +947,7 @@ void sub_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
 
     // Convert the bytes back to a 16-bit value and set the CC
     uint16_t answer = (msb << 8) | lsb;
-    if (answer == 0) set_cc_bit(Z_BIT);
-    if (is_bit_set(answer, 15)) set_cc_bit(N_BIT);
+    set_cc_nz(answer, true);
 
     // Set D's component registers
     reg.a = (answer >> 8) & 0x0FF;
@@ -1061,8 +1091,7 @@ uint8_t do_add(uint8_t value, uint8_t amount) {
     clr_cc_bit(Z_BIT);
 
     uint8_t answer = alu(value, amount, false);
-    if (answer == 0) set_cc_bit(Z_BIT);
-    if (is_bit_set(answer, SIGN_BIT_8)) set_cc_bit(N_BIT);
+    set_cc_nz(answer, false);
     return answer;
 }
 
@@ -1074,8 +1103,7 @@ uint8_t add_with_carry(uint8_t value, uint8_t amount) {
     clr_cc_bit(Z_BIT);
 
     uint8_t answer = alu(value, amount, true);
-    if (answer == 0) set_cc_bit(Z_BIT);
-    if (is_bit_set(answer, SIGN_BIT_8)) set_cc_bit(N_BIT);
+    set_cc_nz(answer, false);
     return answer;
 }
 
@@ -1083,14 +1111,10 @@ uint8_t add_with_carry(uint8_t value, uint8_t amount) {
 uint8_t subtract(uint8_t value, uint8_t amount) {
     // Subtract 'amount' from 'value' by adding 'value' to -'amount'
     // Affects n, z, v, c - 'alu()' sets v, c
-    clr_cc_bit(N_BIT);
-    clr_cc_bit(Z_BIT);
-    clr_cc_bit(V_BIT);
-
+    clr_cc_nzv();
     uint8_t comp = negate(amount);
     uint8_t answer = alu(value, amount, false);
-    if (answer == 0) set_cc_bit(Z_BIT);
-    if (is_bit_set(answer, SIGN_BIT_8)) set_cc_bit(N_BIT);
+    set_cc_nz(answer, false);
 
     // c represents a borrow and is set to the complement of the carry
     // of the internal binary addition
@@ -1121,8 +1145,7 @@ uint16_t subtract_16(uint16_t value_1, uint16_t value_2) {
 
     // Convert the bytes back to a 16-bit value and set the CC
     uint16_t answer = (msb << 8) | lsb;
-    if (answer == 0) set_cc_bit(Z_BIT);
-    if (is_bit_set(answer, SIGN_BIT_16)) set_cc_bit(N_BIT);
+    set_cc_nz(answer, false);
 
     // c represents a borrow and is set to the complement of the carry
     // of the internal binary addition
@@ -1135,14 +1158,10 @@ uint16_t subtract_16(uint16_t value_1, uint16_t value_2) {
 uint8_t sub_with_carry(uint8_t value, uint8_t amount) {
     // Subtract with Carry (borrow)
     // Affects n, z, v, c - 'alu()' sets v and c
-    clr_cc_bit(N_BIT);
-    clr_cc_bit(Z_BIT);
-    clr_cc_bit(V_BIT);
-
+    clr_cc_nzv();
     uint8_t comp = negate(amount);
     uint8_t answer = alu(value, amount, true);
-    if (answer == 0) set_cc_bit(Z_BIT);
-    if (is_bit_set(answer, SIGN_BIT_8)) set_cc_bit(N_BIT);
+    set_cc_nz(answer, false);
 
     // c represents a borrow and is set to the complement of the carry
     // of the internal binary addition
@@ -1155,13 +1174,9 @@ uint8_t sub_with_carry(uint8_t value, uint8_t amount) {
 uint8_t do_and(uint8_t value, uint8_t amount) {
     // ANDs the two supplied values
     // Affects n, z, v - v is always 0
-    clr_cc_bit(N_BIT);
-    clr_cc_bit(Z_BIT);
-    clr_cc_bit(V_BIT);
-
+    clr_cc_nzv();
     uint8_t answer = value & amount;
-    if (answer == 0) set_cc_bit(Z_BIT);
-    if (is_bit_set(answer, SIGN_BIT_8)) set_cc_bit(N_BIT);
+    set_cc_nz(answer, false);
     return answer;
 }
 
@@ -1169,13 +1184,9 @@ uint8_t do_and(uint8_t value, uint8_t amount) {
 uint8_t do_or(uint8_t value, uint8_t amount) {
     // OR
     // Affects n, z, v - v is always cleared
-    clr_cc_bit(N_BIT);
-    clr_cc_bit(Z_BIT);
-    clr_cc_bit(V_BIT);
-
+    clr_cc_nzv();
     uint8_t answer = value | amount;
-    if (answer == 0) set_cc_bit(Z_BIT);
-    if (is_bit_set(answer, SIGN_BIT_8)) set_cc_bit(N_BIT);
+    set_cc_nz(answer, false);
     return answer;
 }
 
@@ -1183,13 +1194,9 @@ uint8_t do_or(uint8_t value, uint8_t amount) {
 uint8_t do_xor(uint8_t value, uint8_t amount) {
     // Perform an exclusive OR
     // Affects n, z ,v - v always cleared
-    clr_cc_bit(N_BIT);
-    clr_cc_bit(Z_BIT);
-    clr_cc_bit(V_BIT);
-
+    clr_cc_nzv();
     uint8_t answer = value ^ amount;
-    if (answer == 0) set_cc_bit(Z_BIT);
-    if (is_bit_set(answer, SIGN_BIT_8)) set_cc_bit(N_BIT);
+    set_cc_nz(answer, false);
     return answer;
 }
 
@@ -1197,9 +1204,7 @@ uint8_t do_xor(uint8_t value, uint8_t amount) {
 uint8_t arith_shift_right(uint8_t value) {
     // Arithmetic shift right
     // Affects n, z, c
-    clr_cc_bit(N_BIT);
-    clr_cc_bit(Z_BIT);
-    clr_cc_bit(V_BIT);
+    clr_cc_nzv();
 
     if (is_bit_set(value, 0)) {
         set_cc_bit(C_BIT);
@@ -1215,8 +1220,7 @@ uint8_t arith_shift_right(uint8_t value) {
         }
     }
 
-    if (value == 0) set_cc_bit(Z_BIT);
-    if (is_bit_set(value, SIGN_BIT_8)) set_cc_bit(N_BIT);
+    set_cc_nz(value, false);
     return value;
 }
 
@@ -1224,9 +1228,7 @@ uint8_t arith_shift_right(uint8_t value) {
 uint8_t logic_shift_right(uint8_t value) {
     // Logical shift right
     // Affects n, z, v - n is always cleared
-    clr_cc_bit(N_BIT);
-    clr_cc_bit(Z_BIT);
-    clr_cc_bit(V_BIT);
+    clr_cc_nzv();
 
     if (is_bit_set(value, 0)) {
         set_cc_bit(C_BIT);
@@ -1242,7 +1244,7 @@ uint8_t logic_shift_right(uint8_t value) {
         }
     }
 
-    value = value & ~(1 << 7);
+    value = value & 0x7F;
     if (value == 0) set_cc_bit(Z_BIT);
     return value;
 }
@@ -1251,10 +1253,7 @@ uint8_t logic_shift_right(uint8_t value) {
 uint8_t logic_shift_left(uint8_t value) {
     // Logical shift left
     // Affects n, z, v, c
-    clr_cc_bit(N_BIT);
-    clr_cc_bit(Z_BIT);
-    clr_cc_bit(V_BIT);
-    clr_cc_bit(C_BIT);
+    set_cc_after_clr();
 
     if (is_bit_set(value, 7)) set_cc_bit(C_BIT);
     if (is_bit_set(value, 7) != is_bit_set(value, 6)) set_cc_bit(V_BIT);
@@ -1267,11 +1266,304 @@ uint8_t logic_shift_left(uint8_t value) {
         }
     }
 
-    value = value & ~1;
-    if (value == 0) set_cc_bit(Z_BIT);
-    if (is_bit_set(value, SIGN_BIT_8)) set_cc_bit(N_BIT);
+    value = value & 0xFE;
+    set_cc_nz(value, false);
     return value;
 }
+
+
+uint8_t rotate_left(uint8_t value) {
+    // Rotate left
+    // Affects n, z, v, c
+    set_cc_after_clr();
+
+    // c becomes bit 7 of original operand
+    bool carry = is_bit_set:reg.cc :C_BIT);
+    if (is_bit_set(value, 7)) set_cc_bit(C_BIT);
+
+    // n is bit 7 XOR bit 6 of value
+    if (is_bit_set(value, 7) != is_bit_set(value, 6)) set_cc_bit(V_BIT);
+
+    for (uint32_t i = 7 ; i > 0  ; i--) {
+        if (is_bit_set(value, i - 1)) {
+            value = value | (1 << i)
+        } else {
+            value = value & ~(1 << i)
+        }
+    }
+
+    // Set bit 0 from the carry
+    if (carry) {
+        value = value | 1;
+    } else {
+        value = value & 0xFE;
+    }
+
+    set_cc_nz(value, false);
+    return value;
+}
+
+
+uint8_t rotate_right(uint8_t value) {
+    // Rotate right
+    // Affects n, z, c
+    clr_cc_bit(N_BIT);
+    clr_cc_bit(Z_BIT);
+    clr_cc_bit(C_BIT);
+
+    bool carry = is_bit_set:reg.cc :C_BIT);
+    if (is_bit_set(value, 0)) set_cc_bit(C_BIT);
+
+    for (uint32_t i = 0 ; i < 7 ; i++) {
+        if (is_bit_set(value, i + 1)) {
+            value = value | (1 << i)
+        } else {
+            value = value & ~(1 << i)
+        }
+    }
+
+    if (carry) {
+        value = value | 0x80;
+    } else {
+        value = value & 0x7F;
+    }
+
+    set_cc_nz(value, false);
+    return value;
+}
+
+
+void compare(uint8_t value, uint8_t amount) {
+    // Compare two values by subtracting the second from the first.
+    // Result is discarded
+    // Affects N, Z, V, C
+    //         C, V set by 'alu()' via 'sub()'
+    set_cc_after_clr();
+    uint8_t answer = subtract(value, amount);
+    set_cc_nz(value, false);
+}
+
+
+uint8_t negate(uint8_t value) {
+    // Returns 2's complement of 8-bit value
+    // Affects Z, N, V, C
+    //         C, V set by 'alu()'
+    //         V set only if value is 0x80
+
+    // Flip value's bits to make the 1s complenent
+    for (uint32_t i = 0 ; i < 8 ; i++) {
+        value = value ^ (1 << i);
+    }
+
+    // Add 1 to the bits to get the 2s complement
+    uint8_t answer = alu(value, 1, false);
+
+    clr_cc_nzv();
+    set_cc_nz(answer, false);
+    if (value == 0x80) set_cc_bit(V_BIT);
+
+    // c represents a borrow and is set to the complement of the carry
+    // of the internal binary addition
+    flp_cc_bit(C_BIT);
+    return answer;
+}
+
+
+uint8_t complement(uint8_t value) {
+    // One's complement the passed value
+    // Affects N, Z, V, C
+    //         V, V take fixed values: 0, 1
+    clr_cc_nzv();
+    clr_cc_bit(C_BIT);
+
+    for (uint32_t i = 0 ; i < 8 ; i++) {
+        value = value ^ (1 << i);
+    }
+
+    set_cc_nz(value, false);
+    return value;
+}
+
+
+uint8_t decrement(uint8_t value) {
+    // Subtract 1 from the operand
+    // Affects: N, Z, V
+    //          V set only if value is $80
+    clr_cc_nzv();
+
+    // See 'Programming the 6809' p 155
+    if (value == 0x80) set_cc_bit(V_BIT);
+
+    uint8_t answer = value - 1;
+    set_cc_nz(answer, false);
+    return answer;
+}
+
+
+uint8_t increment(uint8_t value) {
+    // Add 1 to the operand
+    // Affects N, Z, V
+    clr_cc_nzv();
+
+    // See 'Programming the 6809' p 158
+    if (value == 0x7F) set_cc_bit(V_BIT);
+
+    uint8_t answer = value + 1;
+    set_cc_nz(answer, false);
+    return answer;
+}
+
+
+void transfer_decode(uint8_t reg_code, bool is_swap) {
+    // 'reg_code' contains an 8-bit number that identifies the two registers
+    // to be swapped. Top four bits give source, bottom four bits give
+    // the destination.
+
+    uint8_t source_reg = (reg_code & F0) >> 4;
+    uint8_t dest_reg = reg_code & 0x0F;
+    uint16_t d = 0;
+
+    switch(source_reg) {
+        case 0x00:
+            // D - can only swap to X, Y, U, S, PC
+            if (dest_reg > 0x05) return;
+            d = exchange_16(((reg.a << 8) | reg.b), dest_reg);
+            if (is_swap) {
+                reg.a = (d >> 8) & 0xFF;
+                reg.b = d & 0xFF;
+            }
+            break;
+        case 0x01:
+            // X - can only swap to D, Y, U, S, PC
+            if (dest_reg > 0x05) return;
+            if (is_swap) {
+                reg.x = exchange_16(reg.x, dest_reg);
+            } else {
+                exchange_16(reg.x, dest_reg);
+            }
+            break;
+        case 0x02:
+            // Y - can only swap to D, X, U, S, PC
+            if (dest_reg > 0x05) return;
+            if (is_swap) {
+                reg.y = exchange_16(reg.y, dest_reg);
+            } else {
+                exchange_16(reg.y, dest_reg);
+            }
+            break;
+        case 0x03:
+            // U - can only swap to D, X, Y, S, PC
+            if (dest_reg > 0x05) return;
+            if (is_swap) {
+                reg.u = exchange_16(reg.u, dest_reg);
+            } else {
+                exchange_16(reg.u, dest_reg);
+            }
+            break;
+        case 0x04:
+            // S - can only swap to D, X, Y, U, PC
+            if (dest_reg > 0x05) return;
+            if (is_swap) {
+                reg.s = exchange_16(reg.s, dest_reg);
+            } else {
+                exchange_16(reg.s, dest_reg);
+            }
+            break;
+        case 0x05:
+            // PC - can only swap to D, X, Y, U, S
+            if (dest_reg > 0x05) return;
+            if (is_swap) {
+                reg.pc = exchange_16(reg.pc, dest_reg);
+            } else {
+                exchange_16(reg.pc, dest_reg);
+            }
+            break;
+        case 0x08:
+            // A - can only swap to B, CC, DP
+            if (dest_reg < 0x08) return;
+            if (is_swap) {
+                reg.a = exchange(reg.a, dest_reg);
+            } else {
+                exchange(reg.a, dest_reg);
+            }
+            break;
+        case 0x09:
+            // B - can only swap to A, CC, DP
+            if (dest_reg < 0x08) return;
+            if (is_swap) {
+                reg.b = exchange(reg.b, dest_reg);
+            } else {
+                exchange(reg.b, dest_reg);
+            }
+            break;
+        case 0x0A:
+            // CC - can only swap to A, B, DP
+            if (dest_reg < 0x08) return;
+            if (is_swap) {
+                reg.cc = exchange(reg.cc, dest_reg);
+            } else {
+                exchange(reg.cc, dest_reg);
+            }
+            break;
+        case 0x0B:
+            // DPR - can only swap to A, B, CC
+            if (dest_reg < 0x08) return;
+            if (is_swap) {
+                reg.dp = exchange(reg.dp, dest_reg);
+            } else {
+                exchange(reg.dp, dest_reg);
+            }
+            break;
+    }
+}
+
+
+uint8_t exchange(uint8_t value, uint8_t reg_code) {
+    // Returns the value *from* the register identified by 'reg_code'
+    // after placing the passed value into that register
+    uint8_t return_value = 0x00;
+    switch(reg_code) {  // This is the DESTINATION register
+        case 0x08: // A
+            return_value = reg.a;
+            reg.a = value;
+            break;
+
+        case 0x09: // B
+            return_value = reg.b;
+            reg.b = value;
+            break;
+
+        case 0x0A: // CC
+            return_value = reg.cc;
+            reg.cc = value;
+            break;
+
+        case 0x0B: // DPR
+            return_value = reg.dp;
+            reg.dp = value;
+            break;
+
+        default:
+            // Incorrect Register - signal error
+            // [self halt:@"Incorrect register in 8-bit swap"];
+            return_value = 0xFF;
+    }
+
+    return return_value;
+
+}
+
+
+void tfr_8(uint8_t *src_ptr, uint8_t val, uint8_t dst, bool is_swap) {
+    if (dest_reg < 0x08) return;
+    if (is_swap) {
+        *src_ptr = exchange(val, dest_reg);
+    } else {
+        exchange(val, dest_reg);
+    }
+}
+
+
 
 
 /*
