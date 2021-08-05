@@ -48,6 +48,7 @@
 #define PUSH_PULL_CC_REG        0x01
 #define PUSH_PULL_ALL_REGS      0xFE
 #define PUSH_PULL_EVERY_REG     0xFF
+#define PUSH_PULL_PC_REG        0x80
 
 #define PUSH_TO_HARD_STACK      true
 
@@ -166,6 +167,7 @@ uint16_t    *set_reg_16_ptr(uint8_t reg_code);
 void        transfer_decode2(uint8_t reg_code, bool is_swap);
 void        transfer_decode(uint8_t reg_code, bool is_swap);
 uint8_t     exchange(uint8_t value, uint8_t reg_code);
+uint16_t    exchange_16(uint16_t value, uint8_t reg_code);
 void        load_effective(uint16_t amount, uint8_t reg_code);
 void        push(bool to_hardware, uint8_t post_byte);
 void        pull(bool from_hardware, uint8_t post_byte);
