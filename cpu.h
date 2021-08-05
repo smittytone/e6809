@@ -76,7 +76,7 @@ typedef struct {
 /*
  * PROTOTYPES
  */
-void        process_next_instruction();
+uint32_t    process_next_instruction();
 void        do_branch(uint8_t bop, bool is_long);
 
 // Memory access

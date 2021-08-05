@@ -13,11 +13,13 @@
 /*
  * Process Instructions
  */
-void process_next_instruction() {
+uint32_t process_next_instruction() {
+
+    uint32_t cycles_used = 0;
 
     if (wait_for_interrupt) {
         // Process interrupts
-        return;
+        return cycles_used;
     }
 
     uint8_t opcode = get_next_byte();
@@ -36,22 +38,22 @@ void process_next_instruction() {
 
         if (msn == 0x01) {
             // These ops all use inherent addressing
-            if (lsn == 0x03)  sync();
-            if (lsn == 0x06)  do_branch(BRA, true);  // Set correct op for LBRA handling
-            if (lsn == 0x07)  do_branch(BSR, true);  // Set correct op for LBSR handling
-            if (lsn == DAA)   daa();
+            if (lsn == 0x03) sync();
+            if (lsn == 0x06) do_branch(BRA, true);  // Set correct op for LBRA handling
+            if (lsn == 0x07) do_branch(BSR, true);  // Set correct op for LBSR handling
+            if (lsn == DAA) daa();
             if (lsn == ORCC_immed) orr(reg.cc, get_next_byte());
             if (lsn == ANDCC_immed) and(reg.cc, get_next_byte());
-            if (lsn == SEX)   sex();
-            if (lsn == EXG_immed)   transfer_decode(get_next_byte(), true);
-            if (lsn == TFR_immed)   transfer_decode(get_next_byte(), false);
-            return;
+            if (lsn == SEX) sex();
+            if (lsn == EXG_immed) transfer_decode(get_next_byte(), true);
+            if (lsn == TFR_immed) transfer_decode(get_next_byte(), false);
+            return cycles_used;
         }
 
         if (msn == 0x02) {
             // All 0x02 ops are branch ops
             do_branch(opcode, (extended_opcode != 0));
-            return;
+            return cycles_used;
         }
 
         if (msn == 0x03) {
@@ -61,7 +63,10 @@ void process_next_instruction() {
             if (lsn == 0x06) push(false, get_next_byte());
             if (lsn == 0x05) pull(true,  get_next_byte());
             if (lsn == 0x07) pull(false, get_next_byte());
-            if (lsn == 0x09) rts();
+            if (lsn == 0x09) {
+                // rts();
+                return 99;
+            }
             if (lsn == 0x0A) abx();
             if (lsn == 0x0B) rti();
             if (lsn == 0x0C) cwai();
@@ -69,7 +74,7 @@ void process_next_instruction() {
 
             // Cover all values of SWIx
             if (lsn == 0x0F) swi(extended_opcode);
-            return;
+            return cycles_used;
         }
 
         // Set the address mode as far as we can
@@ -87,17 +92,17 @@ void process_next_instruction() {
                 neg(opcode, address_mode);
             }
 
-            return;
+            return cycles_used;
         }
 
         if (lsn == 0x01) {
             cmp(opcode, address_mode);
-            return;
+            return cycles_used;
         }
 
         if (lsn == 0x02) {
             sbc(opcode, address_mode);
-            return;
+            return cycles_used;
         }
 
         if (lsn == 0x03) {
@@ -109,7 +114,7 @@ void process_next_instruction() {
                 com(opcode, address_mode);
             }
 
-            return;
+            return cycles_used;
         }
 
         if (lsn == 0x04) {
@@ -119,12 +124,12 @@ void process_next_instruction() {
                 and(opcode, address_mode);
             }
 
-            return;
+            return cycles_used;
         }
 
         if (lsn == 0x05) {
             bit(opcode, address_mode);
-            return;
+            return cycles_used;
         }
 
         if (lsn == 0x06) {
@@ -134,7 +139,7 @@ void process_next_instruction() {
                 ld(opcode, address_mode);
             }
 
-            return;
+            return cycles_used;
         }
 
         if (lsn == 0x07) {
@@ -144,7 +149,7 @@ void process_next_instruction() {
                 st(opcode, address_mode);
             }
 
-            return;
+            return cycles_used;
         }
 
         if (lsn == 0x08) {
@@ -154,7 +159,7 @@ void process_next_instruction() {
                 eor(opcode, address_mode);
             }
 
-            return;
+            return cycles_used;
         }
 
         if (lsn == 0x09) {
@@ -164,7 +169,7 @@ void process_next_instruction() {
                 adc(opcode, address_mode);
             }
 
-            return;
+            return cycles_used;
         }
 
         if (lsn == 0x0A) {
@@ -174,12 +179,12 @@ void process_next_instruction() {
                 orr(opcode, address_mode);
             }
 
-            return;
+            return cycles_used;
         }
 
         if (lsn == 0x0B) {
             add(opcode, address_mode);
-            return;
+            return cycles_used;
         }
 
         if (lsn == 0x0C) {
@@ -192,7 +197,7 @@ void process_next_instruction() {
                 cmp_16(opcode, address_mode, extended_opcode);
             }
 
-            return;
+            return cycles_used;
         }
 
         if (lsn == 0x0D) {
@@ -205,7 +210,7 @@ void process_next_instruction() {
                 jsr(address_mode);
             }
 
-            return;
+            return cycles_used;
         }
 
         if (lsn == 0x0E) {
@@ -215,7 +220,7 @@ void process_next_instruction() {
                 ld_16(opcode, address_mode, extended_opcode);
             }
 
-            return;
+            return cycles_used;
         }
 
         if (lsn == 0x0F) {
@@ -810,6 +815,7 @@ void rts() {
     // RTS
     // Pull the PC from the hardware stack
     pull(true, PUSH_PULL_PC_REG);
+
 }
 
 void sbc(uint8_t op, uint8_t mode) {

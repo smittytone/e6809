@@ -27,6 +27,8 @@
 /*
  * CONSTANTS
  */
+#define PIN_STEP_BUTTON             24
+#define DEBOUNCE_TIME_US            5000
 
 
 /*
@@ -39,7 +41,8 @@
  */
 void        boot();
 void        loop();
-
+void        inkey();
+void        dump_registers();
 
 
 #endif // _E6809_HEADER_
