@@ -10,6 +10,11 @@
 #include "main.h"
 
 
+REG_6809    reg;
+uint8_t     mem[KB64];
+bool        wait_for_interrupt;
+
+
 /*
  * Process Instructions
  */

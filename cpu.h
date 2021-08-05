@@ -188,9 +188,8 @@ void reset_registers();
 /*
  * GLOBALS
  */
-REG_6809    reg;
-uint8_t     mem[KB64];
-bool        wait_for_interrupt;
-
+extern REG_6809    reg;
+extern uint8_t     mem[KB64];
+extern bool        wait_for_interrupt;
 
 #endif // _CPU_HEADER_

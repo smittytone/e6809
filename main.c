@@ -27,7 +27,7 @@ void boot() {
     for (uint16_t i = 0 ; i < 65536 ; i++) mem[i] = 0x00;
 
     uint16_t start = 32767;
-    uint8_t prog[] = {0x12};
+    uint8_t prog[] = {0x82, 0x04, 0x00, 0x86, 0x41, 0xA7, 0x80, 0x8C, 0x06, 0x00, 0x26, 0xF9, 0x39};
 
     for (uint16_t i = 0 ; i < 14 ; i++) mem[start + i] = prog[i];
 
