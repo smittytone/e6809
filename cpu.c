@@ -941,15 +941,15 @@ void swi(uint8_t number) {
         set_cc_bit(F_BIT);
 
         // Set the PC to the interrupt vector
-        reg.pc = (mem[INTERRUPT_VECTOR_1] << 8) | mem[INTERRUPT_VECTOR_1 + 1];
+        reg.pc = (mem[SWI1_VECTOR] << 8) | mem[SWI1_VECTOR + 1];
     }
 
     if (number == 2) {
-        reg.pc = (mem[INTERRUPT_VECTOR_2] << 8) | mem[INTERRUPT_VECTOR_2 + 1];
+        reg.pc = (mem[SWI2_VECTOR] << 8) | mem[SWI2_VECTOR + 1];
     }
 
     if (number == 3) {
-        reg.pc = (mem[INTERRUPT_VECTOR_3] << 8) | mem[INTERRUPT_VECTOR_3 + 1];
+        reg.pc = (mem[SWI3_VECTOR] << 8) | mem[SWI3_VECTOR + 1];
     }
 }
 

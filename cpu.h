@@ -52,9 +52,13 @@
 
 #define PUSH_TO_HARD_STACK      true
 
-#define INTERRUPT_VECTOR_1      0xFFFA
-#define INTERRUPT_VECTOR_2      0xFFF4
-#define INTERRUPT_VECTOR_3      0xFFF2
+#define SWI3_VECTOR             0xFFF2
+#define SWI2_VECTOR             0xFFF4
+#define FIRQ_VECTOR             0xFFF6
+#define IRQ_VECTOR              0xFFF8
+#define SWI1_VECTOR             0xFFFA
+#define NMI_VECTOR              0xFFFC
+#define RESET_VECTOR            0xFFFE
 
 
 /*
