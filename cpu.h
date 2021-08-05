@@ -75,37 +75,119 @@ typedef struct {
 /*
  * PROTOTYPES
  */
-void        loop();
 void        process_next_instruction();
 void        do_branch(uint8_t bop, bool is_long);
 
-void     do_op(uint8_t op, bool is_long);
-uint8_t  get_mode(uint8_t n);
+// Memory access
+uint8_t     get_next_byte();
+uint8_t     get_byte(uint16_t address);
+void        set_byte(uint16_t address, uint8_t value);
+void        move_pc(int16_t amount);
+bool        is_bit_set(uint16_t value, uint8_t bit);
 
-uint8_t  add_two_8_bit_values(uint8_t a, uint8_t b);
-void     set_carry();
-void     clr_carry();
-bool     is_cc_bit(uint8_t bit);
-void     set_cc_bit(uint8_t bit);
-void     clr_cc_bit(uint8_t bit);
-void     set_cc(uint8_t value, uint8_t field);
-uint8_t  get_next_byte();
+// Condition code register bit-level getters and setters
+bool        is_cc_bit_set(uint8_t bit);
+void        set_cc_bit(uint8_t bit);
+void        clr_cc_bit(uint8_t bit);
+void        flp_cc_bit(uint8_t bit);
+void        clr_cc_nzv();
+void        set_cc_nz(uint16_t value, bool is_16_bit);
+void        set_cc_after_clr();
+void        set_cc_after_load(uint16_t value, bool is_16_bit);
+void        set_cc_after_store(uint16_t value, bool is_16_bit);
 
-void     decimal_adjust_a();
-uint8_t  do_or(uint8_t value, uint8_t with);
-uint8_t  do_and(uint8_t value, uint8_t with);
-uint8_t  do_com(uint8_t value);
-uint8_t  do_neg(uint8_t value);
-void     reg_transfer(bool is_exg);
-uint8_t  *nibble_to_reg_8(uint8_t n);
-uint16_t *nibble_to_reg_16(uint8_t n);
+// Op Primary Functions
+void        abx();
+void        adc(uint8_t op, uint8_t mode);
+void        add(uint8_t op, uint8_t mode);
+void        add_16(uint8_t op, uint8_t mode);
+void        and(uint8_t op, uint8_t mode);
+void        andcc(uint8_t value);
+void        asl(uint8_t op, uint8_t mode);
+void        asr(uint8_t op, uint8_t mode);
+void        bit(uint8_t op, uint8_t mode);
+void        clr(uint8_t op, uint8_t mode);
+void        cmp(uint8_t op, uint8_t mode);
+void        cmp_16(uint8_t op, uint8_t mode, uint8_t ex_op);
+void        com(uint8_t op, uint8_t mode);
+void        cwai();
+void        daa();
+void        dec(uint8_t op, uint8_t mode);
+void        eor(uint8_t op, uint8_t mode);
+void        inc(uint8_t op, uint8_t mode);
+void        jmp(uint8_t mode);
+void        jsr(uint8_t mode);
+void        ld(uint8_t op, uint8_t mode);
+void        ld_16(uint8_t op, uint8_t mode, uint8_t ex_op);
+void        lea(uint8_t op);
+void        lsr(uint8_t op, uint8_t mode);
+void        mul();
+void        neg(uint8_t op, uint8_t mode);
+void        orr(uint8_t op, uint8_t mode);
+void        orcc(uint8_t value);
+void        rol(uint8_t op, uint8_t mode);
+void        ror(uint8_t op, uint8_t mode);
+void        rti();
+void        rts();
+void        sbc(uint8_t op, uint8_t mode);
+void        sex();
+void        st(uint8_t op, uint8_t mode);
+void        st_16(uint8_t op, uint8_t mode, uint8_t ex_op);
+void        sub(uint8_t op, uint8_t mode);
+void        sub_16(uint8_t op, uint8_t mode, uint8_t ex_op);
+void        swi(uint8_t number);
+void        sync();
+void        tst(uint8_t op, uint8_t mode);
+
+// Op Helper Functions
+uint8_t     alu(uint8_t value_1, uint8_t value_2, bool use_carry);
+uint16_t    alu_16(uint16_t value_1, uint16_t value_2, bool use_carry);
+uint8_t     add_no_carry(uint8_t value, uint8_t amount);
+uint8_t     add_with_carry(uint8_t value, uint8_t amount);
+uint8_t     subtract(uint8_t value, uint8_t amount);
+uint16_t    subtract_16(uint16_t value_1, uint16_t value_2);
+uint8_t     sub_with_carry(uint8_t value, uint8_t amount);
+uint8_t     do_and(uint8_t value, uint8_t amount);
+uint8_t     do_or(uint8_t value, uint8_t amount);
+uint8_t     do_xor(uint8_t value, uint8_t amount);
+uint8_t     arith_shift_right(uint8_t value);
+uint8_t     logic_shift_left(uint8_t value);
+uint8_t     logic_shift_right(uint8_t value);
+uint8_t     partial_shift_right(uint8_t value);
+uint8_t     rotate_left(uint8_t value);
+uint8_t     rotate_right(uint8_t value);
+void        compare(uint8_t value, uint8_t amount);
+uint8_t     negate(uint8_t value);
+uint8_t     complement(uint8_t value);
+uint8_t     decrement(uint8_t value);
+uint8_t     increment(uint8_t value);
+uint8_t     *set_reg_ptr(uint8_t reg_code);
+uint16_t    *set_reg_16_ptr(uint8_t reg_code);
+void        transfer_decode2(uint8_t reg_code, bool is_swap);
+void        transfer_decode(uint8_t reg_code, bool is_swap);
+uint8_t     exchange(uint8_t value, uint8_t reg_code);
+void        load_effective(uint16_t amount, uint8_t reg_code);
+void        push(bool to_hardware, uint8_t post_byte);
+void        pull(bool from_hardware, uint8_t post_byte);
+void        test(uint8_t value);
+
+// Addressing Functions
+uint16_t    address_from_mode(uint8_t mode);
+uint16_t    address_from_next_two_bytes();
+uint16_t    address_from_dpr(int16_t offset);
+uint16_t    indexed_address(uint8_t post_byte);
+uint16_t    register_value(uint8_t source_reg);
+void        increment_register(uint8_t source_reg, int16_t amount);
+
+// Misc
+void reset_registers();
 
 
 /*
  * GLOBALS
  */
-REG_6809    reg_6809;
-uint8_t     mem_6809[KB64];
+REG_6809    reg;
+uint8_t     mem[KB64];
 bool        wait_for_interrupt;
 
 

@@ -7,7 +7,7 @@
  * @licence     MIT
  *
  */
-#include "e6809.h"
+#include "main.h"
 
 
 int main() {
@@ -25,8 +25,6 @@ void boot() {
 void loop() {
 
     while(1) {
-        process_next_instruction()
+        process_next_instruction();
     }
 }
-
-

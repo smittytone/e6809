@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 include(pico_sdk_import.cmake)
 project(e6809 VERSION 1.0.0)
 add_executable(e6809
-               e6809.c
+               main.c
                cpu.c)
 
 pico_sdk_init()
