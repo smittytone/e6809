@@ -31,7 +31,9 @@ uint32_t process_next_instruction() {
     uint8_t extended_opcode = 0;
     uint8_t address_mode = MODE_UNKNOWN;
 
-    if (opcode == OPCODE_EXTENDED_1 || opcode == OPCODE_EXTENDED_2) {
+    // Keep reading extended opcodes until we hit a real one
+    // See MC6809 data sheet fig.17
+    while (opcode == OPCODE_EXTENDED_1 || opcode == OPCODE_EXTENDED_2) {
         extended_opcode = opcode;
         opcode = get_next_byte();
     }
@@ -254,27 +256,25 @@ void do_branch(uint8_t bop, bool is_long) {
 
     if (bop == BRA) branch = true;
 
-    if (bop == BEQ && is_cc_bit_set(Z_BIT)) branch = true;
+    if (bop == BEQ &&  is_cc_bit_set(Z_BIT)) branch = true;
     if (bop == BNE && !is_cc_bit_set(Z_BIT)) branch = true;
 
-    if (bop == BMI && is_cc_bit_set(N_BIT)) branch = true;
-    if (bop == BPL && is_cc_bit_set(N_BIT)) branch = true;
+    if (bop == BMI &&  is_cc_bit_set(N_BIT)) branch = true;
+    if (bop == BPL && !is_cc_bit_set(N_BIT)) branch = true;
 
-    if (bop == BVS && is_cc_bit_set( V_BIT)) branch = true;
-    if (bop == BVC && is_cc_bit_set(V_BIT)) branch = true;
+    if (bop == BVS &&  is_cc_bit_set(V_BIT)) branch = true;
+    if (bop == BVC && !is_cc_bit_set(V_BIT)) branch = true;
 
-    if (bop == BLO && is_cc_bit_set(C_BIT)) branch = true; // Also BCS
-    if (bop == BHS && is_cc_bit_set(C_BIT)) branch = true; // Also BCC
+    if (bop == BLO &&  is_cc_bit_set(C_BIT)) branch = true; // Also BCS
+    if (bop == BHS && !is_cc_bit_set(C_BIT)) branch = true; // Also BCC
 
-    if (bop == BGE && (is_cc_bit_set(N_BIT) == is_cc_bit_set(V_BIT))) branch = true;
-    if (bop == BGT && !is_cc_bit_set(Z_BIT) && is_cc_bit_set(N_BIT)) branch = true;
-    if (bop == BHI && !is_cc_bit_set(C_BIT) && !is_cc_bit_set(Z_BIT)) branch = true;
+    if (bop == BLE &&  (is_cc_bit_set(Z_BIT) || (is_cc_bit_set(N_BIT) != is_cc_bit_set(V_BIT)))) branch = true;
+    if (bop == BGT && !(is_cc_bit_set(Z_BIT) || (is_cc_bit_set(N_BIT) != is_cc_bit_set(V_BIT)))) branch = true;
+    if (bop == BLT &&  (is_cc_bit_set(N_BIT) != is_cc_bit_set(V_BIT))) branch = true;
+    if (bop == BGE && !(is_cc_bit_set(N_BIT) != is_cc_bit_set(V_BIT))) branch = true;
 
-    if (bop == BLE && (is_cc_bit_set(Z_BIT) || ((is_cc_bit_set(N_BIT) || is_cc_bit_set(V_BIT) && is_cc_bit_set(N_BIT) != is_cc_bit_set(V_BIT))))) branch = true;
-
-    if (bop == BLS && (is_cc_bit_set(C_BIT) || is_cc_bit_set(Z_BIT))) branch = true;
-    if (bop == BLT && (is_cc_bit_set(N_BIT) || is_cc_bit_set(V_BIT)) && is_cc_bit_set(V_BIT)) branch = true;
-
+    if (bop == BLS &&  (is_cc_bit_set(C_BIT) || is_cc_bit_set(Z_BIT))) branch = true;
+    if (bop == BHI && !(is_cc_bit_set(C_BIT) || is_cc_bit_set(Z_BIT))) branch = true;
 
     if (bop == BSR) {
         // Branch to Subroutine: push PC to hardware stack (S) first
@@ -285,7 +285,7 @@ void do_branch(uint8_t bop, bool is_long) {
         set_byte(reg.s, ((reg.pc >> 8) & 0xFF));
     }
 
-    if (branch) reg.pc += (uint16_t)offset;
+    if (branch) reg.pc += offset;
 }
 
 
