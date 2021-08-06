@@ -242,7 +242,7 @@ uint32_t process_next_instruction() {
 
 void do_branch(uint8_t bop, bool is_long) {
 
-    int32_t offset = 0;
+    int16_t offset = 0;
 
     if (is_long) {
         offset = address_from_next_two_bytes();
@@ -328,15 +328,15 @@ bool is_cc_bit_set(uint8_t bit) {
 }
 
 void set_cc_bit(uint8_t bit) {
-    reg.cc = (reg.cc | (1 << bit));
+    reg.cc |= (1 << bit);
 }
 
 void clr_cc_bit(uint8_t bit) {
-    reg.cc = (reg.cc & ~(1 << bit));
+    reg.cc &= ~(1 << bit);
 }
 
 void flp_cc_bit(uint8_t bit) {
-    reg.cc = (reg.cc ^ (1 << bit));
+    reg.cc ^= (1 << bit);
 }
 
 void clr_cc_nzv() {
@@ -571,7 +571,7 @@ void cwai() {
     // Clear CC bits and Wait for Interrupt
     // AND CC with the operand, set e, then push every register,
     // including CC to the hardware stack
-    reg.cc = reg.cc & mem[reg.pc];
+    reg.cc &= mem[reg.pc];
     set_cc_bit(E_BIT);
     push(PUSH_TO_HARD_STACK, PUSH_PULL_EVERY_REG);
     wait_for_interrupt = true;
@@ -731,7 +731,7 @@ void lsr(uint8_t op, uint8_t mode) {
 void mul() {
     // MUL: A x B -> D (unsigned)
     // Affects Z, C
-    reg.cc = reg.cc & MASK_ZC;
+    reg.cc &= MASK_ZC;
 
     uint16_t d = reg.a * reg.b;
     if (is_bit_set(d, 7)) set_cc_bit(C_BIT);
@@ -769,7 +769,7 @@ void orr(uint8_t op, uint8_t mode) {
 
 void orcc(uint8_t value) {
     // OR CC: CC | M -> CC
-    reg.cc = reg.cc | value;
+    reg.cc |= value;
 }
 
 void rol(uint8_t op, uint8_t mode) {
@@ -837,7 +837,7 @@ void sbc(uint8_t op, uint8_t mode) {
 void sex() {
     // SEX: sign-extend B into A
     // Affects N, Z
-    reg.cc = reg.cc & MASK_NZ;
+    reg.cc &= MASK_NZ;
     reg.a = 0;
     if (is_bit_set(reg.b, SIGN_BIT_8)) {
         reg.a = 0xFF;
@@ -900,7 +900,7 @@ void sub_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
     // SUBD: D - M:M + 1 -> D
     // Affects N, Z, V, C
     //         V, C (H) set by 'alu()'
-    reg.cc = reg.cc & MASK_NZV;
+    reg.cc &= MASK_NZV;
 
     // Complement the value at M:M + 1
     // NOTE Don't use 'negate()' because we need to
@@ -1054,7 +1054,7 @@ uint8_t add_no_carry(uint8_t value, uint8_t amount) {
     // Adds two 8-bit values
 	// Affects H, N, Z, V, C
     //         'alu:' sets H, V, C
-    reg.cc = reg.cc & MASK_NZ;
+    reg.cc &= MASK_NZ;
     uint8_t answer = alu(value, amount, false);
     set_cc_nz(answer, false);
     return answer;
@@ -1064,7 +1064,7 @@ uint8_t add_with_carry(uint8_t value, uint8_t amount) {
     // Adds two 8-bit values plus CC C
     // Affects H, N, Z, V, C
     //         'alu()' sets H, V, C
-    reg.cc = reg.cc & MASK_NZ;
+    reg.cc &= MASK_NZ;
     uint8_t answer = alu(value, amount, true);
     set_cc_nz(answer, false);
     return answer;
@@ -1074,7 +1074,7 @@ uint8_t subtract(uint8_t value, uint8_t amount) {
     // Subtract 'amount' from 'value' by adding 'value' to -'amount'
     // Affects N, Z, V, C
     //         V, C (H) set by 'alu()'
-    reg.cc = reg.cc & MASK_NZVC;
+    reg.cc &= MASK_NZVC;
     uint8_t comp = negate(amount);
     uint8_t answer = alu(value, amount, false);
     set_cc_nz(answer, false);
@@ -1095,7 +1095,7 @@ uint16_t subtract_16(uint16_t value, uint16_t amount) {
     uint8_t msb = complement((amount >> 8) & 0xFF);
     uint8_t lsb = complement(amount & 0xFF);
 
-    reg.cc = reg.cc & MASK_NZ;
+    reg.cc &= MASK_NZ;
 
     // Add 1 to form the 2's complement
     lsb = alu(lsb, 1, false);
@@ -1120,7 +1120,7 @@ uint8_t sub_with_carry(uint8_t value, uint8_t amount) {
     // Subtract with Carry (borrow)
     // Affects N, Z, V, C
     //         V, C (H) set by 'alu()'
-    reg.cc = reg.cc & MASK_NZV;
+    reg.cc &= MASK_NZV;
     uint8_t comp = negate(amount);
     uint8_t answer = alu(value, comp, true);
     set_cc_nz(answer, false);
@@ -1172,7 +1172,7 @@ uint8_t arith_shift_right(uint8_t value) {
 uint8_t logic_shift_left(uint8_t value) {
     // Logical shift left
     // Affects N, Z, V, C
-    reg.cc = reg.cc & MASK_NZVC;
+    reg.cc &= MASK_NZVC;
     if (is_bit_set(value, 7)) set_cc_bit(C_BIT);
     if (is_bit_set(value, 7) != is_bit_set(value, 6)) set_cc_bit(V_BIT);
 
@@ -1204,7 +1204,7 @@ uint8_t logic_shift_right(uint8_t value) {
 
 uint8_t partial_shift_right(uint8_t value) {
     // Code common to LSR and ASR
-    reg.cc = reg.cc & MASK_NZC;
+    reg.cc &= MASK_NZC;
     if (is_bit_set(value, 0)) set_cc_bit(C_BIT);
 
     for (uint32_t i = 0 ; i < 7 ; i++) {
@@ -1224,7 +1224,7 @@ uint8_t rotate_left(uint8_t value) {
 
     // C becomes bit 7 of original operand
     bool carry = is_cc_bit_set(C_BIT);
-    reg.cc = reg.cc & MASK_NZVC;
+    reg.cc &= MASK_NZVC;
     if (is_bit_set(value, 7)) set_cc_bit(C_BIT);
 
     // N is bit 7 XOR bit 6 of value
@@ -1255,7 +1255,7 @@ uint8_t rotate_right(uint8_t value) {
 
     // C becomes bit 0 of original operand
     bool carry = is_cc_bit_set(C_BIT);
-    reg.cc = reg.cc & MASK_NZC;
+    reg.cc &= MASK_NZC;
     if (is_bit_set(value, 0)) set_cc_bit(C_BIT);
 
     for (uint32_t i = 0 ; i < 7 ; i++) {
@@ -1282,7 +1282,7 @@ void compare(uint8_t value, uint8_t amount) {
     // Result is discarded
     // Affects N, Z, V, C
     //         C, V (H) set by 'alu()' via 'subtract()'
-    reg.cc = reg.cc & MASK_NZVC;
+    reg.cc &= MASK_NZVC;
     uint8_t answer = subtract(value, amount);
     set_cc_nz(value, false);
 }
