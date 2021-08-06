@@ -7,12 +7,13 @@ add_executable(e6809
 
 pico_sdk_init()
 
-pico_enable_stdio_usb(e6809 1)
-pico_enable_stdio_uart(e6809 1)
-pico_add_extra_outputs(e6809)
-
 target_link_libraries(e6809
                       pico_stdlib
                       hardware_gpio
                       hardware_i2c
                       hardware_adc)
+
+pico_enable_stdio_usb(e6809 1)
+pico_enable_stdio_uart(e6809 0)
+pico_add_extra_outputs(e6809)
+#example_auto_set_url(e6809)

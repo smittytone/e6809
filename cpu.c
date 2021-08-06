@@ -46,12 +46,12 @@ uint32_t process_next_instruction() {
             if (lsn == 0x03) sync();
             if (lsn == 0x06) do_branch(BRA, true);  // Set correct op for LBRA handling
             if (lsn == 0x07) do_branch(BSR, true);  // Set correct op for LBSR handling
-            if (lsn == DAA) daa();
-            if (lsn == ORCC_immed) orr(reg.cc, get_next_byte());
-            if (lsn == ANDCC_immed) and(reg.cc, get_next_byte());
-            if (lsn == SEX) sex();
-            if (lsn == EXG_immed) transfer_decode(get_next_byte(), true);
-            if (lsn == TFR_immed) transfer_decode(get_next_byte(), false);
+            if (lsn == 0x09) daa();
+            if (lsn == 0x0A) orcc(get_next_byte());
+            if (lsn == 0x0C) andcc(get_next_byte());
+            if (lsn == 0x0D) sex();
+            if (lsn == 0x0E) transfer_decode2(get_next_byte(), true);
+            if (lsn == 0x0F) transfer_decode2(get_next_byte(), false);
             return cycles_used;
         }
 
@@ -255,7 +255,7 @@ void do_branch(uint8_t bop, bool is_long) {
     if (bop == BRA) branch = true;
 
     if (bop == BEQ && is_cc_bit_set(Z_BIT)) branch = true;
-    if (bop == BNE && is_cc_bit_set(Z_BIT)) branch = true;
+    if (bop == BNE && !is_cc_bit_set(Z_BIT)) branch = true;
 
     if (bop == BMI && is_cc_bit_set(N_BIT)) branch = true;
     if (bop == BPL && is_cc_bit_set(N_BIT)) branch = true;
@@ -270,7 +270,7 @@ void do_branch(uint8_t bop, bool is_long) {
     if (bop == BGT && !is_cc_bit_set(Z_BIT) && is_cc_bit_set(N_BIT)) branch = true;
     if (bop == BHI && !is_cc_bit_set(C_BIT) && !is_cc_bit_set(Z_BIT)) branch = true;
 
-    if (bop == BLE && (is_cc_bit_set(Z_BIT) || ((is_cc_bit_set( N_BIT) || is_cc_bit_set(V_BIT) && is_cc_bit_set(N_BIT) != is_cc_bit_set(V_BIT))))) branch = true;
+    if (bop == BLE && (is_cc_bit_set(Z_BIT) || ((is_cc_bit_set(N_BIT) || is_cc_bit_set(V_BIT) && is_cc_bit_set(N_BIT) != is_cc_bit_set(V_BIT))))) branch = true;
 
     if (bop == BLS && (is_cc_bit_set(C_BIT) || is_cc_bit_set(Z_BIT))) branch = true;
     if (bop == BLT && (is_cc_bit_set(N_BIT) || is_cc_bit_set(V_BIT)) && is_cc_bit_set(V_BIT)) branch = true;
@@ -1107,7 +1107,7 @@ uint16_t subtract_16(uint16_t value, uint16_t amount) {
 
     // Convert the bytes back to a 16-bit value and set the CC
     uint16_t answer = (msb << 8) | lsb;
-    set_cc_nz(answer, false);
+    set_cc_nz(answer, true);
 
     // c represents a borrow and is set to the complement of the carry
     // of the internal binary addition
@@ -2000,8 +2000,8 @@ void reset_registers() {
     reg.b = 0;
     reg.x = 0;
     reg.y = 0;
-    reg.s = 0;
-    reg.u = 0;
+    reg.s = 0xFFFF;
+    reg.u = 0xFFFF;
     reg.pc = 0;
     reg.cc = 0;
     reg.dp = 0;

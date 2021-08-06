@@ -27,9 +27,13 @@
 /*
  * CONSTANTS
  */
-#define PIN_STEP_BUTTON             24
+#define PIN_STEP_BUTTON             17
 #define DEBOUNCE_TIME_US            5000
 
+#define PIN_LED_C                   2
+#define PIN_LED_V                   3
+#define PIN_LED_Z                   4
+#define PIN_LED_N                   5
 
 /*
  * STRUCTURES
@@ -42,6 +46,7 @@
 void        boot();
 void        loop();
 void        inkey();
+void        setup_cc_leds();
 void        dump_registers();
 
 
