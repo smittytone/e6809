@@ -872,10 +872,18 @@ void st_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
     // Get the effective address of the data
     uint16_t address = address_from_mode(mode);
 
-    // Set a pointer to the target register (assume D)
-    uint16_t *reg_ptr = (uint16_t *)reg.a;
-    if (op == STU_direct) reg_ptr = op == OPCODE_EXTENDED_1 ? &reg.s : &reg.u;
-    if (op == STX_direct) reg_ptr = op == OPCODE_EXTENDED_1 ? &reg.y : &reg.x;
+    // Set a pointer to the target register
+    bool touched_d = false;
+    uint16_t *reg_ptr;
+    if (op == STU_direct) {
+        reg_ptr = op == OPCODE_EXTENDED_1 ? &reg.s : &reg.u;
+    } else if (op == STX_direct) {
+        reg_ptr = op == OPCODE_EXTENDED_1 ? &reg.y : &reg.x;
+    } else {
+        reg.d = (reg.a << 8) | reg.d;
+        uint16_t *reg_ptr = &reg.d;
+        touched_d = true;
+    }
 
     // Write the target register out
     set_byte(address, ((*reg_ptr >> 8) & 0xFF));
@@ -883,6 +891,12 @@ void st_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
 
     // Update the CC register
     set_cc_after_store(*reg_ptr, true);
+
+    // If the op touched D re-set the components
+    if (touched_d) {
+        reg.b = reg.d & 0xFF;
+        reg.a = (reg.d >> 8) & 0xFF;
+    }
 }
 
 void sub(uint8_t op, uint8_t mode) {
@@ -1380,8 +1394,8 @@ uint16_t *set_reg_16_ptr(uint8_t reg_code) {
             return &reg.pc;
     }
 
-    // Proxy for D
-    return (uint16_t *)&reg.a;
+    // Return a pointer to d
+    return &reg.d;
 }
 
 
@@ -1390,30 +1404,33 @@ void transfer_decode2(uint8_t reg_code, bool is_swap) {
     uint8_t source_reg = (reg_code & 0xF0) >> 4;
     uint8_t dest_reg = reg_code & 0x0F;
 
-    uint8_t *src_ptr;
-    uint8_t *dst_ptr;
-    uint16_t *src_16_ptr;
-    uint16_t *dst_16_ptr;
-    uint16_t val_16;
-    uint8_t val;
-
     if (source_reg < 0x08 && dest_reg > 0x05) return;
     if (source_reg > 0x05 && dest_reg < 0x08) return;
 
     if (source_reg > 0x05) {
         // 8-bit transfers
-        src_ptr = set_reg_ptr(source_reg);
-        dst_ptr = set_reg_ptr(dest_reg);
-        val = *dst_ptr;
+        uint8_t *src_ptr = set_reg_ptr(source_reg);
+        uint8_t *dst_ptr = set_reg_ptr(dest_reg);
+        uint8_t val = *dst_ptr;
         *dst_ptr = *src_ptr;
         if (is_swap) *src_ptr = val;
     } else {
         // 16-bit transfers
-        src_16_ptr = set_reg_16_ptr(source_reg);
-        dst_16_ptr = set_reg_16_ptr(dest_reg);
-        val_16 = *dst_16_ptr;
+
+        // If the op touches D, use the temporary 16-bit register
+        if (source_reg == 0x00 || dest_reg == 0x00) reg.d = (reg.a << 8) | (reg.b);
+
+        uint16_t *src_16_ptr = set_reg_16_ptr(source_reg);
+        uint16_t *dst_16_ptr = set_reg_16_ptr(dest_reg);
+        uint16_t val_16 = *dst_16_ptr;
         *dst_16_ptr = *src_16_ptr;
         if (is_swap) *src_16_ptr = val_16;
+
+        // If the op touched D, restore the components
+        if (source_reg == 0x00 || dest_reg == 0x00) {
+            reg.b = reg.d & 0xFF;
+            reg.a = (reg.d >> 8) &0xFF;
+        }
     }
 }
 

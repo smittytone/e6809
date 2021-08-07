@@ -67,6 +67,7 @@
 typedef struct {
     uint8_t  a;
     uint8_t  b;
+    uint16_t d; // Only used for TFR/EXG ops which require a pointer to a unit16_7
     uint16_t x;
     uint16_t y;
     uint16_t s;
