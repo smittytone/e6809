@@ -1073,8 +1073,7 @@ uint16_t alu_16(uint16_t value_1, uint16_t value_2, bool use_carry) {
 uint8_t add_no_carry(uint8_t value, uint8_t amount) {
     // Adds two 8-bit values
 	// Affects H, N, Z, V, C
-    //         'alu:' sets H, V, C
-    reg.cc &= MASK_NZ;
+    //         'alu()' sets H, V, C
     uint8_t answer = alu(value, amount, false);
     set_cc_nz(answer, false);
     return answer;
@@ -1084,26 +1083,48 @@ uint8_t add_with_carry(uint8_t value, uint8_t amount) {
     // Adds two 8-bit values plus CC C
     // Affects H, N, Z, V, C
     //         'alu()' sets H, V, C
-    reg.cc &= MASK_NZ;
     uint8_t answer = alu(value, amount, true);
     set_cc_nz(answer, false);
     return answer;
 }
 
 uint8_t subtract(uint8_t value, uint8_t amount) {
-    // Subtract 'amount' from 'value' by adding 'value' to -'amount'
+    // Subtract without Carry
+    return base_sub(value, amount, false);
+}
+
+uint8_t sub_with_carry(uint8_t value, uint8_t amount) {
+    // Subtract with Carry (borrow)
+    return base_sub(value, amount, true);
+}
+
+uint8_t base_sub(uint8_t value, uint8_t amount, bool use_carry) {
+    // Generic subtract
     // Affects N, Z, V, C
+    //         V, C set by 'negate()'
     //         V, C (H) set by 'alu()'
-    reg.cc &= MASK_NZVC;
+
+    // 'negate()' affects C, so preserve it
+    bool c_set = is_cc_bit_set(C_BIT);
     uint8_t comp = negate(amount);
-    uint8_t answer = alu(value, comp, false);
-    set_cc_nz(answer, false);
+
+    // Un-flip C, flipped by 'negate()'
+    if (c_set) {
+        set_cc_bit(C_BIT);
+    } else {
+        clr_cc_bit(C_BIT);
+    }
+
+    uint8_t answer = alu(value, comp, use_carry);
 
     // C represents a borrow and is set to the complement of the carry
     // of the internal binary addition
     flp_cc_bit(C_BIT);
+
+    set_cc_nz(answer, false);
     return answer;
 }
+
 
 uint16_t subtract_16(uint16_t value, uint16_t amount) {
     // Subtract amount from value
@@ -1136,20 +1157,41 @@ uint16_t subtract_16(uint16_t value, uint16_t amount) {
     return answer;
 }
 
-uint8_t sub_with_carry(uint8_t value, uint8_t amount) {
-    // Subtract with Carry (borrow)
-    // Affects N, Z, V, C
-    //         V, C (H) set by 'alu()'
-    reg.cc &= MASK_NZV;
-    uint8_t comp = negate(amount);
-    uint8_t answer = alu(value, comp, true);
-    set_cc_nz(answer, false);
+uint8_t negate(uint8_t value) {
+    // Returns 2's complement of 8-bit value
+    // Affects Z, N, V, C
+    //         C, V (H) set by 'alu()'
+    //         V set only if value is 0x80 (see Zaks p 167)
+    // Preserve 'value' to set V bit
+    uint8_t answer = value;
 
-    // C represents a borrow and is set to the complement of the carry
-    // of the internal binary addition
+    // Flip value's bits to make the 1s complenent
+    for (uint32_t i = 0 ; i < 8 ; i++) {
+        answer = answer ^ (1 << i);
+    }
+
+    // Add 1 to the bits to get the 2s complement
+    answer = alu(answer, 1, false);
+
+    // C represents a borrow and is set to the complement of
+    // the carry of the internal binary addition
     flp_cc_bit(C_BIT);
+
+    if (value == 0x80) set_cc_bit(V_BIT);
+    set_cc_nz(answer, false);
     return answer;
 }
+
+void compare(uint8_t value, uint8_t amount) {
+    // Compare two values by subtracting the second from the first.
+    // Result is discarded
+    // Affects N, Z, V, C
+    //         C, V (H) set by 'alu()' via 'subtract()'
+    //         'subtract()' calls 'negate()', calls 'alu()'
+    uint8_t answer = subtract(value, amount);
+    set_cc_nz(answer, false);
+}
+
 
 uint8_t do_and(uint8_t value, uint8_t amount) {
     // ANDs the two supplied values
@@ -1295,38 +1337,6 @@ uint8_t rotate_right(uint8_t value) {
 
     set_cc_nz(value, false);
     return value;
-}
-
-void compare(uint8_t value, uint8_t amount) {
-    // Compare two values by subtracting the second from the first.
-    // Result is discarded
-    // Affects N, Z, V, C
-    //         C, V (H) set by 'alu()' via 'subtract()'
-    uint8_t answer = subtract(value, amount);
-    set_cc_nz(answer, false);
-}
-
-uint8_t negate(uint8_t value) {
-    // Returns 2's complement of 8-bit value
-    // Affects Z, N, V, C
-    //         C, V (H) set by 'alu()'
-    //         V set only if value is 0x80 (see Zaks p 167)
-    reg.cc &= MASK_NZVC;
-    if (value == 0x80) set_cc_bit(V_BIT);
-
-    // Flip value's bits to make the 1s complenent
-    for (uint32_t i = 0 ; i < 8 ; i++) {
-        value = value ^ (1 << i);
-    }
-
-    // Add 1 to the bits to get the 2s complement
-    uint8_t answer = alu(value, 1, false);
-    set_cc_nz(answer, false);
-
-    // c represents a borrow and is set to the complement of
-    // the carry of the internal binary addition
-    flp_cc_bit(C_BIT);
-    return answer;
 }
 
 uint8_t complement(uint8_t value) {
