@@ -1155,7 +1155,7 @@ uint8_t do_and(uint8_t value, uint8_t amount) {
     // ANDs the two supplied values
     // Affects N, Z, V
     //         V is always cleared
-    clr_cc_nzv();
+    clr_cc_bit(V_BIT);
     uint8_t answer = value & amount;
     set_cc_nz(answer, false);
     return answer;
@@ -1165,7 +1165,7 @@ uint8_t do_or(uint8_t value, uint8_t amount) {
     // OR
     // Affects N, Z, V
     //         V is always cleared
-    clr_cc_nzv();
+    clr_cc_bit(V_BIT);
     uint8_t answer = value | amount;
     set_cc_nz(answer, false);
     return answer;
@@ -1175,7 +1175,7 @@ uint8_t do_xor(uint8_t value, uint8_t amount) {
     // Perform an exclusive OR
     // Affects N, Z, V
     //         V always cleared
-    clr_cc_nzv();
+    clr_cc_bit(V_BIT);
     uint8_t answer = value ^ amount;
     set_cc_nz(answer, false);
     return answer;
@@ -1302,7 +1302,6 @@ void compare(uint8_t value, uint8_t amount) {
     // Result is discarded
     // Affects N, Z, V, C
     //         C, V (H) set by 'alu()' via 'subtract()'
-    reg.cc &= MASK_NZVC;
     uint8_t answer = subtract(value, amount);
     set_cc_nz(answer, false);
 }
@@ -1334,7 +1333,7 @@ uint8_t complement(uint8_t value) {
     // One's complement the passed value
     // Affects N, Z, V, C
     //         V, C take fixed values: 0, 1
-    clr_cc_nzv();
+    clr_cc_bit(V_BIT);
     set_cc_bit(C_BIT);
 
     for (uint32_t i = 0 ; i < 8 ; i++) {
@@ -1349,9 +1348,9 @@ uint8_t decrement(uint8_t value) {
     // Subtract 1 from the operand
     // Affects: N, Z, V
     //          V set only if value is $80
-    clr_cc_nzv();
 
     // See 'Programming the 6809' p 155
+    clr_cc_bit(V_BIT);
     if (value == 0x80) set_cc_bit(V_BIT);
 
     uint8_t answer = value - 1;
@@ -1362,9 +1361,9 @@ uint8_t decrement(uint8_t value) {
 uint8_t increment(uint8_t value) {
     // Add 1 to the operand
     // Affects N, Z, V
-    clr_cc_nzv();
 
     // See 'Programming the 6809' p 158
+    clr_cc_bit(V_BIT);
     if (value == 0x7F) set_cc_bit(V_BIT);
 
     uint8_t answer = value + 1;
