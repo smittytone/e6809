@@ -346,6 +346,7 @@ void clr_cc_nzv() {
 
 void set_cc_nz(uint16_t value, bool is_16_bit) {
     // Set Z and N based on a single 8- or 16-bit input value
+    reg.cc &= MASK_NZ;
     if (value == 0) set_cc_bit(Z_BIT);
     if (is_bit_set(value, (is_16_bit ? SIGN_BIT_16 : SIGN_BIT_8))) set_cc_bit(N_BIT);
 }
@@ -683,21 +684,26 @@ void ld_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
     uint16_t address = address_from_mode(mode);
 
     // 'address_from_mode()' assumes an 8-bit read, so we need to increase PC by 1
-    reg.pc++;
+    if (mode == MODE_IMMEDIATE) reg.pc++;
 
-    // Set a pointer to the target register
-    uint16_t d = 0;
-    uint16_t *reg_ptr = &d;
-    if (op == LDU_immed) reg_ptr = ex_op == OPCODE_EXTENDED_1 ? &reg.s : &reg.u;
-    if (op == LDX_immed) reg_ptr = ex_op == OPCODE_EXTENDED_1 ? &reg.y : &reg.x;
+    bool touched_d = false;
+    uint16_t *reg_ptr;
+    if (op < 0xCC) {
+        reg_ptr = ex_op == OPCODE_EXTENDED_1 ? &reg.y : &reg.x;
+    } else if ((op & 0x0F) == 0x0E) {
+        reg_ptr = ex_op == OPCODE_EXTENDED_1 ? &reg.s : &reg.u;
+    } else {
+        reg_ptr = &reg.d;
+        touched_d = true;
+    }
 
     // Write the data into the target register
     *reg_ptr = (get_byte(address) << 8) | get_byte(address + 1);
 
     // Set the A and B registers if we're targeting D
-    if (op == LDD_immed) {
-        reg.a = (d >> 8) & 0xFF;
-        reg.b = d & 0xFF;
+    if (touched_d) {
+        reg.a = (reg.d >> 8) & 0xFF;
+        reg.b = reg.d & 0xFF;
     }
 
     // Update the CC register
@@ -1090,7 +1096,7 @@ uint8_t subtract(uint8_t value, uint8_t amount) {
     //         V, C (H) set by 'alu()'
     reg.cc &= MASK_NZVC;
     uint8_t comp = negate(amount);
-    uint8_t answer = alu(value, amount, false);
+    uint8_t answer = alu(value, comp, false);
     set_cc_nz(answer, false);
 
     // C represents a borrow and is set to the complement of the carry
@@ -1298,7 +1304,7 @@ void compare(uint8_t value, uint8_t amount) {
     //         C, V (H) set by 'alu()' via 'subtract()'
     reg.cc &= MASK_NZVC;
     uint8_t answer = subtract(value, amount);
-    set_cc_nz(value, false);
+    set_cc_nz(answer, false);
 }
 
 uint8_t negate(uint8_t value) {
@@ -1306,7 +1312,7 @@ uint8_t negate(uint8_t value) {
     // Affects Z, N, V, C
     //         C, V (H) set by 'alu()'
     //         V set only if value is 0x80 (see Zaks p 167)
-    clr_cc_nzv();
+    reg.cc &= MASK_NZVC;
     if (value == 0x80) set_cc_bit(V_BIT);
 
     // Flip value's bits to make the 1s complenent
