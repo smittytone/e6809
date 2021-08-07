@@ -57,8 +57,8 @@ uint32_t process_next_instruction() {
             return cycles_used;
         }
 
-        if (msn == 0x02) {
-            // All 0x02 ops are branch ops
+        if (msn == 0x02 || opcode == BSR) {
+            // All 0x02 ops are branch ops, but BSR is 0x8D
             do_branch(opcode, (extended_opcode != 0));
             return cycles_used;
         }
@@ -875,10 +875,10 @@ void st_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
     // Set a pointer to the target register
     bool touched_d = false;
     uint16_t *reg_ptr;
-    if (op == STU_direct) {
-        reg_ptr = op == OPCODE_EXTENDED_1 ? &reg.s : &reg.u;
-    } else if (op == STX_direct) {
-        reg_ptr = op == OPCODE_EXTENDED_1 ? &reg.y : &reg.x;
+    if (op < STD_direct) {
+        reg_ptr = ex_op == OPCODE_EXTENDED_1 ? &reg.y : &reg.x;
+    } else if ((op & 0x0F) == 0x0F) {
+        reg_ptr = ex_op == OPCODE_EXTENDED_1 ? &reg.s : &reg.u;
     } else {
         reg.d = (reg.a << 8) | reg.d;
         uint16_t *reg_ptr = &reg.d;
