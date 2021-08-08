@@ -48,6 +48,6 @@ void        loop();
 void        inkey();
 void        setup_cc_leds();
 void        dump_registers();
-
+void        run_tests();
 
 #endif // _E6809_HEADER_

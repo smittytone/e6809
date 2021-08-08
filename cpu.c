@@ -752,13 +752,13 @@ void neg(uint8_t op, uint8_t mode) {
     // NEG: !R + 1 -> R, !M + 1 -> M
     if (mode == MODE_INHERENT) {
         if (op == NEGA) {
-            reg.a = negate(reg.a);
+            reg.a = negate(reg.a, false);
         } else {
-            reg.b = negate(reg.b);
+            reg.b = negate(reg.b, false);
         }
     } else {
         uint16_t address = address_from_mode(mode);
-        set_byte(address, negate(get_byte(address)));
+        set_byte(address, negate(get_byte(address), false));
     }
 }
 
@@ -1104,17 +1104,7 @@ uint8_t base_sub(uint8_t value, uint8_t amount, bool use_carry) {
     //         V, C set by 'negate()'
     //         V, C (H) set by 'alu()'
 
-    // 'negate()' affects C, so preserve it
-    bool c_set = is_cc_bit_set(C_BIT);
-    uint8_t comp = negate(amount);
-
-    // Un-flip C, flipped by 'negate()'
-    if (c_set) {
-        set_cc_bit(C_BIT);
-    } else {
-        clr_cc_bit(C_BIT);
-    }
-
+    uint8_t comp = negate(amount, true);
     uint8_t answer = alu(value, comp, use_carry);
 
     // C represents a borrow and is set to the complement of the carry
@@ -1157,7 +1147,7 @@ uint16_t subtract_16(uint16_t value, uint16_t amount) {
     return answer;
 }
 
-uint8_t negate(uint8_t value) {
+uint8_t negate(uint8_t value, bool is_intermediate) {
     // Returns 2's complement of 8-bit value
     // Affects Z, N, V, C
     //         C, V (H) set by 'alu()'
@@ -1173,6 +1163,9 @@ uint8_t negate(uint8_t value) {
     // Add 1 to the bits to get the 2s complement
     answer = alu(answer, 1, false);
 
+    // Return without setting CC
+    if (is_intermediate) return answer;
+
     // C represents a borrow and is set to the complement of
     // the carry of the internal binary addition
     flp_cc_bit(C_BIT);
@@ -1186,10 +1179,9 @@ void compare(uint8_t value, uint8_t amount) {
     // Compare two values by subtracting the second from the first.
     // Result is discarded
     // Affects N, Z, V, C
-    //         C, V (H) set by 'alu()' via 'subtract()'
-    //         'subtract()' calls 'negate()', calls 'alu()'
-    uint8_t answer = subtract(value, amount);
-    set_cc_nz(answer, false);
+    //         C, V (H) set by 'alu()' via 'base_sub()'
+    //         'base_sub()' sets N, Z
+    uint8_t answer = base_sub(value, amount, false);
 }
 
 

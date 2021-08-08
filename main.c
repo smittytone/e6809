@@ -140,3 +140,41 @@ void dump_registers() {
     printf("%s\n", cc_oop);
     printf("--------------------------------------------------\n");
 }
+
+
+void run_tests() {
+    uint32_t errors = 0;
+    uint32_t passes = 0;
+    uint32_t tests = 0;
+
+    // Test 1
+    tests++;
+    reg.cc = 0x00;
+    compare(0xF6, 0x18);
+    if (reg.cc == 0x04) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    // Test 2
+    tests++;
+    reg.cc = 0x00;
+    unit8_t result = complement(0x23);
+    if (rresult == 0xDC && reg.cc == 0x05) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    // Test 3
+    tests++;
+    reg.cc = 0x00;
+    reg.a = add_no_carry(0x39, 0x47);
+    daa();
+    if (reg.aa == 0x86) {
+        passes++;
+    } else {
+        errors++;
+    }
+}
