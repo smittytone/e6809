@@ -23,6 +23,8 @@
 #include "hardware/adc.h"
 #include "ops.h"
 #include "cpu.h"
+#include "cpu_tests.h"
+
 
 /*
  * CONSTANTS

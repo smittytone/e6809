@@ -3,7 +3,8 @@ include(pico_sdk_import.cmake)
 project(e6809 VERSION 1.0.0)
 add_executable(e6809
                main.c
-               cpu.c)
+               cpu.c
+               cpu_tests.c)
 
 pico_sdk_init()
 
