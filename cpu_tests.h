@@ -28,12 +28,8 @@ void        test_main();
 void        test_alu();
 void        test_index();
 void        test_logic();
+void        test_reg();
 void        test_setup();
-
-
-uint32_t errors = 0;
-uint32_t passes = 0;
-uint32_t tests = 0;
 
 
 #endif // _CPU_TESTS_HEADER_

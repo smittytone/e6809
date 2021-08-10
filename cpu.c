@@ -572,7 +572,7 @@ void cwai() {
     // Clear CC bits and Wait for Interrupt
     // AND CC with the operand, set e, then push every register,
     // including CC to the hardware stack
-    reg.cc &= mem[reg.pc];
+    reg.cc &= get_next_byte();
     set_cc_bit(E_BIT);
     push(PUSH_TO_HARD_STACK, PUSH_PULL_EVERY_REG);
     wait_for_interrupt = true;
@@ -1218,9 +1218,9 @@ uint8_t do_xor(uint8_t value, uint8_t amount) {
 uint8_t arith_shift_right(uint8_t value) {
     // Arithmetic shift right
     // Affects N, Z, C
-    partial_shift_right(value);
-    set_cc_nz(value, false);
-    return value;
+    uint8_t answer = partial_shift_right(value);
+    set_cc_nz(answer, false);
+    return answer;
 }
 
 uint8_t logic_shift_left(uint8_t value) {
@@ -1232,9 +1232,9 @@ uint8_t logic_shift_left(uint8_t value) {
 
     for (uint32_t i = 7 ; i > 0  ; i--) {
         if (is_bit_set(value, i - 1)) {
-            value = value | (1 << i);
+            value |= (1 << i);
         } else {
-            value = value & ~(1 << i);
+            value &= ~(1 << i);
         }
     }
 
@@ -1248,12 +1248,12 @@ uint8_t logic_shift_right(uint8_t value) {
     // Logical shift right
     // Affects N, Z, C
     //         N is always cleared
-    partial_shift_right(value);
+    uint8_t answer = partial_shift_right(value);
 
     // Clear bit 7
-    value = value & 0x7F;
-    if (value == 0) set_cc_bit(Z_BIT);
-    return value;
+    answer &= 0x7F;
+    if (answer == 0) set_cc_bit(Z_BIT);
+    return answer;
 }
 
 uint8_t partial_shift_right(uint8_t value) {
@@ -1263,9 +1263,9 @@ uint8_t partial_shift_right(uint8_t value) {
 
     for (uint32_t i = 0 ; i < 7 ; i++) {
         if (is_bit_set(value, i + 1)) {
-            value = value | (1 << i);
+            value |= (1 << i);
         } else {
-            value = value & ~(1 << i);
+            value &= ~(1 << i);
         }
     }
 
@@ -1286,17 +1286,17 @@ uint8_t rotate_left(uint8_t value) {
 
     for (uint32_t i = 7 ; i > 0  ; i--) {
         if (is_bit_set(value, i - 1)) {
-            value = value | (1 << i);
+            value |= (1 << i);
         } else {
-            value = value & ~(1 << i);
+            value &= ~(1 << i);
         }
     }
 
     // Set bit 0 from the carry
     if (carry) {
-        value = value | 1;
+        value |= 1;
     } else {
-        value = value & 0xFE;
+        value &= 0xFE;
     }
 
     set_cc_nz(value, false);
@@ -1314,17 +1314,17 @@ uint8_t rotate_right(uint8_t value) {
 
     for (uint32_t i = 0 ; i < 7 ; i++) {
         if (is_bit_set(value, i + 1)) {
-            value = value | (1 << i);
+            value |= (1 << i);
         } else {
-            value = value & ~(1 << i);
+            value &= ~(1 << i);
         }
     }
 
     // Set bit 7 from the carry
     if (carry) {
-        value = value | 0x80;
+        value |= 0x80;
     } else {
-        value = value & 0x7F;
+        value &= 0x7F;
     }
 
     set_cc_nz(value, false);

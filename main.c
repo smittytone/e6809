@@ -16,7 +16,7 @@ int main() {
     stdio_init_all();
     setup_cc_leds();
     boot();
-    alu_tests();
+    test_main();
     //loop();
     return 0;
 }
