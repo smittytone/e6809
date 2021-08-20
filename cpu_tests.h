@@ -25,10 +25,12 @@
  * PROTOTYPES
  */
 void        test_main();
+void        test_addressing();
 void        test_alu();
 void        test_index();
 void        test_logic();
 void        test_reg();
+void        test_branch();
 void        test_setup();
 
 

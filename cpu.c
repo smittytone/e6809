@@ -295,7 +295,9 @@ void do_branch(uint8_t bop, bool is_long) {
 
 uint8_t get_next_byte() {
     // Get the byte at the PC and increment PC
-    return (mem[reg.pc++]);
+    uint8_t d = mem[reg.pc];
+    reg.pc++;
+    return d;
 }
 
 uint8_t get_byte(uint16_t address) {
@@ -645,7 +647,8 @@ void inc(uint8_t op, uint8_t mode) {
 
 void jmp(uint8_t mode) {
     // JMP: M -> PC
-    reg.pc = address_from_mode(mode);
+    uint16_t data_address = address_from_mode(mode);
+    reg.pc = (get_byte(data_address) << 8) | get_byte(data_address + 1);
 }
 
 void jsr(uint8_t mode) {
@@ -654,12 +657,12 @@ void jsr(uint8_t mode) {
     //      S = S- 1;
     //      PC MSB to stack;
     //      M -> PC
-    uint16_t address = address_from_mode(mode);
+    uint16_t data_address = address_from_mode(mode);
     reg.s--;
     set_byte(reg.s, (reg.pc & 0xFF));
     reg.s--;
     set_byte(reg.s, ((reg.pc >> 8) & 0xFF));
-    reg.pc = address;
+    reg.pc = (get_byte(data_address) << 8) | get_byte(data_address + 1);;
 }
 
 void ld(uint8_t op, uint8_t mode) {
@@ -1795,18 +1798,23 @@ void test(uint8_t value) {
  */
 uint16_t address_from_mode(uint8_t mode) {
     // Calculate the intended 16-bit address based on the opcode's
-    // addressing mode
+    // addressing mode -- this is the address of the data
     // NOTE All of the called methods update the PC register
     uint16_t address = 0;
     if (mode == MODE_IMMEDIATE) {
+        // The data is at the next byte
         address = reg.pc;
         reg.pc++;
     } else if (mode == MODE_DIRECT) {
+        // The data is at the DP:<next byte>
         address = address_from_dpr(0);
         reg.pc++;
     } else if (mode == MODE_INDEXED) {
-        address = indexed_address(get_next_byte());
+        // Indexed addressing, inc. extended indirect
+        uint8_t post_byte = get_next_byte();
+        address = indexed_address(post_byte);
     } else {
+        // Extended: next two bytes give the address
         address = address_from_next_two_bytes();
     }
 
@@ -1828,7 +1836,7 @@ uint16_t address_from_dpr(int16_t offset) {
     // TODO Should we increment regPC?
     uint16_t address = reg.pc;
     address += offset;
-    return (reg.dp << 8) | get_byte((uint32_t)address);
+    return (reg.dp << 8) | get_byte(address);
 }
 
 uint16_t indexed_address(uint8_t post_byte) {
