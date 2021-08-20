@@ -37,6 +37,7 @@ void test_alu() {
     uint8_t result;
 
     // ADC
+    // Zaks p.122
     test_setup();
     reg.cc = 0x0B;
     result = add_with_carry(0x14, 0x22);
@@ -46,11 +47,63 @@ void test_alu() {
         errors++;
     }
 
-    // ADD
+    // Leventhal p.22-3
+    test_setup();
+    reg.cc = 0x01;
+    result = add_with_carry(0x3A, 0x7C);
+    if (result == 0xB7 && reg.cc == 0x2A) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    // ADD 8-bit
+    // Zaks p.123
     test_setup();
     reg.cc = 0x13;
     result = add_no_carry(0xF2, 0x39);
     if (result == 0x2B && reg.cc == 0x11) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    // Leventhal p.22-3
+    test_setup();
+    reg.cc = 0x00;
+    result = add_no_carry(0x24, 0x8B);
+    if (result == 0xAF && reg.cc == 0x08) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    // ADD 16-bit
+    // Zaks p.124
+    test_setup();
+    reg.cc = 0x00;
+    reg.a = 0x00;
+    reg.b = 0x0F;
+    reg.pc = 0x00;
+    mem[0] = 0x03;
+    mem[1] = 0x22;
+    add_16(0x00, MODE_IMMEDIATE);    // First arg, op, is not used
+    if (reg.a == 0x03 && reg.b == 0x31 && reg.cc == 0x00) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    // Leventhal p.22-6
+    test_setup();
+    reg.cc = 0x00;
+    reg.a = 0x10;
+    reg.b = 0x55;
+    reg.pc = 0x00;
+    mem[0] = 0x10;
+    mem[1] = 0x11;
+    add_16(0x00, MODE_IMMEDIATE);    // First arg, op, is not used
+    if (reg.a == 0x20 && reg.b == 0x66 && reg.cc == 0x00) {
         passes++;
     } else {
         errors++;
@@ -108,7 +161,7 @@ void test_alu() {
     if (reg.a == 0x85 && reg.cc == 0x08) {
         passes++;
     } else {
-        errors++;  //KNWON
+        errors++;  // FAIL
     }
 
     // DEC
@@ -169,11 +222,23 @@ void test_alu() {
 void test_index() {
 
     // ABX
+    // Zaks p.121
     test_setup();
     reg.x = 0x8006;
     reg.b = 0xCE;
     abx();
     if (reg.x == 0x80D4) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    // Leventhal p.22-2
+    test_setup();
+    reg.x = 0x1097;
+    reg.b = 0x84;
+    abx();
+    if (reg.x == 0x111B) {
         passes++;
     } else {
         errors++;
@@ -197,10 +262,21 @@ void test_logic() {
     uint8_t result;
 
     // AND
+    // Zaks p.125
     test_setup();
     reg.cc = 0x32;
     result = do_and(0x8B, 0x0F);
     if (result == 0x0B && reg.cc == 0x30) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    // Leventhal p.22-7
+    test_setup();
+    reg.cc = 0x0F;
+    result = do_and(0xFC, 0x13);
+    if (result == 0x10 && reg.cc == 0x01) {
         passes++;
     } else {
         errors++;

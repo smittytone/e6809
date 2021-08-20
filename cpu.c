@@ -419,7 +419,7 @@ void add_16(uint8_t op, uint8_t mode) {
     // Get bytes
     uint16_t address = address_from_mode(mode);
     uint8_t msb = get_byte(address);
-    uint8_t lsb = get_byte(address);
+    uint8_t lsb = get_byte(address + 1);
 
     // Add the two LSBs (M+1, B) to set the carry,
     // then add the two MSBs (M, A) with the carry
