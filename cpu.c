@@ -295,9 +295,7 @@ void do_branch(uint8_t bop, bool is_long) {
 
 uint8_t get_next_byte() {
     // Get the byte at the PC and increment PC
-    uint8_t d = mem[reg.pc];
-    reg.pc++;
-    return d;
+    return mem[reg.pc++];
 }
 
 uint8_t get_byte(uint16_t address) {
@@ -647,8 +645,8 @@ void inc(uint8_t op, uint8_t mode) {
 
 void jmp(uint8_t mode) {
     // JMP: M -> PC
-    uint16_t data_address = address_from_mode(mode);
-    reg.pc = (get_byte(data_address) << 8) | get_byte(data_address + 1);
+    uint16_t address = address_from_mode(mode);
+    reg.pc = mode == MODE_INDEXED ? address : ((get_byte(address) << 8) | get_byte(address + 1));
 }
 
 void jsr(uint8_t mode) {
@@ -657,12 +655,12 @@ void jsr(uint8_t mode) {
     //      S = S- 1;
     //      PC MSB to stack;
     //      M -> PC
-    uint16_t data_address = address_from_mode(mode);
+    uint16_t address = address_from_mode(mode);
     reg.s--;
     set_byte(reg.s, (reg.pc & 0xFF));
     reg.s--;
     set_byte(reg.s, ((reg.pc >> 8) & 0xFF));
-    reg.pc = (get_byte(data_address) << 8) | get_byte(data_address + 1);;
+    reg.pc = address;
 }
 
 void ld(uint8_t op, uint8_t mode) {
@@ -1108,7 +1106,13 @@ uint8_t base_sub(uint8_t value, uint8_t amount, bool use_carry) {
     //         V, C (H) set by 'alu()'
 
     uint8_t comp = negate(amount, true);
-    uint8_t answer = alu(value, comp, use_carry);
+    uint8_t answer = alu(value, comp, false);
+
+    // Don't run 'use_carry' through alu() as it will ADD 1,
+    // so peform the borrow here. 0xFF = 2C of 1.
+    if (use_carry) {
+        answer = alu(answer, 0xFF, false);
+    }
 
     // C represents a borrow and is set to the complement of the carry
     // of the internal binary addition
@@ -1157,6 +1161,7 @@ uint8_t negate(uint8_t value, bool is_intermediate) {
     //         V set only if value is 0x80 (see Zaks p 167)
     // Preserve 'value' to set V bit
     uint8_t answer = value;
+    uint8_t cc = reg.cc;
 
     // Flip value's bits to make the 1s complenent
     for (uint32_t i = 0 ; i < 8 ; i++) {
@@ -1167,7 +1172,10 @@ uint8_t negate(uint8_t value, bool is_intermediate) {
     answer = alu(answer, 1, false);
 
     // Return without setting CC
-    if (is_intermediate) return answer;
+    if (is_intermediate) {
+        reg.cc = cc;
+        return answer;
+    }
 
     // C represents a borrow and is set to the complement of
     // the carry of the internal binary addition
@@ -1623,21 +1631,25 @@ uint16_t exchange_16(uint16_t value, uint8_t reg_code) {
 void load_effective(uint16_t amount, uint8_t reg_code) {
     // Put passed value into an 8-bit register
     // Affects Z -- but only for X and Y registers
-    switch(reg_code) {
-        case 0x00:
-            reg.x = amount;
-            if (amount == 0) set_cc_bit(Z_BIT);
-            break;
+    uint16_t* reg_ptr = &reg.x;
+    switch (reg_code) {
         case 0x01:
-            reg.y = amount;
-            if (amount == 0) set_cc_bit(Z_BIT);
-            break;
+            reg_ptr = &reg.y;
         case 0x02:
-            reg.s = amount;
-            break;
+            reg_ptr = &reg.s;
         case 0x03:
-            reg.u = amount;
+            reg_ptr = &reg.u;
     }
+
+    if (reg_code < 2) {
+        if (amount == 0) {
+            set_cc_bit(Z_BIT);
+        } else {
+            clr_cc_bit(Z_BIT);
+        }
+    }
+
+    *reg_ptr = amount;
 }
 
 
@@ -1797,16 +1809,21 @@ void test(uint8_t value) {
  * Addressing Functions
  */
 uint16_t address_from_mode(uint8_t mode) {
-    // Calculate the intended 16-bit address based on the opcode's
-    // addressing mode -- this is the address of the data
+    // Calculate the effective 16-bit address based on the opcode's
+    // addressing mode -- this is the address of the data.
+    // On entry PC is pointing to the post byte
     // NOTE All of the called methods update the PC register
     uint16_t address = 0;
     if (mode == MODE_IMMEDIATE) {
-        // The data is at the next byte
+        // The effective address is the next byte,
+        // to which PC is already pointing
+        // NOTE Increment PC to avoid doing so for all 8-bit reads
         address = reg.pc;
         reg.pc++;
     } else if (mode == MODE_DIRECT) {
-        // The data is at the DP:<next byte>
+        // The effective address is MSB: DP, LSB: next byte,
+        // to which PC is already pointing
+        // NOTE Increment PC to avoid doing so for all 8-bit reads
         address = address_from_dpr(0);
         reg.pc++;
     } else if (mode == MODE_INDEXED) {
@@ -1814,7 +1831,8 @@ uint16_t address_from_mode(uint8_t mode) {
         uint8_t post_byte = get_next_byte();
         address = indexed_address(post_byte);
     } else {
-        // Extended: next two bytes give the address
+        // The effective address is stored in the next two bytes
+        // NOTE Moves PC on 2
         address = address_from_next_two_bytes();
     }
 
@@ -1857,6 +1875,7 @@ uint16_t indexed_address(uint8_t post_byte) {
     } else {
         // All other opcodes have bit 7 set to 1
         uint8_t msb, lsb, value;
+        uint16_t value_16;
         switch(op) {
             case 0:
                 // Auto-increment (,R+)
@@ -1898,13 +1917,13 @@ uint16_t indexed_address(uint8_t post_byte) {
                 // 16-bit constant offset; offset is 2s-comp
                 msb = get_next_byte();
                 lsb = get_next_byte();
-                value = (msb << 8) | lsb;
-                address += is_bit_set(value, SIGN_BIT_16) ? value - 65536 : value;
+                value_16 = (msb << 8) | lsb;
+                address += is_bit_set(value_16, SIGN_BIT_16) ? value_16 - 65536 : value_16;
                 break;
             case 11:
                 // Accumulator offset D; D is a 2s-comp offset
-                value = (reg.a << 8) | reg.b;
-                address += is_bit_set(value, SIGN_BIT_16) ? value - 65536 : value;
+                value_16 = (reg.a << 8) | reg.b;
+                address += is_bit_set(value_16, SIGN_BIT_16) ? value_16 - 65536 : value_16;
                 break;
             case 12:
                 // PC relative 8-bit offset; offset is 2s-comp
@@ -1915,8 +1934,8 @@ uint16_t indexed_address(uint8_t post_byte) {
                 // regPC relative 16-bit offset; offset is 2s-comp
                 msb = get_next_byte();
                 lsb = get_next_byte();
-                value = (msb << 8) | lsb;
-                address = reg.pc + (is_bit_set(value, SIGN_BIT_16) ? value - 65536 : value);
+                value_16 = (msb << 8) | lsb;
+                address = reg.pc + (is_bit_set(value_16, SIGN_BIT_16) ? value_16 - 65536 : value_16);
                 break;
 
             // From here on, the addressing is indirect: the Effective Address is a handle not a pointer
@@ -1956,14 +1975,14 @@ uint16_t indexed_address(uint8_t post_byte) {
                 // eg. LDA [n,X]
                 msb = get_next_byte();
                 lsb = get_next_byte();
-                value = (msb << 8) | lsb;
-                address += (is_bit_set(value, SIGN_BIT_16) ? value - 65536 : value);
+                value_16 = (msb << 8) | lsb;
+                address += (is_bit_set(value_16, SIGN_BIT_16) ? value_16 - 65536 : value_16);
                 break;
             case 27:
                 // Indirect Accumulator offset D
                 // eg. LDA [D,X]
-                value = (reg.a << 8) | reg.b;
-                address += (is_bit_set(value, SIGN_BIT_16) ? value - 65536 : value);
+                value_16 = (reg.a << 8) | reg.b;
+                address += (is_bit_set(value_16, SIGN_BIT_16) ? value_16 - 65536 : value_16);
                 break;
             case 28:
                 // Indirect regPC relative 8-bit offset
@@ -1976,8 +1995,8 @@ uint16_t indexed_address(uint8_t post_byte) {
                 // eg. LDX [n,PCR]
                 msb = get_next_byte();
                 lsb = get_next_byte();
-                value = (msb << 8) | lsb;
-                address = reg.pc + (is_bit_set(value, SIGN_BIT_16) ? value - 65536 : value);
+                value_16 = (msb << 8) | lsb;
+                address = reg.pc + (is_bit_set(value_16, SIGN_BIT_16) ? value_16 - 65536 : value_16);
                 break;
             case 31:
                 // Extended indirect

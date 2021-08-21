@@ -288,6 +288,7 @@ void test_alu() {
     }
 
     // MUL
+    // Zaks p.166
     test_setup();
     reg.a = 0x0C;
     reg.b = 0x64;
@@ -298,7 +299,20 @@ void test_alu() {
         errors++;
     }
 
+    // Levenathal p.22-52
+    test_setup();
+    reg.a = 0x6F;
+    reg.b = 0x61;
+    reg.cc = 0x0F;
+    mul();
+    if (reg.a == 0x2A && reg.b == 0x0F && reg.cc == 0x0A) {
+        passes++;
+    } else {
+        errors++;
+    }
+
     // NEG
+    // Zaks p.167
     test_setup();
     reg.cc = 34;
     result = negate(0xF3, false);
@@ -309,7 +323,41 @@ void test_alu() {
         errors++;
     }
 
+    // Leventhal p.22-53
+    test_setup();
+    result = negate(0x3A, false);
+    // NOTE Zaks CC values weird and wrong
+    if (result == 0xC6 && (reg.cc & 0x0F) == 0x09) {
+        passes++;
+    } else {
+        errors++;
+    }
+
     // SBC
+    // Zaks p.179
+    test_setup();
+    reg.cc = 0x01;
+    result = sub_with_carry(0x35, 0x03);
+    if (result == 0x31 && reg.cc == 0x20) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    // Leventhal p.22-64
+    test_setup();
+    reg.cc = 0x01;
+    reg.b = 0x14;
+    reg.y = 0x105A;
+    mem[reg.y + 0x3E] = 0x34;
+    mem[0x0000] = 0xA8;
+    mem[0x0001] = 0x3E;
+    sbc(SBCB_indexed, MODE_INDEXED);
+    if (reg.b == 0xDF && (reg.cc & 0x0F) == 0x08) {
+        passes++;
+    } else {
+        errors++;
+    }
 
 }
 
@@ -340,12 +388,31 @@ void test_index() {
     }
 
     // LEA
+    // Zaks p.163
     test_setup();
-    reg.pc = 0;
-    mem[0] = 0x4A;
+    reg.pc = 0x00;
+    mem[0x0000] = 0x4A;
     reg.u = 0x0455;
     lea(LEAU_indexed);
     if (reg.u == 0x045F) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    // Leventhal p.22-50
+    test_setup();
+    uint16_t mm = 0xE386;
+    reg.pc = mm;
+    mem[mm] = 0x9D;
+    mem[mm + 1] = 0x02;
+    mem[mm + 2] = 0x3C;
+    mem[mm + 3 + 0x023C] = 0xDE;
+    mem[mm + 3 + 0x023D] = 0x2F;
+    reg.x = 0xFFFF;
+    reg.cc = 0xFF;
+    lea(LEAX_indexed);
+    if (reg.x == 0xDE2F && reg.cc == 0xFB) {
         passes++;
     } else {
         errors++;
@@ -409,7 +476,7 @@ void test_logic() {
         errors++;
     }
 
-    // Zaks p.127
+    // Zaks p.164
     test_setup();
     result = logic_shift_left(0xB8);
     if (result == 0x70 && reg.cc == 0x03) {
@@ -502,6 +569,7 @@ void test_logic() {
     }
 
     // LSR
+    // Zaks p.165
     test_setup();
     reg.cc = 0x0F;
     result = logic_shift_right(0x3E);
@@ -513,6 +581,7 @@ void test_logic() {
     }
 
     // OR
+    // Zaks p.169
     test_setup();
     reg.cc = 0x43;
     result = do_or(0xDA, 0x0F);
@@ -522,7 +591,18 @@ void test_logic() {
         errors++;
     }
 
+    // Leventhal p.169
+    test_setup();
+    reg.cc = 0x0F;
+    result = do_or(0xE3, 0xAB);
+    if (result == 0xEB && reg.cc == 0x09) {
+        passes++;
+    } else {
+        errors++;
+    }
+
     // ORCC
+    // Zaks p.170
     test_setup();
     reg.cc = 0x13;
     orcc(0x50);
@@ -532,7 +612,17 @@ void test_logic() {
         errors++;
     }
 
+    test_setup();
+    reg.cc = 0x13;
+    orcc(0xC0);
+    if (reg.cc == 0xD3) {
+        passes++;
+    } else {
+        errors++;
+    }
+
     // ROL
+    // Zaks p.175
     test_setup();
     reg.cc = 0x09;
     result = rotate_left(0x89);
@@ -543,7 +633,24 @@ void test_logic() {
         errors++;
     }
 
+    // Leventhal p.22-60
+    test_setup();
+    reg.cc = 0x0E;
+    reg.pc = 0x00;
+    mem[0x0000] = 0xA4;
+    reg.y = 0x1403;
+    mem[reg.y] = 0x2E;
+    rol(0x69, MODE_INDEXED);
+    reg.a = mem[reg.y];
+    // NOTE Error in Zaks: CC is 0x02 not 0x00
+    if (reg.a == 0x5C && reg.cc == 0x00) {
+        passes++;
+    } else {
+        errors++;
+    }
+
     // ROR
+    // Zaks p.176
     test_setup();
     reg.cc = 0x09;
     result = rotate_right(0x89);
@@ -553,6 +660,7 @@ void test_logic() {
     } else {
         errors++;
     }
+
 }
 
 
@@ -584,7 +692,8 @@ void test_reg() {
         errors++;
     }
 
-    // LD
+    // LD 8-bit
+    // Zaks p.161
     test_setup();
     reg.cc = 0x13;
     reg.pc = 0x00;
@@ -598,9 +707,63 @@ void test_reg() {
         errors++;
     }
 
-    // PSHS
+    // Leventhal p.22-48
     test_setup();
-    reg.s = 0x00;
+    reg.x = 0x13E1;
+    reg.a = 0x20;
+    reg.b = 0xB8;
+    reg.pc = 0x00;
+    reg.cc = 0x03;
+    mem[0x0000] = 0x9B;
+    mem[0x3499] = 0xA4;
+    mem[0x349A] = 0x7D;
+    mem[0xA47D] = 0xAA;
+    ld(LDB_indexed, MODE_INDEXED);
+    if (reg.b == 0xAA && reg.cc == 0x09) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    // LD 16-bit
+    // Zaks p.162
+    test_setup();
+    reg.cc = 0x54;
+    reg.pc = 0x00;
+    mem[0x0000] = 0x14;
+    mem[0x0001] = 0xA2;
+    reg.a = 0x03;
+    reg.b = 0x30;
+    ld_16(LDD_immed, MODE_IMMEDIATE, 0);
+    if (reg.a == 0x14 && reg.b == 0xA2 && reg.cc == 0x50) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    // Leventhal p.22-49
+    test_setup();
+    reg.y = 0x8E05;
+    reg.a = 0x20;
+    reg.b = 0xB8;
+    reg.pc = 0x00;
+    reg.cc = 0x03;
+    mem[0x0000] = 0xB1;
+    mem[0x8E05] = 0xB3;
+    mem[0x8E06] = 0x94;
+    mem[0xB394] = 0x07;
+    mem[0xB395] = 0xF2;
+    ld_16(LDD_indexed, MODE_INDEXED, 0);
+    if (reg.a == 0x07 && reg.b == 0xF2 && reg.y == 0x8e07 && reg.cc == 0x01) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    // PSHS
+    // Zak p.171
+    test_setup();
+    reg.s = 0xFFFF;
     reg.a = 1;
     reg.b = 2;
     reg.cc = 0xFF;
@@ -608,20 +771,43 @@ void test_reg() {
     reg.x = 0x8008;
     reg.y = 0x8010;
     reg.u = 0x8020;
-    reg.u = 0x8040;
-    uint8_t rmem[13] = {0,0,0,0,0,0,0,0,0,0,0,0,0};
+    uint8_t smem[13] = {0,0,0,0,0,0,0,0,0,0,0,0,0};
     push(true, 0xFF);
-    for (uint16_t i = reg.s ; i == 0 ; i++) {
-        rmem[i - reg.s] = mem[i];
+    for (uint16_t i = reg.s ; i < 65535 ; i++) {
+        smem[i - reg.s] = mem[i];
     }
 
-    if (reg.s == 65524) {
+    if (reg.s == 65523 && smem[3] == 0x04) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    // PSHU
+    // Zak p.172
+    test_setup();
+    reg.u = 0xFFFF;
+    reg.a = 1;
+    reg.b = 2;
+    reg.cc = 0xFF;
+    reg.dp = 4;
+    reg.x = 0x8008;
+    reg.y = 0x8010;
+    reg.s = 0x8021;
+    uint8_t umem[13] = {0,0,0,0,0,0,0,0,0,0,0,0,0};
+    push(false, 0xFF);
+    for (uint16_t i = reg.u ; i < 65535 ; i++) {
+        umem[i - reg.u] = mem[i];
+    }
+
+    if (reg.u == 65523 && umem[8] == 0x80 && umem[9] == 0x21) {
         passes++;
     } else {
         errors++;
     }
 
     // SEX
+    // Zaks p.180
     test_setup();
     reg.b = 0xE6;
     sex();
@@ -631,6 +817,27 @@ void test_reg() {
         errors++;
     }
 
+
+    // ST 8-bit
+    // Zaks p.181
+    test_setup();
+    reg.cc = 0x0F;
+    reg.b = 0xE5;
+    reg.x = 0x556A;
+    mem[0x0000] = 0xE7;
+    mem[0x0001] = 0x98;
+    mem[0x0002] = 0x0F;
+    mem[0x5579] = 0x03;
+    mem[0x557A] = 0xBB;
+    mem[0x03BB] = 0x02;
+    process_next_instruction();
+    // st(STB_indexed, MODE_INDEXED);
+    reg.a = mem[0x03BB];
+    if (reg.a == 0xE5 && reg.cc == 0x09) {
+        passes++;
+    } else {
+        errors++;
+    }
 }
 
 
@@ -650,6 +857,18 @@ void test_branch() {
         errors++;
     }
 
+    // Zaks p.159
+    test_setup();
+    reg.pc = 0x3041;
+    reg.x = 0xB290;
+    mem[0x3041] = 0x84;
+    jmp(MODE_INDEXED);
+    if (reg.pc == 0xB290) {
+        passes++;
+    } else {
+        errors++;
+    }
+
     // Leventhal p.22-40
     test_setup();
     reg.pc = 0x00FF;
@@ -664,17 +883,70 @@ void test_branch() {
         errors++;
     }
 
-    // Zaks p.159
+
+    // JSR
+    // Zaks p.160
     test_setup();
-    reg.pc = 0x3041;
-    reg.x = 0xB290;
-    mem[0x00FF] = 0x84;
-    jmp(MODE_INDEXED);
-    if (reg.pc == 0xB290) {
+    reg.s = 0x03F2;
+    reg.pc = 0x10CB;
+    mem[0x10CB] = 0x32;
+    mem[0x10CC] = 0x0D;
+    mem[0x03F0] = 0x03;
+    mem[0x03F1] = 0x4B;
+    jsr(MODE_EXTENDED);
+    reg.a = mem[0x03F0];    // MSB
+    reg.b = mem[0x03F1];    // LSB
+    if (reg.pc == 0x320D && reg.s == 0x03F0 && reg.a == 0x10 && reg.b == 0xCD) {
         passes++;
     } else {
         errors++;
     }
+
+    // RTS
+    // Zaks p.178
+    tests++;
+    rts();
+    if (reg.pc == 0x10CD && reg.s == 0x03F2) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+
+    // JSR
+    // Leventhal p.22-14
+    test_setup();
+    reg.s = 0x08A0;
+    reg.pc = 0xE56C;
+    mem[0xE56C] = 0xE1;
+    mem[0xE56D] = 0xA3;
+    mem[0x089E] = 0xFF;
+    mem[0x089F] = 0xFF;
+    jsr(MODE_EXTENDED);
+    reg.a = mem[0x089E];    // MSB
+    reg.b = mem[0x089F];    // LSB
+    if (reg.pc == 0xE1A3 && reg.s == 0x089E && reg.a == 0xE5 && reg.b == 0x6E) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    // RTS
+    // Leventhal p.22-62
+    tests++;
+    rts();
+    if (reg.pc == 0xE56E && reg.s == 0x08A0) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+
+    // RTI
+    // TODO
+    // Zaks p.177
+    // Leventhal p.22-61
+
 }
 
 
