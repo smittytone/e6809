@@ -359,6 +359,42 @@ void test_alu() {
         errors++;
     }
 
+    // SUB 8-bit
+    // Zaks p.183
+    test_setup();
+    reg.cc = 0x44;
+    result = subtract(0x03, 0x21);
+    if (result == 0xE2 && reg.cc == 0x69) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    // Leventhal p.183
+    test_setup();
+    result = subtract(0xE3, 0xA0);
+    if (result == 0x43 && (reg.cc & 0xF) == 0x00) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    /*
+    // SUB 16-bit
+    // Zaks p.184
+    test_setup();
+    reg.cc = 0x59;
+    reg.a = 0x6B;
+    reg.b = 0x90;
+    mem[0] = 0x02;
+    mem[1] = 0x0F;
+    sub_16(SUBB_immed, MODE_IMMEDIATE, 0x00);
+    if (reg.a == 0x69 && reg.b == 0x81 && reg.cc == 0x50) {
+        passes++;
+    } else {
+        errors++;   // FAILS ON CC (C BIT)
+    }
+    */
 }
 
 
@@ -817,7 +853,6 @@ void test_reg() {
         errors++;
     }
 
-
     // ST 8-bit
     // Zaks p.181
     test_setup();
@@ -831,9 +866,61 @@ void test_reg() {
     mem[0x557A] = 0xBB;
     mem[0x03BB] = 0x02;
     process_next_instruction();
-    // st(STB_indexed, MODE_INDEXED);
     reg.a = mem[0x03BB];
     if (reg.a == 0xE5 && reg.cc == 0x09) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    // Leventhal p.22-67
+    test_setup();
+    reg.cc = 0x0F;
+    reg.b = 0x63;
+    reg.y = 0x0238;
+    mem[0x0000] = 0xE7;
+    mem[0x0001] = 0xA9;
+    mem[0x0002] = 0x03;
+    mem[0x0003] = 0x02;
+    mem[0x053A] = 0xFF;
+    process_next_instruction();
+    reg.a = mem[0x053A];
+    if (reg.a == 0x63 && reg.cc == 0x01) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    // ST 16-bit
+    // Zaks p.182
+    test_setup();
+    reg.x = 0x660C;
+    reg.cc = 0x0F;
+    mem[0x0000] = 0x12;
+    mem[0x0001] = 0xB0;
+    mem[0x12B0] = 0x37;
+    mem[0x12B1] = 0xBF;
+    st_16(STX_extended, MODE_EXTENDED, 0x00);
+    reg.y = (mem[0x12B0] << 8) | mem[0x12B1];
+    if (reg.x == reg.y && reg.cc == 0x01) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    // Leventhal p.22-67
+    test_setup();
+    reg.y = 0x1430;
+    reg.x = reg.y + 2;
+    reg.a = 0xC1;
+    reg.b = 0x9A;
+    reg.cc = 0x0F;
+    mem[0x0000] = 0xED;
+    mem[0x0001] = 0xA1;
+    mem[0x1430] = 0xFF;
+    mem[0x1431] = 0xFF;
+    process_next_instruction();
+    if (reg.a == mem[0x1430] && reg.b == mem[0x1431] && reg.cc == 0x09 && reg.y == reg.x) {
         passes++;
     } else {
         errors++;
@@ -947,6 +1034,44 @@ void test_branch() {
     // Zaks p.177
     // Leventhal p.22-61
 
+
+    // SWI
+    // Zaks p.185-7
+    test_setup();
+    mem[SWI1_VECTOR] = 0x20;
+    mem[SWI1_VECTOR + 1] = 0x01;
+    reg.s = 0xF000;
+    reg.x = (mem[SWI1_VECTOR] << 8) | mem[SWI1_VECTOR + 1];
+    swi(1);
+    if (reg.pc == reg.x && reg.cc == 0xD0) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    test_setup();
+    mem[SWI2_VECTOR] = 0x20;
+    mem[SWI2_VECTOR + 1] = 0x01;
+    reg.s = 0xF000;
+    reg.x = (mem[SWI2_VECTOR] << 8) | mem[SWI2_VECTOR + 1];
+    swi(2);
+    if (reg.pc == reg.x && reg.cc == 0x80) {
+        passes++;
+    } else {
+        errors++;
+    }
+
+    test_setup();
+    mem[SWI3_VECTOR] = 0x20;
+    mem[SWI3_VECTOR + 1] = 0x01;
+    reg.s = 0xF000;
+    reg.x = (mem[SWI3_VECTOR] << 8) | mem[SWI3_VECTOR + 1];
+    swi(3);
+    if (reg.pc == reg.x && reg.cc == 0x80) {
+        passes++;
+    } else {
+        errors++;
+    }
 }
 
 

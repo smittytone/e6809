@@ -77,6 +77,10 @@ typedef struct {
     uint8_t  dp;
 } REG_6809;
 
+typedef struct {
+    bool    wait_for_interrupt;
+    bool    is_sync;
+} STATE_6809;
 
 /*
  * PROTOTYPES
@@ -196,6 +200,6 @@ void reset_registers();
  */
 extern REG_6809    reg;
 extern uint8_t     mem[KB64];
-extern bool        wait_for_interrupt;
+extern STATE_6809  state;
 
 #endif // _CPU_HEADER_

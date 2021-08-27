@@ -12,7 +12,7 @@
 
 REG_6809    reg;
 uint8_t     mem[KB64];
-bool        wait_for_interrupt;
+STATE_6809  state;
 
 
 /*
@@ -22,7 +22,7 @@ uint32_t process_next_instruction() {
 
     uint32_t cycles_used = 0;
 
-    if (wait_for_interrupt) {
+    if (state.wait_for_interrupt) {
         // Process interrupts
         return cycles_used;
     }
@@ -575,7 +575,7 @@ void cwai() {
     reg.cc &= get_next_byte();
     set_cc_bit(E_BIT);
     push(PUSH_TO_HARD_STACK, PUSH_PULL_EVERY_REG);
-    wait_for_interrupt = true;
+    state.wait_for_interrupt = true;
 }
 
 void daa() {
@@ -888,7 +888,7 @@ void st_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
         reg_ptr = ex_op == OPCODE_EXTENDED_1 ? &reg.s : &reg.u;
     } else {
         reg.d = (reg.a << 8) | reg.d;
-        uint16_t *reg_ptr = &reg.d;
+        reg_ptr = &reg.d;
         touched_d = true;
     }
 
@@ -922,6 +922,7 @@ void sub_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
     // Affects N, Z, V, C
     //         V, C (H) set by 'alu()'
     reg.cc &= MASK_NZV;
+    uint8_t cc = reg.cc;
 
     // Complement the value at M:M + 1
     // NOTE Don't use 'negate()' because we need to
@@ -933,6 +934,7 @@ void sub_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
     // Add 1 to form the 2's complement
     lsb = alu(lsb, 1, false);
     msb = alu(msb, 0, true);
+    reg.cc = cc;
 
     // Add D - A and B
     lsb = alu(reg.b, lsb, false);
@@ -954,7 +956,7 @@ void swi(uint8_t number) {
     // Set e to 1 then push every register to the hardware stac
     set_cc_bit(E_BIT);
     push(true, PUSH_PULL_EVERY_REG);
-    wait_for_interrupt = false;
+    state.wait_for_interrupt = false;
 
     if (number == 1) {
         // Set I and F
@@ -976,7 +978,10 @@ void swi(uint8_t number) {
 
 void sync() {
     // SYNC
-    wait_for_interrupt = true;
+    // If interrupt is masked, or is < 3 cycled - continue
+    // If interrupt > 2 cycle, wait
+    state.wait_for_interrupt = true;
+    state.is_sync = true;
 }
 
 void tst(uint8_t op, uint8_t mode) {
@@ -1874,8 +1879,9 @@ uint16_t indexed_address(uint8_t post_byte) {
         address += offset;
     } else {
         // All other opcodes have bit 7 set to 1
-        uint8_t msb, lsb, value;
-        uint16_t value_16;
+        uint8_t msb, lsb;
+        int8_t value;
+        int16_t value_16;
         switch(op) {
             case 0:
                 // Auto-increment (,R+)
