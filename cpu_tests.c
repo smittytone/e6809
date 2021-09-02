@@ -1072,6 +1072,17 @@ void test_branch() {
     } else {
         errors++;
     }
+
+
+    // TFR
+    test_setup();
+    reg.a = 0xFF;
+    transfer_decode2(0x8A, false);
+    if (reg.cc == reg.a) {
+        passes++;
+    } else {
+        errors++;
+    }
 }
 
 
