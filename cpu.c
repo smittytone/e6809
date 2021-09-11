@@ -1111,12 +1111,13 @@ uint8_t base_sub(uint8_t value, uint8_t amount, bool use_carry) {
     // Affects N, Z, V, C
     //         V, C set by 'negate()'
     //         V, C (H) set by 'alu()'
+    bool carry_set = is_bit_set(reg.cc, C_BIT);
     uint8_t comp = twos_complement(amount);
     uint8_t answer = alu(value, comp, false);
 
     // Don't run 'use_carry' through alu() as will may ADD 1,
     // so peform the borrow here, if C is set. 0xFF = 2C of 1.
-    if (use_carry && is_bit_set(reg.cc, 0x01)) {
+    if (use_carry && carry_set) {
         answer = alu(answer, 0xFF, false);
     }
 
@@ -1162,7 +1163,7 @@ uint16_t subtract_16(uint16_t value, uint16_t amount) {
     return answer;
 }
 
-uint8_t negate(uint8_t value) {
+uint8_t negate(uint8_t value, bool ignore) {
     // Returns 2's complement of 8-bit value
     // Affects Z, N, V, C
     //         C, V (H) set by 'alu()'
