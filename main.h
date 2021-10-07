@@ -20,10 +20,12 @@
 #include "pico/binary_info.h"
 #include "hardware/gpio.h"
 #include "hardware/i2c.h"
+#include "hardware/spi.h"
 #include "hardware/adc.h"
 #include "ops.h"
 #include "cpu.h"
 #include "cpu_tests.h"
+#include "keypad.h"
 
 
 /*
@@ -47,7 +49,10 @@
  */
 void        boot();
 void        loop();
-void        inkey();
+void        process_key(uint16_t);
+void        set_keys();
+uint8_t     get_val(uint16_t input);
+uint16_t    inkey();
 void        setup_cc_leds();
 void        dump_registers();
 void        run_tests();
