@@ -70,12 +70,12 @@ uint32_t process_next_instruction() {
             if (lsn == 0x06) push(false, get_next_byte());
             if (lsn == 0x05) pull(true,  get_next_byte());
             if (lsn == 0x07) pull(false, get_next_byte());
-            if (lsn == 0x09) {
-                // rts();
-                return 99;
-            }
+            if (lsn == 0x09) rts();
             if (lsn == 0x0A) abx();
-            if (lsn == 0x0B) rti();
+            if (lsn == 0x0B) {
+                //rti();
+                return 99;  // Use this to break to monitor FOR NOW
+            }
             if (lsn == 0x0C) cwai();
             if (lsn == 0x0D) mul();
 
@@ -827,7 +827,6 @@ void rts() {
     // RTS
     // Pull the PC from the hardware stack
     pull(true, PUSH_PULL_PC_REG);
-
 }
 
 void sbc(uint8_t op, uint8_t mode) {

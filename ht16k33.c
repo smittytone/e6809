@@ -30,19 +30,11 @@ void i2c_write_block(uint8_t address, uint8_t *data, uint8_t count) {
 
 
 /*
- * HT16K33 LED Matrix Functions
+ * HT16K33 Segment LED Functions
  */
-
-void ht16k33_init() {
-    gpio_set_function(SDA_GPIO, GPIO_FUNC_I2C);
-    gpio_set_function(SCL_GPIO, GPIO_FUNC_I2C);
-    gpio_pull_up(SDA_GPIO);
-    gpio_pull_up(SCL_GPIO);
-}
-
-void ht16k33_start(uint8_t address, uint8_t *buffer) {
+void ht16k33_init(uint8_t address, uint8_t *buffer) {
     ht16k33_power(address, 1);
-    ht16k33_bright(address, 2);
+    ht16k33_bright(address, 6);
     ht16k33_clear(address, buffer);
     ht16k33_draw(address, buffer);
 }
@@ -61,7 +53,6 @@ void ht16k33_bright(uint8_t address, uint8_t brightness) {
 void ht16k33_clear(uint8_t address, uint8_t *buffer) {
     // Clear the display buffer and then write it out
     for (uint8_t i = 0 ; i < 16 ; ++i) buffer[i] = 0;
-    ht16k33_draw(address, buffer);
 }
 
 void ht16k33_draw(uint8_t address, uint8_t *buffer) {
@@ -73,7 +64,6 @@ void ht16k33_draw(uint8_t address, uint8_t *buffer) {
     // Span the 8 bytes of the graphics buffer
     // across the 16 bytes of the LED's buffer
     for (uint8_t i = 0 ; i < 16 ; ++i) {
-        uint8_t a = buffer[i];
         tx_buffer[i + 1] = buffer[i];
     }
 
@@ -81,14 +71,15 @@ void ht16k33_draw(uint8_t address, uint8_t *buffer) {
     i2c_write_block(address, tx_buffer, sizeof(tx_buffer));
 }
 
-void ht16k33_set_number(uint8_t address, uint8_t *buffer, uint32_t number, uint32_t digit, bool has_dot) {
-    if (digit > 4) return;
-    if (number > 9) return;
-    ht16k33_set_alpha(address, buffer, '0' + number, digit, has_dot);
+void ht16k33_set_number(uint8_t address, uint8_t *buffer, uint16_t number, uint8_t digit, bool has_dot) {
+    if (digit > 3) return;
+    if (number > 15) return;
+    if (number < 10) ht16k33_set_alpha(address, buffer, '0' + number, digit, has_dot);
+    if (number > 9) ht16k33_set_alpha(address, buffer, 'a' + (number - 10), digit, has_dot);
 }
 
-void ht16k33_set_alpha(uint8_t address, uint8_t *buffer, char chr, uint32_t digit, bool has_dot) {
-    if (digit > 4) return;
+void ht16k33_set_alpha(uint8_t address, uint8_t *buffer, char chr, uint8_t digit, bool has_dot) {
+    if (digit > 3) return;
 
     uint8_t char_val = 0xFF;
     if (chr == ' ') {
@@ -106,3 +97,10 @@ void ht16k33_set_alpha(uint8_t address, uint8_t *buffer, char chr, uint32_t digi
     if (char_val == 0xFF) return;
     buffer[POS[digit]] = CHARSET[char_val];
     if (has_dot) buffer[POS[digit]] |= 0x80;
+}
+
+void ht16k33_set_glyph(uint8_t address, uint8_t *buffer, uint8_t glyph, uint8_t digit, bool has_dot) {
+    if (glyph > 0x7F) return;
+    buffer[POS[digit]] = glyph;
+    if (has_dot) buffer[POS[digit]] |= 0x80;
+}

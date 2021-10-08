@@ -44,43 +44,50 @@
 #define MENU_MAIN_ADDR              1
 #define MENU_MAIN_BYTE              2
 #define MENU_MAIN_RUN_STEP          3
-// #define MENU_MAIN_RUN              4
-#define INPUT_MAIN_ADDR             15
-#define INPUT_MAIN_BYTE             14
-#define INPUT_MAIN_RUN_STEP         13
-#define INPUT_MAIN_RUN              12
-#define INPUT_MAIN_MASK             0x7000
+#define MENU_MAIN_RUN               4
+#define INPUT_MAIN_ADDR             0x8000
+#define INPUT_MAIN_BYTE             0x4000
+#define INPUT_MAIN_RUN_STEP         0x2000
+#define INPUT_MAIN_RUN              0x1000
+#define INPUT_MAIN_MEM_UP           0x0008
+#define INPUT_MAIN_MEM_DOWN         0x0001
+#define INPUT_MAIN_MASK             0xE009
 
 #define MENU_MODE_STEP              10
-#define INPUT_STEP_NEXT             12
-#define INPUT_STEP_SHOW_CC          13
-#define INPUT_STEP_SHOW_AD          14
-#define INPUT_STEP_EXIT             15
+#define INPUT_STEP_NEXT             0x8000
+#define INPUT_STEP_SHOW_CC          0x4000
+#define INPUT_STEP_SHOW_AD          0x2000
+#define INPUT_STEP_EXIT             0x1000
 #define INPUT_STEP_MASK             0xF000
 
 #define MENU_MODE_CONFIRM           20
 #define MENU_CONF_OK                21
 #define MENU_CONF_CANCEL            22
-#define INPUT_CONF_OK               15
-#define INPUT_CONF_CANCEL           12
+#define INPUT_CONF_OK               0x8000
+#define INPUT_CONF_CANCEL           0x1000
 #define INPUT_CONF_MASK             0x9000
+
+#define MENU_MODE_RUN               30
+#define INPUT_STEP_MASK             0x0000
 
 
 /*
  * PROTOTYPES
  */
 void        boot();
+void        setup_board();
 
 void        loop();
 void        process_key(uint16_t);
 void        set_keys();
-uint8_t     get_val(uint16_t input);
+uint8_t     keypress_to_value(uint16_t input);
 
 void        update_display();
 void        display_cc();
 void        display_left(uint16_t value);
 void        display_right(uint16_t value);
-void        display(uint16_t value, uint8_t index);
+void        display_16_bit(uint16_t value, uint8_t index);
+void        display_8_bit(uint16_t value, uint8_t index);
 
 void        setup_cc_leds();
 void        dump_registers();

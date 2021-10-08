@@ -18,8 +18,8 @@
 #define I2C_FREQUENCY                           400000
 #define ON                                      1
 #define OFF                                     0
-#define SDA_GPIO                                8
-#define SCL_GPIO                                9
+#define SDA_GPIO                                20
+#define SCL_GPIO                                21
 
 #define HT16K33_GENERIC_DISPLAY_ON              0x81
 #define HT16K33_GENERIC_DISPLAY_OFF             0x80
@@ -39,14 +39,15 @@
  */
 void        i2c_write_byte(uint8_t address, uint8_t byte);
 void        i2c_write_block(uint8_t address, uint8_t *data, uint8_t count);
-void        ht16k33_init();
-void        ht16k33_start(uint8_t address, uint8_t *buffer);
+
+void        ht16k33_init(uint8_t address, uint8_t *buffer);
 void        ht16k33_power(uint8_t address, uint8_t on);
 void        ht16k33_bright(uint8_t address, uint8_t brightness);
 void        ht16k33_clear(uint8_t address, uint8_t *buffer);
 void        ht16k33_draw(uint8_t address, uint8_t *buffer);
-void        ht16k33_set_number(uint8_t address, uint8_t *buffer, uint32_t number, uint32_t digit, bool has_dot);
-void        ht16k33_set_alpha(uint8_t address, uint8_t *buffer, char chr, uint32_t digit, bool has_dot);
+void        ht16k33_set_number(uint8_t address, uint8_t *buffer, uint16_t number, uint8_t digit, bool has_dot);
+void        ht16k33_set_alpha(uint8_t address, uint8_t *buffer, char chr, uint8_t digit, bool has_dot);
+void        ht16k33_set_glyph(uint8_t address, uint8_t *buffer, uint8_t glyph, uint8_t digit, bool has_dot);
 
 
 #endif  // _HT16K33_HEADER_

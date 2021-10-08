@@ -10,16 +10,17 @@
 #include "main.h"
 
 
-uint8_t buffer[72]; // H x W x 4 + 8
-uint8_t *led_data = buffer + 4;
+uint8_t led_buffer[72]; // H x W x 4 + 8
+uint8_t *led_data = led_buffer + 4;
 
 
 void keypad_init() {
-    for (uint32_t i = 0 ; i < sizeof(buffer) ; ++i) {
-        buffer[i] = 0x00;
+    for (uint32_t i = 0 ; i < sizeof(led_buffer) ; ++i) {
+        led_buffer[i] = 0x00;
     }
 
-    keypad_set_brightness(DEFAULT_BRIGHTNESS); // Must be called to init each LED frame
+    // Must be called to init each LED frame
+    keypad_set_brightness(DEFAULT_BRIGHTNESS);
 
     // Set up I2C to read buttons
     i2c_init(i2c0, 400000);
@@ -43,7 +44,7 @@ void keypad_init() {
 
 void keypad_update_leds() {
     gpio_put(KEYPAD_PIN_LEDS_CS, 0);
-    spi_write_blocking(spi0, buffer, sizeof(buffer));
+    spi_write_blocking(spi0, led_buffer, sizeof(led_buffer));
     gpio_put(KEYPAD_PIN_LEDS_CS, 1);
 }
 
@@ -84,9 +85,9 @@ void keypad_clear() {
 }
 
 uint16_t keypad_get_button_states() {
-    uint8_t i2c_read_buffer[2];
+    uint8_t i2c_read_led_buffer[2];
     uint8_t reg = 0;
     i2c_write_blocking(i2c0, KEYPAD_I2C_ADDRESS, &reg, 1, true);
-    i2c_read_blocking(i2c0, KEYPAD_I2C_ADDRESS, i2c_read_buffer, 2, false);
-    return ~((i2c_read_buffer[0]) | (i2c_read_buffer[1] << 8));
+    i2c_read_blocking(i2c0, KEYPAD_I2C_ADDRESS, i2c_read_led_buffer, 2, false);
+    return ~((i2c_read_led_buffer[0]) | (i2c_read_led_buffer[1] << 8));
 }
