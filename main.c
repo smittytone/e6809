@@ -10,15 +10,19 @@
 #include "main.h"
 
 
-uint16_t    lit_buttons = 0;
 uint8_t     mode = 0;
-uint8_t     old_mode = 0;
-bool        mode_changed = false;
+uint8_t     previous_mode = 0;
 uint8_t     input_count = 0;
 uint16_t    input_value = 0;
-uint16_t    input_valid = 0;
-
+uint16_t    input_mask = 0;
 uint16_t    current_address = 0x0000;
+bool        mode_changed = false;
+bool        do_display_cc = false;
+uint8_t     buffer[32];
+uint8_t    *display_buffer[2] = {buffer, buffer + 16};
+uint8_t     display_address[2] = {0x70, 0x71};
+
+
 
 
 int main() {
@@ -36,6 +40,19 @@ int main() {
     // Enter UI
     loop();
     return 0;
+}
+
+
+void setup_board() {
+
+    // Set up the keypad -- this sets up I2C
+    keypad_init();
+    keypad_set_brightness(0.2f);
+
+    // Set up the displays
+    ht16k33_init();
+    ht16k33_start(display_address[0]);
+    ht16k33_start(display_address[1]);
 }
 
 
@@ -60,39 +77,33 @@ void boot() {
 void loop() {
     printf("Looping...");
 
-    bool key_pressed = false;
-    bool key_can_release = false;
+    bool is_key_pressed = false;
+    bool can_key_release = false;
     uint32_t debounce_count_press = 0;
     uint32_t debounce_count_release = 0;
     uint16_t the_key = 0;
 
-    uint32_t loop_count = 0;
-    uint32_t rh = 0;
-    uint32_t rl = 0;
-
-    keypad_init();
-    keypad_set_brightness(0.2f);
     set_keys();
 
     while (true) {
 
         uint32_t now = time_us_32();
         uint16_t any_key = keypad_get_button_states();
-        key_pressed = (any_key != 0);
+        is_key_pressed = (any_key != 0);
 
-        if (key_pressed) {
+        if (is_key_pressed) {
             if (debounce_count_press == 0) {
                 debounce_count_press = now;
             } else if (now - debounce_count_press > DEBOUNCE_TIME_US) {
                 debounce_count_press == 0;
-                key_can_release = true;
+                can_key_release = true;
                 if (the_key == 0) the_key = any_key;
             }
-        } else if (key_can_release) {
+        } else if (can_key_release) {
             if (debounce_count_press == 0) {
                 debounce_count_press = now;
             } else if (now - debounce_count_press > DEBOUNCE_TIME_US) {
-                key_can_release = false;
+                can_key_release = false;
                 process_key(the_key);
                 the_key = 0;
             }
@@ -102,33 +113,58 @@ void loop() {
 
 
 void process_key(uint16_t input) {
-    input &= input_valid;
+    input &= input_mask;
     if (input != 0) {
         switch (mode) {
-            case 1:
-            case 2:
+            case MENU_MAIN_ADDR:
+            case MENU_MAIN_BYTE:
                 input_value = (input_value << 4) | get_val(input);
                 input_count -= 1;
                 if (input_count == 0) {
-                    old_mode = mode;
-                    mode = 3;
+                    previous_mode = mode;
+                    mode = MENU_MODE_CONFIRM;
                     mode_changed = true;
                 }
                 break;
-            case 3:
-                if (input == 0x01) {
-                    // Pass value
-                    if (old_mode == 2) {
+            case MENU_MODE_STEP:
+                // Single-step run menu
+                // 0 -- Run next instruction
+                // 1 -- Switch the display to the CC register
+                // 2 -- Switch the display to address and contents
+                // 3 -- Exit to main menu
+                if (input == INPUT_STEP_NEXT) {
+                    // Run next instruction
+                }
+
+                if (input == INPUT_STEP_SHOW_CC) {
+                    // Switch display to CC register
+                    do_display_cc = true;
+                }
+
+                if (input == INPUT_STEP_SHOW_AD) {
+                    // Switch display to address, byte
+                    do_display_cc = false;
+                }
+
+                if (input == INPUT_STEP_EXIT) {
+                    // Bail back to main menu
+                    mode = MENU_MODE_MAIN;
+                    mode_changed = true;
+                }
+                break;
+            case MENU_MODE_CONFIRM:
+                if (input == INPUT_CONF_OK) {
+                    if (previous_mode == MENU_MAIN_ADDR) {
                         current_address = input_value;
                     }
 
-                    if (old_mode == 1) {
+                    if (previous_mode == MENU_MAIN_BYTE) {
                         mem[current_address] = input_value;
                         current_address++;
                     }
                 }
 
-                mode = 0;
+                mode = MENU_MODE_MAIN;
                 mode_changed = true;
                 break;
             default:
@@ -137,23 +173,18 @@ void process_key(uint16_t input) {
                 // 1 -- Input 16-bit value to set current memory location
                 // 2 -- Run code at current memory
                 // 3 -- Run code at current memory, single stepping
-                if (input == 0x01) {
-                    mode = 1;
+                if (input == INPUT_MAIN_ADDR) {
+                    mode = MENU_MAIN_ADDR;
                     mode_changed = true;
                 }
 
-                if (input == 0x02) {
-                    mode = 2;
+                if (input == INPUT_MAIN_BYTE) {
+                    mode = MENU_MAIN_BYTE;
                     mode_changed = true;
                 }
 
-                if (input == 0x03) {
-                    mode = 2;
-                    mode_changed = true;
-                }
-
-                if (input == 0x04) {
-                    mode = 3;
+                if (input == INPUT_MAIN_RUN_STEP) {
+                    mode = MENU_MODE_STEP;
                     mode_changed = true;
                 }
         }
@@ -171,24 +202,32 @@ void set_keys() {
     keypad_update_leds();
 
     switch (mode) {
-        case 1:
+        case MENU_MAIN_ADDR:
             // Enter 16-bit address: all keys yellow
             keypad_set_all(0x10, 0x10, 0x00);
             input_count = 4;
-            input_valid = 0xFFFF;
+            input_mask = 0xFFFF;
             break;
-        case 2:
+        case MENU_MAIN_BYTE:
             // Enter 8-bit data: all keys cyan
             keypad_set_all(0x00, 0x10, 0x10);
             input_count = 2;
-            input_valid = 0xFFFF;
+            input_mask = 0xFFFF;
             break;
-        case 3:
+        case MENU_MODE_STEP:
+            // Run code in single-step mode: blue
+            keypad_set_led(0, 0x00, 0x00, 0x10);
+            keypad_set_led(1, 0x00, 0x00, 0x10);
+            keypad_set_led(2, 0x00, 0x00, 0x10);
+            keypad_set_led(3, 0x00, 0x00, 0x10);
+            input_count = 1;
+            input_mask = 0x0009;
+        case MENU_MODE_CONFIRM:
             // Enter or cancel input
             keypad_set_led(0, 0x00, 0x10, 0x00);
             keypad_set_led(3, 0x10, 0x00, 0x00);
             input_count = 1;
-            input_valid = 0x0009;
+            input_mask = 0x0009;
             break;
         default:
             // Enter action: lower keys green
@@ -197,7 +236,7 @@ void set_keys() {
             keypad_set_led(2, 0x00, 0x10, 0x00);
             keypad_set_led(3, 0x00, 0x10, 0x00);
             input_count = 1;
-            input_valid = 0x000F;
+            input_mask = 0x000F;
             break;
     }
 
@@ -215,18 +254,50 @@ uint8_t get_val(uint16_t input) {
     return 0;
 }
 
-uint16_t inkey() {
-    // Wait for any button to be pushed, using debounce
-    bool is_pressed = false;
-    bool was_pressed = false;
-    uint32_t debounce_count_press = 0;
-    uint32_t debounce_count_release = 0;
-
-    while (true) {
-
+void update_display() {
+    if (do_display_cc) {
+        display_cc();
+    } else {
+        display_left(current_address);
+        display_right((uint16_t)mem[current_address]);
     }
 }
 
+void display_cc() {
+    ht16k33_clear(display_address[0], buffer[0]);
+    ht16k33_clear(display_address[1], buffer[1]);
+
+    for (uint8_t i == 0 ; i < 4 ; ++i) {
+        ht16k33_set_number(display_address[0], buffer[0], ((reg.cc >> i) & 0x01), 3 - i, false);
+    }
+
+    for (uint8_t i == 4 ; i < 8 ; ++i) {
+        ht16k33_set_number(display_address[1], buffer[1], ((reg.cc >> i) & 0x01), 7 - i, false);
+    }
+
+    ht16k33_draw(display_address[0], buffer[0]);
+    ht16k33_draw(display_address[1], buffer[1]);
+}
+
+void display_left(uint16_t value) {
+    // Put the value on the left (0) display
+    display(value, 0);
+}
+
+void display_right(uint16_t value) {
+    // Put the value on the right (1) display
+    display(value, 1);
+}
+
+void display(uint16_t value, uint8_t index) {
+    if (value > 0xFFFF) value = 0x0000;
+    ht16k33_clear(display_address[index]);
+    ht16k33_set_number(display_address[index], buffer[index], (value >> 12) & 0x0F, 0, false);
+    ht16k33_set_number(display_address[index], buffer[index], (value >> 8) & 0x0F, 1, false);
+    ht16k33_set_number(display_address[index], buffer[index], (value >> 4) & 0x0F, 2, false);
+    ht16k33_set_number(display_address[index], buffer[index], value & 0x0F, 3, false);
+    ht16k33_draw(display_address[index], buffer[index]);
+}
 
 void setup_cc_leds() {
     gpio_init(PIN_LED_C);

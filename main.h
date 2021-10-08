@@ -26,6 +26,7 @@
 #include "cpu.h"
 #include "cpu_tests.h"
 #include "keypad.h"
+#include "ht16k33.h"
 
 
 /*
@@ -39,20 +40,44 @@
 #define PIN_LED_Z                   4
 #define PIN_LED_N                   5
 
-/*
- * STRUCTURES
- */
+#define MENU_MODE_MAIN              0
+#define MENU_MAIN_ADDR              1
+#define MENU_MAIN_BYTE              2
+#define MENU_MAIN_RUN_STEP          3
+// #define MENU_MAIN_RUN              4
+#define INPUT_MAIN_ADDR             1
+#define INPUT_MAIN_BYTE             2
+#define INPUT_MAIN_RUN_STEP         3
+
+#define MENU_MODE_STEP              10
+#define INPUT_STEP_NEXT             1
+#define INPUT_STEP_SHOW_CC          2
+#define INPUT_STEP_SHOW_AD          3
+#define INPUT_STEP_EXIT             4
+
+#define MENU_MODE_CONFIRM           20
+#define MENU_CONF_OK                21
+#define MENU_CONF_CANCEL            22
+#define INPUT_CONF_OK               1
+#define INPUT_CONF_CANCEL           2
 
 
 /*
  * PROTOTYPES
  */
 void        boot();
+
 void        loop();
 void        process_key(uint16_t);
 void        set_keys();
 uint8_t     get_val(uint16_t input);
-uint16_t    inkey();
+
+void        update_display();
+void        display_cc();
+void        display_left(uint16_t value);
+void        display_right(uint16_t value);
+void        display(uint16_t value, uint8_t index);
+
 void        setup_cc_leds();
 void        dump_registers();
 void        run_tests();
