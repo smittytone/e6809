@@ -193,7 +193,6 @@ void process_key(uint16_t input) {
 
     update_display();
     if (mode_changed) set_keys();
-
 }
 
 
@@ -247,6 +246,9 @@ void set_keys() {
     mode_changed = false;
 }
 
+/*
+ * Convert the key press value into an actual value
+ */
 uint8_t get_val(uint16_t input) {
     for (uint32_t i = 0 ; i < 16 ; ++i) {
         if ((input & (1 << i)) != 0) {
@@ -257,12 +259,20 @@ uint8_t get_val(uint16_t input) {
     return 0;
 }
 
+/*
+ * Update the display
+ */
 void update_display() {
     if (do_display_cc) {
         display_cc();
     } else {
         display_left(current_address);
-        display_right((uint16_t)mem[current_address]);
+
+        if (mode == MENU_MAIN_BYTE) {
+            display_right((uint16_t)input_value);
+        } else {
+            display_right((uint16_t)mem[current_address]);
+        }
     }
 }
 
