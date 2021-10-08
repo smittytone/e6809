@@ -45,21 +45,25 @@
 #define MENU_MAIN_BYTE              2
 #define MENU_MAIN_RUN_STEP          3
 // #define MENU_MAIN_RUN              4
-#define INPUT_MAIN_ADDR             1
-#define INPUT_MAIN_BYTE             2
-#define INPUT_MAIN_RUN_STEP         3
+#define INPUT_MAIN_ADDR             15
+#define INPUT_MAIN_BYTE             14
+#define INPUT_MAIN_RUN_STEP         13
+#define INPUT_MAIN_RUN              12
+#define INPUT_MAIN_MASK             0x7000
 
 #define MENU_MODE_STEP              10
-#define INPUT_STEP_NEXT             1
-#define INPUT_STEP_SHOW_CC          2
-#define INPUT_STEP_SHOW_AD          3
-#define INPUT_STEP_EXIT             4
+#define INPUT_STEP_NEXT             12
+#define INPUT_STEP_SHOW_CC          13
+#define INPUT_STEP_SHOW_AD          14
+#define INPUT_STEP_EXIT             15
+#define INPUT_STEP_MASK             0xF000
 
 #define MENU_MODE_CONFIRM           20
 #define MENU_CONF_OK                21
 #define MENU_CONF_CANCEL            22
-#define INPUT_CONF_OK               1
-#define INPUT_CONF_CANCEL           2
+#define INPUT_CONF_OK               15
+#define INPUT_CONF_CANCEL           12
+#define INPUT_CONF_MASK             0x9000
 
 
 /*

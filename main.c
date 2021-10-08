@@ -139,6 +139,7 @@ void process_key(uint16_t input) {
                 if (input == INPUT_STEP_SHOW_CC) {
                     // Switch display to CC register
                     do_display_cc = true;
+
                 }
 
                 if (input == INPUT_STEP_SHOW_AD) {
@@ -190,7 +191,9 @@ void process_key(uint16_t input) {
         }
     }
 
+    update_display();
     if (mode_changed) set_keys();
+
 }
 
 
@@ -216,27 +219,27 @@ void set_keys() {
             break;
         case MENU_MODE_STEP:
             // Run code in single-step mode: blue
-            keypad_set_led(0, 0x00, 0x00, 0x10);
-            keypad_set_led(1, 0x00, 0x00, 0x10);
-            keypad_set_led(2, 0x00, 0x00, 0x10);
-            keypad_set_led(3, 0x00, 0x00, 0x10);
+            keypad_set_led(INPUT_STEP_NEXT, 0x00, 0x00, 0x10);
+            keypad_set_led(INPUT_STEP_SHOW_CC, 0x00, 0x00, 0x10);
+            keypad_set_led(INPUT_STEP_SHOW_AD, 0x00, 0x00, 0x10);
+            keypad_set_led(INPUT_STEP_EXIT, 0x00, 0x00, 0x10);
             input_count = 1;
-            input_mask = 0x0009;
+            input_mask = INPUT_STEP_MASK;
         case MENU_MODE_CONFIRM:
             // Enter or cancel input
             keypad_set_led(0, 0x00, 0x10, 0x00);
             keypad_set_led(3, 0x10, 0x00, 0x00);
             input_count = 1;
-            input_mask = 0x0009;
+            input_mask = INPUT_CONF_MASK;
             break;
         default:
             // Enter action: lower keys green
-            keypad_set_led(0, 0x00, 0x10, 0x00);
-            keypad_set_led(1, 0x00, 0x10, 0x00);
-            keypad_set_led(2, 0x00, 0x10, 0x00);
-            keypad_set_led(3, 0x00, 0x10, 0x00);
+            keypad_set_led(INPUT_MAIN_ADDR, 0x00, 0x10, 0x00);
+            keypad_set_led(INPUT_MAIN_BYTE, 0x00, 0x10, 0x00);
+            keypad_set_led(INPUT_MAIN_RUN_STEP, 0x00, 0x10, 0x00);
+            keypad_set_led(INPUT_MAIN_RUN, 0x00, 0x10, 0x00);
             input_count = 1;
-            input_mask = 0x000F;
+            input_mask = INPUT_MAIN_MASK;
             break;
     }
 
