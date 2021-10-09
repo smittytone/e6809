@@ -1,5 +1,6 @@
 /*
  * e6809 for Raspberry Pi Pico
+ * Opcode constant definitions
  *
  * @version     1.0.0
  * @author      smittytone

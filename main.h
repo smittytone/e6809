@@ -11,6 +11,9 @@
 #define _E6809_HEADER_
 
 
+/*
+ *      INCLUDES
+ */
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,7 +33,7 @@
 
 
 /*
- * CONSTANTS
+ *      CONSTANTS
  */
 #define PIN_STEP_BUTTON             17
 #define DEBOUNCE_TIME_US            5000
@@ -58,7 +61,9 @@
 #define INPUT_STEP_SHOW_CC          0x4000
 #define INPUT_STEP_SHOW_AD          0x2000
 #define INPUT_STEP_EXIT             0x1000
-#define INPUT_STEP_MASK             0xF000
+#define INPUT_MAIN_MEM_UP           0x0008
+#define INPUT_MAIN_MEM_DOWN         0x0001
+#define INPUT_STEP_MASK             0xF009
 
 #define MENU_MODE_CONFIRM           20
 #define MENU_CONF_OK                21
@@ -72,12 +77,12 @@
 
 
 /*
- * PROTOTYPES
+ *      PROTOTYPES
  */
-void        boot();
-void        setup_board();
+bool        setup_board();
+void        boot_cpu();
 
-void        loop();
+void        ui_input_loop();
 void        process_key(uint16_t);
 void        set_keys();
 uint8_t     keypress_to_value(uint16_t input);
@@ -86,11 +91,11 @@ void        update_display();
 void        display_cc();
 void        display_left(uint16_t value);
 void        display_right(uint16_t value);
-void        display_16_bit(uint16_t value, uint8_t index);
-void        display_8_bit(uint16_t value, uint8_t index);
+void        display_value(uint16_t value, uint8_t index, bool is_16_bit);
 
 void        setup_cc_leds();
 void        dump_registers();
 void        run_tests();
+
 
 #endif // _E6809_HEADER_

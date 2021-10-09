@@ -22,53 +22,80 @@ uint16_t    current_address = 0x0000;
 uint16_t    start_address = 0x0000;
 bool        mode_changed = false;
 bool        do_display_cc = false;
+bool        do_display_pc = true;
 bool        is_running = false;
+bool        using_board = false;
 uint8_t     buffer[32];
 uint8_t    *display_buffer[2] = {buffer, buffer + 16};
 uint8_t     display_address[2] = {0x71, 0x70};
 
 
-
-
+/*
+ *      ENTRY POINT
+ */
 int main() {
-
     // Enable STDIO
     stdio_init_all();
 
     // Prepare the board
-    setup_board();
+    using_board = setup_board();
 
     // Boot the CPU
-    boot();
+    boot_cpu();
 
-    // Run tests
-    //test_main();
+    // Branch according to whether the Pico is connected
+    // to a monitor board
+    if (using_board) {
+        // Enter the UI
+        ui_input_loop();
+    } else {
+        // Run tests -- for now
+        test_main();
+    }
 
-    // Enter the UI
-    loop();
     return 0;
 }
 
 
-void setup_board() {
+/*
+    Bring up the monitor board if it is present.
+
+    - Returns: `true` if the board is present and enabled, otherwise `false`.
+ */
+bool setup_board() {
+    printf("Configuring the monitor board");
+
     // Set up the keypad -- this sets up I2C0 @ 400,000bps
-    keypad_init();
+    if (!keypad_init()) {
+        printf("No monitor board found");
+        return false;
+    }
+
     keypad_set_brightness(0.2);
 
     // Set up the displays
     ht16k33_init(display_address[0], display_buffer[0]);
     ht16k33_init(display_address[1], display_buffer[1]);
+
+    return true;
 }
 
 
-void boot() {
-    printf("Booting...");
+/*
+    Bring up the virtual 6809e and 64KB of memory.
+
+    In future, this will offer alternative memory layouts.
+ */
+void boot_cpu() {
+    printf("Resetting the registers");
     reset_registers();
 
+    printf("Initializing memory");
     for (uint32_t i = 0 ; i < 65536 ; i++) {
         mem[i] = RTI;
     }
 
+    printf("Entering sample program at 0x4000");
     uint16_t start = 0x4000;
     uint8_t prog[] = {0x86,0xFF,0x8E,0x80,0x00,0xA7,0x80,0x8C,0x80,0x09,0x2D,0xF9,0x3B};
     for (uint16_t i = 0 ; i < 13 ; i++) mem[start + i] = prog[i];
@@ -84,12 +111,16 @@ void boot() {
     {0x34,0x46,0x33,0x64,0xA6,0x42,0xAE,0x43,0xE6,0x80,0x34,0x04,0x34,0x04,0x4A,0x27,0x13,0xE6,0x80,0xE1,0xE4,0x2E,0x08,0xE1,0x61,0x2E,0x06,0xE7,0x61,0x20,0x02,0xE7,0xE4,0x4A,0x26,0xED,0xA6,0xE0,0xA7,0x45,0xA6,0xE0,0xA7,0x46,0x35,0xC6,0x32,0x7E,0x8E,0x80,0x42,0x34,0x10,0xB6,0x80,0x41,0x34,0x02,0x8D,0xC4,0xA6,0x63,0xE6,0x64,0x39,0x0A,0x01,0x02,0x03,0x04,0x00,0x06,0x07,0x09,0x08,0x0B};
     {0x86, 0x41, 0x8E, 0x04, 0x00, 0xA7, 0x80, 0x8C, 0x06, 0x00, 0x26, 0xF9, 0x1A, 0x0F, 0x3B};
     */
-
 }
 
 
-void loop() {
-    printf("Looping...");
+/*
+    Initialise and run the main event loop. This primarily continually reads the
+    keypad, allowing for debounces on press and release actions. Buttons are
+    triggered only on release.
+ */
+void ui_input_loop() {
+    printf("Entering UI at main menu");
 
     bool is_key_pressed = false;
     bool can_key_release = false;
@@ -97,43 +128,60 @@ void loop() {
     uint32_t debounce_count_release = 0;
     uint16_t the_key = 0;
 
+    // Set the button colours and the display
     set_keys();
-    display_left(current_address);
-    display_right(0);
+    update_display();
 
+    // Run the button press loop
     while (true) {
-
+        // Read the keypad
         uint32_t now = time_us_32();
         uint16_t any_key = keypad_get_button_states();
         is_key_pressed = (any_key != 0);
 
         if (is_key_pressed) {
+            // Allow a debounce period, eg. 20ms
             if (debounce_count_press == 0) {
                 debounce_count_press = now;
             } else if (now - debounce_count_press > DEBOUNCE_TIME_US) {
+                // Key still pressed -- start to check for its release
                 debounce_count_press == 0;
                 can_key_release = true;
                 if (the_key == 0) the_key = any_key;
             }
         } else if (can_key_release) {
+            // Allow a debounce period, eg. 20ms
             if (debounce_count_press == 0) {
                 debounce_count_press = now;
             } else if (now - debounce_count_press > DEBOUNCE_TIME_US) {
+                // Key released -- check and action it
                 can_key_release = false;
                 process_key(the_key);
                 the_key = 0;
             }
+        } else {
+            // Allow room for interrupts
+            // TODO
         }
     }
 }
 
+/*
+    Process a key press to determine if it is valid - a lit button was pressed -
+    and to then trigger the action the key represents.
 
+    - Parameters:
+        - input: The key press value read from the keypad.
+ */
 void process_key(uint16_t input) {
+    // Make sure the key pressed was a valid one
     input &= input_mask;
     if (input != 0) {
+        // Check the key's action according to the menu mode
         switch (mode) {
             case MENU_MAIN_ADDR:
             case MENU_MAIN_BYTE:
+                // 8- and 16-bit value input -- determined by 'input_count'
                 input_value = (input_value << 4) | keypress_to_value(input);
                 input_count -= 1;
 
@@ -145,6 +193,7 @@ void process_key(uint16_t input) {
                 }
 
                 if (input_count == 0) {
+                    // Got 2 or 4 presses -- jump to confirm menu
                     previous_mode = mode;
                     mode = MENU_MODE_CONFIRM;
                     mode_changed = true;
@@ -153,40 +202,60 @@ void process_key(uint16_t input) {
                 break;
             case MENU_MODE_STEP:
                 // Single-step run menu
-                // 0 -- Run next instruction
-                // 1 -- Switch the display to the CC register
-                // 2 -- Switch the display to address and contents
-                // 3 -- Exit to main menu
+                // 0 -- Memory stop down                                   -- BLUE
+                // 3 -- Memory step up                                     -- BLUE
+                // C -- Run next instruction                               -- GREEN
+                // D -- Toggle the display between address and CC register -- MAGENTA
+                // E -- Track the PC register on the display               -- ORANGE
+                // F -- Exit to main menu                                  -- RED
                 if (input == INPUT_STEP_NEXT && is_running) {
                     // Run next instruction
                     uint32_t result = process_next_instruction();
 
                     if (result == 99) {
+                        // Code hit RTI -- jump back to the main menu
                         mode = MENU_MODE_MAIN;
                         mode_changed = true;
                         is_running = false;
                         current_address = start_address;
                     } else {
-                        current_address = reg.pc;
+                        if (do_display_pc) current_address = reg.pc;
                     }
 
                     update_display();
 
                     if (result == 99) {
+                        // If the code completed, add a long minus sign to the right display
                         ht16k33_set_glyph(display_address[1], display_buffer[1], 0x40, 0, false);
                         ht16k33_set_glyph(display_address[1], display_buffer[1], 0x40, 1, false);
                         ht16k33_draw(display_address[1], display_buffer[1]);
                     }
                 }
 
-                if (input == INPUT_STEP_SHOW_CC || input == INPUT_STEP_SHOW_AD) {
-                    // Switch display to CC register
-                    do_display_cc = (input == INPUT_STEP_SHOW_CC);
+                if (input == INPUT_STEP_SHOW_CC) {
+                    // Toggle the display between memory and CC register views
+                    do_display_cc = !do_display_cc;
+                    update_display();
+                }
+
+                if (input == INPUT_STEP_SHOW_AD) {
+                    // Jump to current value of PC register
+                    do_display_pc = true;
+                    current_address = reg.pc;
+                    update_display();
+                }
+
+                if (input == INPUT_STEP_MEM_UP || input == INPUT_STEP_MEM_DOWN) {
+                    // Step up and down from the current memory value
+                    // NOTE This will 'fix' the memory displayed -- hit the Blue
+                    //      key in the menu to continue tracking the PC register
+                    current_address += (input == INPUT_STEP_MEM_UP ? 1 : -1);
+                    do_display_pc = false;
                     update_display();
                 }
 
                 if (input == INPUT_STEP_EXIT) {
-                    // Bail back to main menu
+                    // User hit Cancel -- go back to the main menu
                     mode = MENU_MODE_MAIN;
                     mode_changed = true;
                     is_running = false;
@@ -196,7 +265,10 @@ void process_key(uint16_t input) {
 
                 break;
             case MENU_MODE_CONFIRM:
-                // Only update value sif OK (green) was hit
+                // Confirm value entry menu
+                // C -- Reject value -- RED
+                // F -- Accept value -- GREEN
+                // Only update values if OK (green) was hit
                 if (input == INPUT_CONF_OK) {
                     if (previous_mode == MENU_MAIN_ADDR) {
                         current_address = input_value;
@@ -209,8 +281,7 @@ void process_key(uint16_t input) {
                 }
 
                 // Show the current values
-                display_left(current_address);
-                display_right(mem[current_address]);
+                update_display();
 
                 // Switch back to main menu
                 mode = MENU_MODE_MAIN;
@@ -218,12 +289,12 @@ void process_key(uint16_t input) {
                 break;
             default:
                 // Main menu
-                // 0 -- Memory stop down
-                // 3 -- Memory step up
+                // 0 -- Memory stop down                                  -- BLUE
+                // 3 -- Memory step up                                    -- BLUE
                 // C -- Run code at current memory NON-FUNCTIONAL
-                // D -- Run code at current memory, single stepping
-                // E -- Input 8-bit value to current memory location
-                // F -- Input 16-bit value to set current memory location
+                // D -- Run code at current memory, single stepping       -- GREEN
+                // E -- Input 8-bit value to current memory location      -- CYAN
+                // F -- Input 16-bit value to set current memory location -- YELLOW
                 if (input == INPUT_MAIN_ADDR) {
                     mode = MENU_MAIN_ADDR;
                     mode_changed = true;
@@ -257,11 +328,17 @@ void process_key(uint16_t input) {
     if (mode_changed) set_keys();
 }
 
+/*
+    Prime the keypad for the current menu mode, setting key colours,
+    masking the keys that can be pressed, and, for data-entry screens,
+    the number of digits that can be entered.
+ */
 void set_keys() {
     // Clear the keyboard
     keypad_clear();
     keypad_update_leds();
 
+    // Illuminate available keys according to menu mode
     switch (mode) {
         case MENU_MAIN_ADDR:
             // Enter 16-bit address: all keys yellow
@@ -278,11 +355,13 @@ void set_keys() {
             input_value = 0;
             break;
         case MENU_MODE_STEP:
-            // Run code in single-step mode: blue
+            // Run code in single-step mode
             keypad_set_led(15, 0x00, 0x10, 0x00);
             keypad_set_led(14, 0x10, 0x00, 0x10);
-            keypad_set_led(13, 0x00, 0x00, 0x10);
+            keypad_set_led(13, 0x20, 0x10, 0x00);
             keypad_set_led(12, 0x10, 0x00, 0x00);
+            keypad_set_led(3,  0x00, 0x00, 0x40);
+            keypad_set_led(0,  0x00, 0x00, 0x40);
             input_count = 1;
             input_mask = INPUT_STEP_MASK;
             break;
@@ -311,20 +390,25 @@ void set_keys() {
 }
 
 /*
- * Convert the key press value into an actual value
+    Convert the key press value into an actual value.
+
+    - Parameters:
+        - input: The key press value read from the keypad.
+
+    - Returns: The actual value represented by the pressed key.
  */
 uint8_t keypress_to_value(uint16_t input) {
+    // NOTE Assumes one key press and exits at the first
+    //      low bit that is set
     for (uint32_t i = 0 ; i < 16 ; ++i) {
-        if ((input & (1 << i)) != 0) {
-            return i;
-        }
+        if ((input & (1 << i)) != 0) return i;
     }
 
     return 0;
 }
 
 /*
- * Update the display
+    Update the display by mode.
  */
 void update_display() {
     if (do_display_cc) {
@@ -335,6 +419,9 @@ void update_display() {
     }
 }
 
+/*
+    Display the CC register as eight binary digits.
+ */
 void display_cc() {
     ht16k33_clear(display_address[0], display_buffer[0]);
     ht16k33_clear(display_address[1], display_buffer[1]);
@@ -351,37 +438,56 @@ void display_cc() {
     ht16k33_draw(display_address[1], display_buffer[1]);
 }
 
+/*
+    Display a 16-bit value on the left display.
+
+    - Parameters:
+        - value: The 16-bit value to display.
+ */
 void display_left(uint16_t value) {
-    // Put the value on the left (0) display
-    display_16_bit(value, 0);
+    display_value(value, 0, true);
 }
 
+/*
+    Display an 8-bit value on the right display.
+
+    - Parameters:
+        - value: The 8-bit value to display.
+ */
 void display_right(uint16_t value) {
-    // Put the value on the right (1) display
-    display_8_bit(value, 1);
+    display_value(value, 1, false);
 }
 
-void display_16_bit(uint16_t value, uint8_t index) {
+/*
+    Display an 8- or 16-bit value on a display, specified by index:
+    0 = left, 1 = right.
+
+    - Parameters:
+        - value:     The value to display.
+        - index:     The display's index, 0 or 1.
+        - is_16_bit: Whether the value is 16-bit (`true`) or 8-bit (`false`).
+ */
+void display_value(uint16_t value, uint8_t index, bool is_16_bit) {
     if (value > 0xFFFF) value = 0x0000;
+    if (!is_16_bit) value &= 0xFF;
     ht16k33_clear(display_address[index], display_buffer[index]);
-    ht16k33_set_number(display_address[index], display_buffer[index], (value >> 12) & 0x0F, 0, false);
-    ht16k33_set_number(display_address[index], display_buffer[index], (value >> 8) & 0x0F, 1, false);
+
+    if (is_16_bit) {
+        ht16k33_set_number(display_address[index], display_buffer[index], (value >> 12) & 0x0F, 0, false);
+        ht16k33_set_number(display_address[index], display_buffer[index], (value >> 8) & 0x0F, 1, false);
+    }
+
     ht16k33_set_number(display_address[index], display_buffer[index], (value >> 4) & 0x0F, 2, false);
     ht16k33_set_number(display_address[index], display_buffer[index], value & 0x0F, 3, false);
     ht16k33_draw(display_address[index], display_buffer[index]);
 }
 
-void display_8_bit(uint16_t value, uint8_t index) {
-    value &= 0xFF;
-    ht16k33_clear(display_address[index], display_buffer[index]);
-    ht16k33_set_number(display_address[index], display_buffer[index], (value >> 4) & 0x0F, 2, false);
-    ht16k33_set_number(display_address[index], display_buffer[index], value & 0x0F, 3, false);
-    ht16k33_draw(display_address[index], display_buffer[index]);
-}
 
 
 
-
+/*
+ *  OLD CODE -- MAY BE REMOVED
+ */
 void setup_cc_leds() {
     gpio_init(PIN_LED_C);
     gpio_set_dir(PIN_LED_C, GPIO_OUT);
