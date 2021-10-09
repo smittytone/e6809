@@ -61,8 +61,8 @@
 #define INPUT_STEP_SHOW_CC          0x4000
 #define INPUT_STEP_SHOW_AD          0x2000
 #define INPUT_STEP_EXIT             0x1000
-#define INPUT_MAIN_MEM_UP           0x0008
-#define INPUT_MAIN_MEM_DOWN         0x0001
+#define INPUT_STEP_MEM_UP           0x0008
+#define INPUT_STEP_MEM_DOWN         0x0001
 #define INPUT_STEP_MASK             0xF009
 
 #define MENU_MODE_CONFIRM           20
