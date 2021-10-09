@@ -1,5 +1,6 @@
 /*
  * e6809 for Raspberry Pi Pico
+ * Display driver
  *
  * @version     1.0.0
  * @author      smittytone
@@ -37,12 +38,14 @@
 /*
  *      PROTOTYPES
  */
+// I2C Functions
 void        i2c_write_byte(uint8_t address, uint8_t byte);
 void        i2c_write_block(uint8_t address, uint8_t *data, uint8_t count);
 
+// Display Functions
 void        ht16k33_init(uint8_t address, uint8_t *buffer);
 void        ht16k33_power(uint8_t address, uint8_t on);
-void        ht16k33_bright(uint8_t address, uint8_t brightness);
+void        ht16k33_brightness(uint8_t address, uint8_t brightness);
 void        ht16k33_clear(uint8_t address, uint8_t *buffer);
 void        ht16k33_draw(uint8_t address, uint8_t *buffer);
 void        ht16k33_set_number(uint8_t address, uint8_t *buffer, uint16_t number, uint8_t digit, bool has_dot);

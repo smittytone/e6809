@@ -1,5 +1,6 @@
 /*
  * e6809 for Raspberry Pi Pico
+ * Display driver
  *
  * @version     1.0.0
  * @author      smittytone
@@ -10,51 +11,96 @@
 #include "main.h"
 
 
+/*
+ *      GLOBALS
+ */
 const uint8_t CHARSET[18] = {0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F, 0x5F, 0x7C, 0x58, 0x5E, 0x7B, 0x71, 0x40, 0x63};
 const uint8_t POS[4] = {0, 2, 6, 8};
 
 
 /*
- * I2C Functions
+ *      I2C FUNCTIONS
  */
 
+/*
+    Convenience function to write a single byte to the matrix
+ */
 void i2c_write_byte(uint8_t address, uint8_t byte) {
-    // Convenience function to write a single byte to the matrix
     i2c_write_blocking(I2C_PORT, address, &byte, 1, false);
 }
 
+/*
+    Convenience function to write a 'count' bytes to the matrix
+ */
 void i2c_write_block(uint8_t address, uint8_t *data, uint8_t count) {
-    // Convenience function to write a 'count' bytes to the matrix
     i2c_write_blocking(I2C_PORT, address, data, count, false);
 }
 
 
 /*
- * HT16K33 Segment LED Functions
+ *      HT16K33 SEGMENT LED FUNCTIONS
+ */
+
+/*
+    Initialise the display.
+    NOTE Assumes the display is on I2C0.
+
+    - Parameters:
+        - address: The display's I2C address.
+        - buffer:  Pointer to the display code's data buffer.
  */
 void ht16k33_init(uint8_t address, uint8_t *buffer) {
     ht16k33_power(address, 1);
-    ht16k33_bright(address, 6);
+    ht16k33_brightness(address, 6);
     ht16k33_clear(address, buffer);
     ht16k33_draw(address, buffer);
 }
 
+/*
+    Power the display on or off.
+
+    - Parameters:
+        - address: The display's I2C address.
+        - on:      Whether to power up the display (`true`) or turn it off (`false`).
+ */
 void ht16k33_power(uint8_t address, uint8_t on) {
     i2c_write_byte(address, on == ON ? HT16K33_GENERIC_SYSTEM_ON : HT16K33_GENERIC_DISPLAY_OFF);
     i2c_write_byte(address, on == ON ? HT16K33_GENERIC_DISPLAY_ON : HT16K33_GENERIC_SYSTEM_OFF);
 }
 
-void ht16k33_bright(uint8_t address, uint8_t brightness) {
+/*
+    Power the display on or off.
+
+    - Parameters:
+        - address:    The display's I2C address.
+        - brightness: The brightness value, 1-15.
+ */
+void ht16k33_brightness(uint8_t address, uint8_t brightness) {
     // Set the LED brightness
     if (brightness < 0 || brightness > 15) brightness = 15;
     i2c_write_byte(address, HT16K33_GENERIC_CMD_BRIGHTNESS | brightness);
 }
 
+/*
+    Clear the display.
+    Writes to the buffer, but not the device: call `draw()` after.
+
+    - Parameters:
+        - address: The display's I2C address.
+        - buffer:  Pointer to the display code's data buffer.
+ */
 void ht16k33_clear(uint8_t address, uint8_t *buffer) {
     // Clear the display buffer and then write it out
     for (uint8_t i = 0 ; i < 16 ; ++i) buffer[i] = 0;
 }
 
+/*
+    Writes the buffer to the device.
+
+    - Parameters:
+        - address: The display's I2C address.
+        - buffer:  Pointer to the display code's data buffer.
+ */
 void ht16k33_draw(uint8_t address, uint8_t *buffer) {
     // Set up the buffer holding the data to be
     // transmitted to the LED
@@ -71,6 +117,16 @@ void ht16k33_draw(uint8_t address, uint8_t *buffer) {
     i2c_write_block(address, tx_buffer, sizeof(tx_buffer));
 }
 
+/*
+    Set the specified digit to a hex number.
+
+    - Parameters:
+        - address: The display's I2C address.
+        - buffer:  Pointer to the display code's data buffer.
+        - number:  The value to show, 0x00-0x0F.
+        - digit:   The target display digit, 0-3.
+        - has_dot: Illuminate the decimal point (`true`) or not (`false`).
+ */
 void ht16k33_set_number(uint8_t address, uint8_t *buffer, uint16_t number, uint8_t digit, bool has_dot) {
     if (digit > 3) return;
     if (number > 15) return;
@@ -78,6 +134,17 @@ void ht16k33_set_number(uint8_t address, uint8_t *buffer, uint16_t number, uint8
     if (number > 9) ht16k33_set_alpha(address, buffer, 'a' + (number - 10), digit, has_dot);
 }
 
+/*
+    Set the specified digit to a character from the driver's
+    character set -- see `CHARSET`, above.
+
+    - Parameters:
+        - address: The display's I2C address.
+        - buffer:  Pointer to the display code's data buffer.
+        - chr:     The character to show, from the CHARSET.
+        - digit:   The target display digit, 0-3.
+        - has_dot: Illuminate the decimal point (`true`) or not (`false`).
+ */
 void ht16k33_set_alpha(uint8_t address, uint8_t *buffer, char chr, uint8_t digit, bool has_dot) {
     if (digit > 3) return;
 
@@ -99,6 +166,16 @@ void ht16k33_set_alpha(uint8_t address, uint8_t *buffer, char chr, uint8_t digit
     if (has_dot) buffer[POS[digit]] |= 0x80;
 }
 
+/*
+    Set the specified digit to an arbitrary glyph, one bit per segment.
+
+    - Parameters:
+        - address: The display's I2C address.
+        - buffer:  Pointer to the display code's data buffer.
+        - glyph:   The glyph value, 0x00-0x7F.
+        - digit:   The target display digit, 0-3.
+        - has_dot: Illuminate the decimal point (`true`) or not (`false`).
+ */
 void ht16k33_set_glyph(uint8_t address, uint8_t *buffer, uint8_t glyph, uint8_t digit, bool has_dot) {
     if (glyph > 0x7F) return;
     buffer[POS[digit]] = glyph;
