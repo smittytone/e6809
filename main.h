@@ -43,6 +43,9 @@
 #define PIN_LED_Z                   4
 #define PIN_LED_N                   5
 
+#define DISPLAY_LEFT                0
+#define DISPLAY_RIGHT               1
+
 #define MENU_MODE_MAIN              0
 #define MENU_MAIN_ADDR              1
 #define MENU_MAIN_BYTE              2
@@ -54,7 +57,7 @@
 #define INPUT_MAIN_RUN              0x1000
 #define INPUT_MAIN_MEM_UP           0x0008
 #define INPUT_MAIN_MEM_DOWN         0x0001
-#define INPUT_MAIN_MASK             0xE009
+#define INPUT_MAIN_MASK             0xF009
 
 #define MENU_MODE_STEP              10
 #define INPUT_STEP_NEXT             0x8000
@@ -68,12 +71,16 @@
 #define MENU_MODE_CONFIRM           20
 #define MENU_CONF_OK                21
 #define MENU_CONF_CANCEL            22
+#define MENU_CONF_CONTINUE          23
 #define INPUT_CONF_OK               0x8000
 #define INPUT_CONF_CANCEL           0x1000
-#define INPUT_CONF_MASK             0x9000
+#define INPUT_CONF_CONTINUE         0x4000
+#define INPUT_CONF_MASK_ADDR        0x9000
+#define INPUT_CONF_MASK_BYTE        0xD000
 
 #define MENU_MODE_RUN               30
-#define INPUT_RUN_MASK             0x0000
+#define MENU_MODE_RUN_DONE          31
+#define INPUT_RUN_MASK              0xFFFF
 
 
 /*

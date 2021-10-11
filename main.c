@@ -13,6 +13,7 @@
 /*
  *      GLOBALS
  */
+uint8_t     display_mode = 0;
 uint8_t     input_count = 0;
 uint16_t    input_value = 0;
 uint16_t    input_mask = 0;
@@ -21,9 +22,9 @@ uint16_t    previous_mode = 0;
 uint16_t    current_address = 0x0000;
 uint16_t    start_address = 0x0000;
 bool        mode_changed = false;
-bool        do_display_cc = false;
 bool        do_display_pc = true;
-bool        is_running = false;
+bool        is_running_steps = false;
+bool        is_running_full = false;
 bool        using_board = false;
 uint8_t     buffer[32];
 uint8_t    *display_buffer[2] = {buffer, buffer + 16};
@@ -138,6 +139,17 @@ void ui_input_loop() {
         uint32_t now = time_us_32();
         uint16_t any_key = keypad_get_button_states();
         is_key_pressed = (any_key != 0);
+        if (is_running_full) {
+            uint32_t result = process_next_instruction();
+            if (result == 99) {
+                // Code hit RTI -- show we're not running
+                // NOTE A key press then will take the
+                //      user to the main menu
+                mode = MENU_MODE_RUN_DONE;
+                mode_changed = true;
+                set_keys();
+            }
+        }
 
         if (is_key_pressed) {
             // Allow a debounce period, eg. 20ms
@@ -208,7 +220,7 @@ void process_key(uint16_t input) {
                 // D -- Toggle the display between address and CC register -- MAGENTA
                 // E -- Track the PC register on the display               -- ORANGE
                 // F -- Exit to main menu                                  -- RED
-                if (input == INPUT_STEP_NEXT && is_running) {
+                if (input == INPUT_STEP_NEXT && is_running_steps) {
                     // Run next instruction
                     uint32_t result = process_next_instruction();
 
@@ -216,7 +228,7 @@ void process_key(uint16_t input) {
                         // Code hit RTI -- jump back to the main menu
                         mode = MENU_MODE_MAIN;
                         mode_changed = true;
-                        is_running = false;
+                        is_running_steps = false;
                         current_address = start_address;
                     } else {
                         if (do_display_pc) current_address = reg.pc;
@@ -233,8 +245,14 @@ void process_key(uint16_t input) {
                 }
 
                 if (input == INPUT_STEP_SHOW_CC) {
-                    // Toggle the display between memory and CC register views
-                    do_display_cc = !do_display_cc;
+                    // Toggle the display between modes:
+                    // 0 - Address : value
+                    // 1 - CC register (binary)
+                    // 2 - DP : A, B (D) registers
+                    // 3 - X : Y registers
+                    // 4 - S : U registers
+                    display_mode++;
+                    if (display_mode > 4) display_mode = 0;
                     update_display();
                 }
 
@@ -258,7 +276,7 @@ void process_key(uint16_t input) {
                     // User hit Cancel -- go back to the main menu
                     mode = MENU_MODE_MAIN;
                     mode_changed = true;
-                    is_running = false;
+                    is_running_steps = false;
                     current_address = start_address;
                     update_display();
                 }
@@ -269,6 +287,9 @@ void process_key(uint16_t input) {
                 // C -- Reject value -- RED
                 // F -- Accept value -- GREEN
                 // Only update values if OK (green) was hit
+                mode = MENU_MODE_MAIN;
+                mode_changed = true;
+
                 if (input == INPUT_CONF_OK) {
                     if (previous_mode == MENU_MAIN_ADDR) {
                         current_address = input_value;
@@ -278,20 +299,46 @@ void process_key(uint16_t input) {
                         mem[current_address] = input_value;
                         current_address++;
                     }
+
+                    if (previous_mode == MENU_MODE_RUN) {
+                        // Continue running
+                        mode = previous_mode;
+                    }
+                } else if (input == INPUT_CONF_CANCEL) {
+                    if (previous_mode == MENU_MODE_RUN) {
+                        // Halt running
+                        current_address = start_address;
+                    }
+                }
+
+                if (input == INPUT_CONF_CONTINUE) {
+                    // Accept input and jump back to data-entry
+                    // NOTE Continue button only shown after byte entry
+                    mem[current_address] = input_value;
+                    current_address++;
+                    mode = previous_mode;
                 }
 
                 // Show the current values
                 update_display();
-
-                // Switch back to main menu
+                break;
+            case MENU_MODE_RUN:
+                // Key press during a run -- treat this as a pause
+                // so show the Confirm Menu to continue or cancel
+                previous_mode = mode;
+                mode = MENU_MODE_CONFIRM;
+                mode_changed = true;
+            case MENU_MODE_RUN_DONE:
+                // Key press after run returned, so go back to
+                // the Main Menu
                 mode = MENU_MODE_MAIN;
                 mode_changed = true;
-                break;
+                current_address = start_address;
             default:
                 // Main menu
                 // 0 -- Memory stop down                                  -- BLUE
                 // 3 -- Memory step up                                    -- BLUE
-                // C -- Run code at current memory NON-FUNCTIONAL
+                // C -- Run code at current memory                        -- WHITE
                 // D -- Run code at current memory, single stepping       -- GREEN
                 // E -- Input 8-bit value to current memory location      -- CYAN
                 // F -- Input 16-bit value to set current memory location -- YELLOW
@@ -305,16 +352,20 @@ void process_key(uint16_t input) {
                     mode_changed = true;
                 }
 
-                if (input == INPUT_MAIN_RUN_STEP || input == INPUT_MAIN_RUN) {
+                if (input == INPUT_MAIN_RUN_STEP) {
                     mode = MENU_MODE_STEP;
                     mode_changed = true;
-                    is_running = true;
+                    is_running_steps = true;
                     start_address = current_address;
                     reg.pc = current_address;
                 }
 
                 if (input == INPUT_MAIN_RUN) {
                     mode = MENU_MODE_RUN;
+                    mode_changed = true;
+                    is_running_full = true;
+                    start_address = current_address;
+                    reg.pc = current_address;
                 }
 
                 if (input == INPUT_MAIN_MEM_UP || input == INPUT_MAIN_MEM_DOWN) {
@@ -370,14 +421,31 @@ void set_keys() {
             keypad_set_led(15, 0x00, 0x10, 0x00);
             keypad_set_led(12, 0x10, 0x00, 0x00);
             input_count = 1;
-            input_mask = INPUT_CONF_MASK;
+            input_mask = INPUT_CONF_MASK_ADDR;
+
+            // Show continue for program entry
+            if (previous_mode == MENU_MAIN_BYTE) {
+                keypad_set_led(14, 0x20, 0x10, 0x00);
+                input_mask = INPUT_CONF_MASK_BYTE;
+            }
+
             break;
+        case MENU_MODE_RUN:
+            keypad_set_all(0x10, 0x10, 0x10);
+            is_running_full = true;
+            input_count = 1;
+            input_mask = INPUT_RUN_MASK;
+        case MENU_MODE_RUN_DONE:
+            keypad_set_all(0x00, 0x00, 0x00);
+            is_running_full = false;
+            input_count = 1;
+            input_mask = INPUT_RUN_MASK;
         default:
             // Main menu: enter an action
             keypad_set_led(15, 0x10, 0x10, 0x00);
             keypad_set_led(14, 0x00, 0x10, 0x10);
             keypad_set_led(13, 0x00, 0x10, 0x00);
-            keypad_set_led(12, 0x00, 0x00, 0x00);
+            keypad_set_led(12, 0x10, 0x10, 0x10);
             keypad_set_led(3,  0x00, 0x00, 0x40);
             keypad_set_led(0,  0x00, 0x00, 0x40);
             input_count = 1;
@@ -411,11 +479,31 @@ uint8_t keypress_to_value(uint16_t input) {
     Update the display by mode.
  */
 void update_display() {
-    if (do_display_cc) {
-        display_cc();
-    } else {
-        display_left(current_address);
-        display_right((uint16_t)mem[current_address]);
+    uint16_t left = 0;
+    uint16_t right = 0;
+    switch(display_mode) {
+        case 0:
+            display_left(current_address);
+            display_right((uint16_t)mem[current_address]);
+            return;
+        case 1:
+            display_cc();
+            return;
+        case 2:
+            left = (uint16_t)reg.dp;
+            right = (reg.a << 8) | reg.b;
+            break;
+        case 3:
+            left = reg.x;
+            right = reg.y;
+            break;
+        default:
+            left = reg.s;
+            right = reg.u;
+        }
+
+        display_value(left,  DISPLAY_LEFT,  true);
+        display_value(right, DISPLAY_RIGHT, true);
     }
 }
 
@@ -423,19 +511,19 @@ void update_display() {
     Display the CC register as eight binary digits.
  */
 void display_cc() {
-    ht16k33_clear(display_address[0], display_buffer[0]);
-    ht16k33_clear(display_address[1], display_buffer[1]);
+    ht16k33_clear(display_address[DISPLAY_LEFT],  display_buffer[DISPLAY_LEFT]);
+    ht16k33_clear(display_address[DISPLAY_RIGHT], display_buffer[DISPLAY_RIGHT]);
 
     for (uint8_t i = 0 ; i < 4 ; ++i) {
-        ht16k33_set_number(display_address[0], display_buffer[1], ((reg.cc >> i) & 0x01), 3 - i, false);
+        ht16k33_set_number(display_address[DISPLAY_RIGHT], display_buffer[DISPLAY_RIGHT], ((reg.cc >> i) & 0x01), 3 - i, false);
     }
 
     for (uint8_t i = 4 ; i < 8 ; ++i) {
-        ht16k33_set_number(display_address[1], display_buffer[0], ((reg.cc >> i) & 0x01), 7 - i, false);
+        ht16k33_set_number(display_address[DISPLAY_LEFT], display_buffer[DISPLAY_LEFT], ((reg.cc >> i) & 0x01), 7 - i, false);
     }
 
-    ht16k33_draw(display_address[0], display_buffer[0]);
-    ht16k33_draw(display_address[1], display_buffer[1]);
+    ht16k33_draw(display_address[DISPLAY_LEFT],  display_buffer[DISPLAY_LEFT]);
+    ht16k33_draw(display_address[DISPLAY_RIGHT], display_buffer[DISPLAY_RIGHT]);
 }
 
 /*
@@ -445,7 +533,7 @@ void display_cc() {
         - value: The 16-bit value to display.
  */
 void display_left(uint16_t value) {
-    display_value(value, 0, true);
+    display_value(value, DISPLAY_LEFT, true);
 }
 
 /*
@@ -455,7 +543,7 @@ void display_left(uint16_t value) {
         - value: The 8-bit value to display.
  */
 void display_right(uint16_t value) {
-    display_value(value, 1, false);
+    display_value(value, DISPLAY_RIGHT, false);
 }
 
 /*
