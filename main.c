@@ -98,8 +98,8 @@ void boot_cpu() {
 
     printf("Entering sample program at 0x4000");
     uint16_t start = 0x4000;
-    uint8_t prog[] = {0x86,0xFF,0x8E,0x80,0x00,0xA7,0x80,0x8C,0x80,0x09,0x2D,0xF9,0x3B};
-    for (uint16_t i = 0 ; i < 13 ; i++) mem[start + i] = prog[i];
+    uint8_t prog[] = {0x86,0xFF,0x8E,0x80,0x00,0xA7,0x80,0x8C,0x80,0x09,0x2D,0xF9,0x8E,0x40,0x00,0x6E,0x84};
+    for (uint16_t i = 0 ; i < 17 ; i++) mem[start + i] = prog[i];
 
     reg.pc = 0x4000;
     reg.cc = 0x6B;
@@ -141,6 +141,8 @@ void ui_input_loop() {
         is_key_pressed = (any_key != 0);
         if (is_running_full) {
             uint32_t result = process_next_instruction();
+            display_left(reg.pc);
+            display_right((uint16_t)mem[reg.pc]);
             if (result == 99) {
                 // Code hit RTI -- show we're not running
                 // NOTE A key press then will take the
@@ -303,6 +305,7 @@ void process_key(uint16_t input) {
                     if (previous_mode == MENU_MODE_RUN) {
                         // Continue running
                         mode = previous_mode;
+                        is_running_full;
                     }
                 } else if (input == INPUT_CONF_CANCEL) {
                     if (previous_mode == MENU_MODE_RUN) {
@@ -328,12 +331,15 @@ void process_key(uint16_t input) {
                 previous_mode = mode;
                 mode = MENU_MODE_CONFIRM;
                 mode_changed = true;
+                is_running_full = false;
+                break;
             case MENU_MODE_RUN_DONE:
                 // Key press after run returned, so go back to
                 // the Main Menu
                 mode = MENU_MODE_MAIN;
                 mode_changed = true;
                 current_address = start_address;
+                break;
             default:
                 // Main menu
                 // 0 -- Memory stop down                                  -- BLUE
@@ -431,21 +437,23 @@ void set_keys() {
 
             break;
         case MENU_MODE_RUN:
-            keypad_set_all(0x10, 0x10, 0x10);
+            keypad_set_all(0x10, 0x20, 0x20);
             is_running_full = true;
             input_count = 1;
             input_mask = INPUT_RUN_MASK;
+            break;
         case MENU_MODE_RUN_DONE:
-            keypad_set_all(0x00, 0x00, 0x00);
+            keypad_set_all(0x03, 0x06, 0x06);
             is_running_full = false;
             input_count = 1;
             input_mask = INPUT_RUN_MASK;
+            break;
         default:
             // Main menu: enter an action
             keypad_set_led(15, 0x10, 0x10, 0x00);
             keypad_set_led(14, 0x00, 0x10, 0x10);
             keypad_set_led(13, 0x00, 0x10, 0x00);
-            keypad_set_led(12, 0x10, 0x10, 0x10);
+            keypad_set_led(12, 0x10, 0x20, 0x20);
             keypad_set_led(3,  0x00, 0x00, 0x40);
             keypad_set_led(0,  0x00, 0x00, 0x40);
             input_count = 1;
@@ -500,11 +508,10 @@ void update_display() {
         default:
             left = reg.s;
             right = reg.u;
-        }
-
-        display_value(left,  DISPLAY_LEFT,  true);
-        display_value(right, DISPLAY_RIGHT, true);
     }
+
+    display_value(left,  DISPLAY_LEFT,  true);
+    display_value(right, DISPLAY_RIGHT, true);
 }
 
 /*
