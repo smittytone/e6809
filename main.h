@@ -38,11 +38,6 @@
 #define PIN_STEP_BUTTON             17
 #define DEBOUNCE_TIME_US            5000
 
-#define PIN_LED_C                   2
-#define PIN_LED_V                   3
-#define PIN_LED_Z                   4
-#define PIN_LED_N                   5
-
 #define DISPLAY_LEFT                0
 #define DISPLAY_RIGHT               1
 
@@ -100,8 +95,6 @@ void        display_left(uint16_t value);
 void        display_right(uint16_t value);
 void        display_value(uint16_t value, uint8_t index, bool is_16_bit);
 
-void        setup_cc_leds();
-void        dump_registers();
 void        run_tests();
 
 

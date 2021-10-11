@@ -125,8 +125,11 @@ void ui_input_loop() {
 
     bool is_key_pressed = false;
     bool can_key_release = false;
+    
     uint32_t debounce_count_press = 0;
     uint32_t debounce_count_release = 0;
+    unit32_t cpu_cylce_complete = 0;
+    
     uint16_t the_key = 0;
 
     // Set the button colours and the display
@@ -140,15 +143,20 @@ void ui_input_loop() {
         uint16_t any_key = keypad_get_button_states();
         is_key_pressed = (any_key != 0);
         if (is_running_full) {
+            // Execute the next instruction
             uint32_t result = process_next_instruction();
+            
+            // Update the display
             display_left(reg.pc);
             display_right((uint16_t)mem[reg.pc]);
+            
             if (result == 99) {
                 // Code hit RTI -- show we're not running
                 // NOTE A key press then will take the
                 //      user to the main menu
                 mode = MENU_MODE_RUN_DONE;
                 mode_changed = true;
+                is_running_full = false;
                 set_keys();
             }
         }
@@ -174,7 +182,7 @@ void ui_input_loop() {
                 the_key = 0;
             }
         } else {
-            // Allow room for interrupts
+            // pause to allow room for interrupts
             // TODO
         }
     }
@@ -286,20 +294,23 @@ void process_key(uint16_t input) {
                 break;
             case MENU_MODE_CONFIRM:
                 // Confirm value entry menu
-                // C -- Reject value -- RED
-                // F -- Accept value -- GREEN
-                // Only update values if OK (green) was hit
+                // C -- Reject value and return to main menu  -- RED
+                // E -- Accept value and return to data entry -- ORANGE
+                // F -- Accept value and return to main menu  -- GREEN
+                
+                // There's always a mode change
                 mode = MENU_MODE_MAIN;
                 mode_changed = true;
 
                 if (input == INPUT_CONF_OK) {
+                    // User hit OK -- results depend on which menu mode
+                    // they came from
                     if (previous_mode == MENU_MAIN_ADDR) {
                         current_address = input_value;
                     }
 
                     if (previous_mode == MENU_MAIN_BYTE) {
                         mem[current_address] = input_value;
-                        current_address++;
                     }
 
                     if (previous_mode == MENU_MODE_RUN) {
@@ -307,9 +318,11 @@ void process_key(uint16_t input) {
                         mode = previous_mode;
                         is_running_full;
                     }
-                } else if (input == INPUT_CONF_CANCEL) {
+                }
+                
+                if (input == INPUT_CONF_CANCEL) {
                     if (previous_mode == MENU_MODE_RUN) {
-                        // Halt running
+                        // Halt running and reset the current address
                         current_address = start_address;
                     }
                 }
@@ -338,6 +351,7 @@ void process_key(uint16_t input) {
                 // the Main Menu
                 mode = MENU_MODE_MAIN;
                 mode_changed = true;
+                is_running_full = false;
                 current_address = start_address;
                 break;
             default:
@@ -364,6 +378,7 @@ void process_key(uint16_t input) {
                     is_running_steps = true;
                     start_address = current_address;
                     reg.pc = current_address;
+                    do_display_pc = true;
                 }
 
                 if (input == INPUT_MAIN_RUN) {
@@ -438,13 +453,11 @@ void set_keys() {
             break;
         case MENU_MODE_RUN:
             keypad_set_all(0x10, 0x20, 0x20);
-            is_running_full = true;
             input_count = 1;
             input_mask = INPUT_RUN_MASK;
             break;
         case MENU_MODE_RUN_DONE:
             keypad_set_all(0x03, 0x06, 0x06);
-            is_running_full = false;
             input_count = 1;
             input_mask = INPUT_RUN_MASK;
             break;
@@ -575,48 +588,4 @@ void display_value(uint16_t value, uint8_t index, bool is_16_bit) {
     ht16k33_set_number(display_address[index], display_buffer[index], (value >> 4) & 0x0F, 2, false);
     ht16k33_set_number(display_address[index], display_buffer[index], value & 0x0F, 3, false);
     ht16k33_draw(display_address[index], display_buffer[index]);
-}
-
-
-
-
-/*
- *  OLD CODE -- MAY BE REMOVED
- */
-void setup_cc_leds() {
-    gpio_init(PIN_LED_C);
-    gpio_set_dir(PIN_LED_C, GPIO_OUT);
-    gpio_put(PIN_LED_C, false);
-
-    gpio_init(PIN_LED_V);
-    gpio_set_dir(PIN_LED_V, GPIO_OUT);
-    gpio_put(PIN_LED_V, false);
-
-    gpio_init(PIN_LED_Z);
-    gpio_set_dir(PIN_LED_Z, GPIO_OUT);
-    gpio_put(PIN_LED_Z, false);
-
-    gpio_init(PIN_LED_N);
-    gpio_set_dir(PIN_LED_N, GPIO_OUT);
-    gpio_put(PIN_LED_N, false);
-}
-
-void dump_registers() {
-    uint8_t gpios[] = {PIN_LED_N, PIN_LED_Z, PIN_LED_V, PIN_LED_C};
-
-    printf("A [%02x] B [%02x] DP [%02x]\n", reg.a, reg.b, reg.dp);
-    printf("X [%04x] Y [%04x] S [%04x] U [%04x] PC [%04x]\n", reg.x, reg.y, reg.u, reg.pc);
-    printf("    E  F  H  I  N  Z  V  C\n");
-    char *cc_oop = "CC [ ][ ][ ][ ][ ][ ][ ][ ]\n";
-    char *delta = cc_oop;
-    for (int32_t cc_bit = 7 ; cc_bit > -1 ; cc_bit--) {
-        delta += 3;
-        *delta = is_cc_bit_set(cc_bit) ? '1' : '0';
-
-        if (cc_bit < 4) {
-            gpio_put(gpios[3 - cc_bit], is_cc_bit_set(cc_bit));
-        }
-    }
-    printf("%s\n", cc_oop);
-    printf("--------------------------------------------------\n");
 }
