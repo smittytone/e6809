@@ -73,7 +73,7 @@
 #define INPUT_CONF_MASK             0x9000
 
 #define MENU_MODE_RUN               30
-#define INPUT_STEP_MASK             0x0000
+#define INPUT_RUN_MASK             0x0000
 
 
 /*
