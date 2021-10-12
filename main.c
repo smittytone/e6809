@@ -125,11 +125,11 @@ void ui_input_loop() {
 
     bool is_key_pressed = false;
     bool can_key_release = false;
-    
+
     uint32_t debounce_count_press = 0;
     uint32_t debounce_count_release = 0;
-    unit32_t cpu_cylce_complete = 0;
-    
+    uint32_t cpu_cylce_complete = 0;
+
     uint16_t the_key = 0;
 
     // Set the button colours and the display
@@ -145,11 +145,11 @@ void ui_input_loop() {
         if (is_running_full) {
             // Execute the next instruction
             uint32_t result = process_next_instruction();
-            
+
             // Update the display
             display_left(reg.pc);
             display_right((uint16_t)mem[reg.pc]);
-            
+
             if (result == 99) {
                 // Code hit RTI -- show we're not running
                 // NOTE A key press then will take the
@@ -297,7 +297,7 @@ void process_key(uint16_t input) {
                 // C -- Reject value and return to main menu  -- RED
                 // E -- Accept value and return to data entry -- ORANGE
                 // F -- Accept value and return to main menu  -- GREEN
-                
+
                 // There's always a mode change
                 mode = MENU_MODE_MAIN;
                 mode_changed = true;
@@ -316,14 +316,7 @@ void process_key(uint16_t input) {
                     if (previous_mode == MENU_MODE_RUN) {
                         // Continue running
                         mode = previous_mode;
-                        is_running_full;
-                    }
-                }
-                
-                if (input == INPUT_CONF_CANCEL) {
-                    if (previous_mode == MENU_MODE_RUN) {
-                        // Halt running and reset the current address
-                        current_address = start_address;
+                        is_running_full = true;
                     }
                 }
 
