@@ -64,11 +64,15 @@ int main() {
     - Returns: `true` if the board is present and enabled, otherwise `false`.
  */
 bool setup_board() {
-    printf("Configuring the monitor board");
+    #if DEBUG
+    printf("Configuring the monitor board\n");
+    #endif
 
     // Set up the keypad -- this sets up I2C0 @ 400,000bps
     if (!keypad_init()) {
-        printf("No monitor board found");
+        #if DEBUG
+        printf("No monitor board found\n");
+        #endif
         return false;
     }
 
@@ -88,15 +92,21 @@ bool setup_board() {
     In future, this will offer alternative memory layouts.
  */
 void boot_cpu() {
-    printf("Resetting the registers");
+    #if DEBUG
+    printf("Resetting the registers\n");
+    #endif
     reset_registers();
 
-    printf("Initializing memory");
+    #if DEBUG
+    printf("Initializing memory\n");
+    #endif
     for (uint32_t i = 0 ; i < 65536 ; i++) {
         mem[i] = RTI;
     }
 
-    printf("Entering sample program at 0x4000");
+    #if DEBUG
+    printf("Entering sample program at 0x4000\n");
+    #endif
     uint16_t start = 0x4000;
     uint8_t prog[] = {0x86,0xFF,0x8E,0x80,0x00,0xA7,0x80,0x8C,0x80,0x09,0x2D,0xF9,0x8E,0x40,0x00,0x6E,0x84};
     for (uint16_t i = 0 ; i < 17 ; i++) mem[start + i] = prog[i];
@@ -121,7 +131,9 @@ void boot_cpu() {
     triggered only on release.
  */
 void ui_input_loop() {
-    printf("Entering UI at main menu");
+    #if DEBUG
+    printf("Entering UI at main menu\n");
+    #endif
 
     bool is_key_pressed = false;
     bool can_key_release = false;
@@ -499,13 +511,20 @@ void update_display() {
         case 0:
             display_left(current_address);
             display_right((uint16_t)mem[current_address]);
+
+            #if DEBUG
+            printf("0x%04X -> 0x%02X\n", current_address, mem[current_address]);
+            #endif
             return;
         case 1:
             display_cc();
             return;
         case 2:
-            left = (uint16_t)reg.dp;
-            right = (reg.a << 8) | reg.b;
+            left = (reg.a << 8) | reg.b;
+            right = (uint16_t)reg.dp;
+            // Clear the zeros between left and right
+            ht16k33_set_glyph(display_address[DISPLAY_RIGHT], display_buffer[DISPLAY_RIGHT], 0, 0, false);
+            ht16k33_set_glyph(display_address[DISPLAY_RIGHT], display_buffer[DISPLAY_RIGHT], 0, 1, false);
             break;
         case 3:
             left = reg.x;

@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.13)
 include(pico_sdk_import.cmake)
-project(e6809 VERSION 1.0.0)
+project(e6809
+        VERSION 1.0.0
+        DESCRIPTION "Motorola 6809e simulator")
+
+add_definitions(-DDEBUG)
+
 add_executable(e6809
                main.c
                cpu.c
