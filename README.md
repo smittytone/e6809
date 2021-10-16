@@ -27,13 +27,16 @@ When you run code, whether without breaks or in single-step mode, the Program Co
 
 ### Confirm Menu
 
-![](./images/monitor_confirm.png)
+![](./images/monitor_confirm_data.png)
 
 * `C` — Exit to main menu.
 * `E` — Accept the current byte and continue in data-entry mode.
+* `E` — Flip between address/value and register views.
 * `F` — Accept the current byte or address and return to previous menu.
 
-The orange button is only illuminated when you have entered a byte value. Tap it to go straight to byte-entry mode, or hit green to store the byte and return to the main menu.
+The orange button (shown above) is only illuminated when you have entered a byte value. Tap it to go straight to byte-entry mode, or hit green to store the byte and return to the main menu.
+
+The magenta button (not shown above) is only illuminated when you have paused running code. Tap it to change the display mode (see next section).
 
 ### Single-step Menu
 
@@ -42,7 +45,7 @@ The orange button is only illuminated when you have entered a byte value. Tap it
 * `0` — Step through memory, down.
 * `3` — Step through memory, up.
 * `D` — Reset display to current address.
-* `E` — Flip between address/value and Condition Code register views.
+* `E` — Flip between address/value and register views.
 * `F` — Process instruction at current address.
 
 Using the memory step keys can take you away from the address referenced by the 6809e’s Program Counter register. Hit the orange button to align the display with the PC.

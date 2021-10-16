@@ -91,9 +91,10 @@ uint8_t     keypress_to_value(uint16_t input);
 
 void        update_display();
 void        display_cc();
+void        display_ab_dp();
 void        display_left(uint16_t value);
 void        display_right(uint16_t value);
-void        display_value(uint16_t value, uint8_t index, bool is_16_bit);
+void        display_value(uint16_t value, uint8_t index, bool is_16_bit, bool show_colon);
 
 void        run_tests();
 

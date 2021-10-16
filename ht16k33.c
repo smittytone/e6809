@@ -182,3 +182,15 @@ void ht16k33_set_glyph(uint8_t address, uint8_t *buffer, uint8_t glyph, uint8_t 
     buffer[POS[digit]] = glyph;
     if (has_dot) buffer[POS[digit]] |= 0x80;
 }
+
+/*
+    Show or hide the display's colon symbol.
+
+    - Parameters:
+        - address: The display's I2C address.
+        - buffer:  Pointer to the display code's data buffer.
+        - show:    Show (`true`) or hide (`false`) the colon.
+ */
+void ht16k33_show_colon(uint8_t address, uint8_t *buffer, bool show) {
+    buffer[HT16K33_SEGMENT_COLON_ROW] = (show ? 0x02 : 0x00);
+}

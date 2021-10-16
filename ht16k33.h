@@ -33,6 +33,7 @@
 #define HT16K33_SEGMENT_MINUS_CHAR              0x10
 #define HT16K33_SEGMENT_DEGREE_CHAR             0x11
 #define HT16K33_SEGMENT_SPACE_CHAR              0x00
+#define HT16K33_SEGMENT_COLON_ROW               0x04
 
 
 /*
@@ -51,6 +52,7 @@ void        ht16k33_draw(uint8_t address, uint8_t *buffer);
 void        ht16k33_set_number(uint8_t address, uint8_t *buffer, uint16_t number, uint8_t digit, bool has_dot);
 void        ht16k33_set_alpha(uint8_t address, uint8_t *buffer, char chr, uint8_t digit, bool has_dot);
 void        ht16k33_set_glyph(uint8_t address, uint8_t *buffer, uint8_t glyph, uint8_t digit, bool has_dot);
+void        ht16k33_show_colon(uint8_t address, uint8_t *buffer, bool show);
 
 
 #endif  // _HT16K33_HEADER_

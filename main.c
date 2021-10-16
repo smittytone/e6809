@@ -159,8 +159,7 @@ void ui_input_loop() {
             uint32_t result = process_next_instruction();
 
             // Update the display
-            display_left(reg.pc);
-            display_right((uint16_t)mem[reg.pc]);
+            update_display();
 
             if (result == 99) {
                 // Code hit RTI -- show we're not running
@@ -308,6 +307,7 @@ void process_key(uint16_t input) {
                 // Confirm value entry menu
                 // C -- Reject value and return to main menu  -- RED
                 // E -- Accept value and return to data entry -- ORANGE
+                // E -- Switch display                        -- MAGENTA
                 // F -- Accept value and return to main menu  -- GREEN
 
                 // There's always a mode change
@@ -333,11 +333,18 @@ void process_key(uint16_t input) {
                 }
 
                 if (input == INPUT_CONF_CONTINUE) {
-                    // Accept input and jump back to data-entry
-                    // NOTE Continue button only shown after byte entry
-                    mem[current_address] = input_value;
-                    current_address++;
-                    mode = previous_mode;
+                    if (previous_mode == MENU_MODE_RUN) {
+                        display_mode++;
+                        if (display_mode > 4) display_mode = 0;
+                        mode = MENU_MODE_CONFIRM;
+                    } else {
+                        // Accept input and jump back to data-entry
+                        // NOTE Continue button only shown after byte entry
+                        mem[current_address] = input_value;
+                        current_address++;
+                        mode = previous_mode;
+                        mode_changed = false;
+                    }
                 }
 
                 // Show the current values
@@ -455,6 +462,12 @@ void set_keys() {
                 input_mask = INPUT_CONF_MASK_BYTE;
             }
 
+            // Show display change for run pause
+            if (previous_mode == MENU_MODE_RUN) {
+                keypad_set_led(14, 0x10, 0x00, 0x10);
+                input_mask = INPUT_CONF_MASK_BYTE;
+            }
+
             break;
         case MENU_MODE_RUN:
             keypad_set_all(0x10, 0x20, 0x20);
@@ -509,8 +522,8 @@ void update_display() {
     uint16_t right = 0;
     switch(display_mode) {
         case 0:
-            display_left(current_address);
-            display_right((uint16_t)mem[current_address]);
+            display_left(is_running_full ? reg.pc : current_address);
+            display_right(is_running_full ? (uint16_t)mem[reg.pc] : (uint16_t)mem[current_address]);
 
             #if DEBUG
             printf("0x%04X -> 0x%02X\n", current_address, mem[current_address]);
@@ -520,12 +533,14 @@ void update_display() {
             display_cc();
             return;
         case 2:
+            /*
             left = (reg.a << 8) | reg.b;
             right = (uint16_t)reg.dp;
-            // Clear the zeros between left and right
-            ht16k33_set_glyph(display_address[DISPLAY_RIGHT], display_buffer[DISPLAY_RIGHT], 0, 0, false);
-            ht16k33_set_glyph(display_address[DISPLAY_RIGHT], display_buffer[DISPLAY_RIGHT], 0, 1, false);
-            break;
+            display_value(left,  DISPLAY_LEFT,  true, true);
+            display_value(right, DISPLAY_RIGHT, false, false);
+            */
+            display_ab_dp();
+            return;
         case 3:
             left = reg.x;
             right = reg.y;
@@ -535,8 +550,8 @@ void update_display() {
             right = reg.u;
     }
 
-    display_value(left,  DISPLAY_LEFT,  true);
-    display_value(right, DISPLAY_RIGHT, true);
+    display_value(left,  DISPLAY_LEFT,  true, false);
+    display_value(right, DISPLAY_RIGHT, true, false);
 }
 
 /*
@@ -559,13 +574,36 @@ void display_cc() {
 }
 
 /*
+    Display the A, B and DP registers evenly spaced on the display.
+ */
+void display_ab_dp() {
+    ht16k33_clear(display_address[DISPLAY_LEFT],  display_buffer[DISPLAY_LEFT]);
+    ht16k33_clear(display_address[DISPLAY_RIGHT], display_buffer[DISPLAY_RIGHT]);
+
+    // A register
+    ht16k33_set_number(display_address[DISPLAY_LEFT], display_buffer[DISPLAY_LEFT], ((reg.a >> 4) & 0x0F), 0, false);
+    ht16k33_set_number(display_address[DISPLAY_LEFT], display_buffer[DISPLAY_LEFT], (reg.a & 0x0F), 1, false);
+
+    // B register
+    ht16k33_set_number(display_address[DISPLAY_LEFT], display_buffer[DISPLAY_LEFT], ((reg.b >> 4) & 0x0F), 3, false);
+    ht16k33_set_number(display_address[DISPLAY_RIGHT], display_buffer[DISPLAY_RIGHT], (reg.b & 0x0F), 0, false);
+
+    // DP register
+    ht16k33_set_number(display_address[DISPLAY_RIGHT], display_buffer[DISPLAY_RIGHT], ((reg.dp >> 4) & 0x0F), 2, false);
+    ht16k33_set_number(display_address[DISPLAY_RIGHT], display_buffer[DISPLAY_RIGHT], (reg.dp & 0x0F), 3, false);
+
+    ht16k33_draw(display_address[DISPLAY_LEFT],  display_buffer[DISPLAY_LEFT]);
+    ht16k33_draw(display_address[DISPLAY_RIGHT], display_buffer[DISPLAY_RIGHT]);
+}
+
+/*
     Display a 16-bit value on the left display.
 
     - Parameters:
         - value: The 16-bit value to display.
  */
 void display_left(uint16_t value) {
-    display_value(value, DISPLAY_LEFT, true);
+    display_value(value, DISPLAY_LEFT, true, false);
 }
 
 /*
@@ -575,7 +613,7 @@ void display_left(uint16_t value) {
         - value: The 8-bit value to display.
  */
 void display_right(uint16_t value) {
-    display_value(value, DISPLAY_RIGHT, false);
+    display_value(value, DISPLAY_RIGHT, false, false);
 }
 
 /*
@@ -587,7 +625,7 @@ void display_right(uint16_t value) {
         - index:     The display's index, 0 or 1.
         - is_16_bit: Whether the value is 16-bit (`true`) or 8-bit (`false`).
  */
-void display_value(uint16_t value, uint8_t index, bool is_16_bit) {
+void display_value(uint16_t value, uint8_t index, bool is_16_bit, bool show_colon) {
     if (value > 0xFFFF) value = 0x0000;
     if (!is_16_bit) value &= 0xFF;
     ht16k33_clear(display_address[index], display_buffer[index]);
@@ -599,5 +637,7 @@ void display_value(uint16_t value, uint8_t index, bool is_16_bit) {
 
     ht16k33_set_number(display_address[index], display_buffer[index], (value >> 4) & 0x0F, 2, false);
     ht16k33_set_number(display_address[index], display_buffer[index], value & 0x0F, 3, false);
+
+    if (show_colon) ht16k33_show_colon(display_address[index], display_buffer[index], true);
     ht16k33_draw(display_address[index], display_buffer[index]);
 }
