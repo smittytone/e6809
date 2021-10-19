@@ -6,11 +6,19 @@ It is intended for standalone usage — though not as a drop in replacement for 
 
 This is a work in progress, and not yet released to the public.
 
+## The CPU
+
+The CPU is booted and run on power up. The code checks for the presence of the [Monitor Board](#the-monitor-board) and will switch to that if it is available. If not, it currently runs the CPU test suite, but this will change as I near ‘release’.
+
+### Interrupts
+
+The 6809e’s `NMI`, `IRQ` and `FIRQ` interrupts are broken out to the RP2040’s GPIO pins 22, 20 and 21, respectively. Other control pins, such as `HALT` and `RESET`, will be added. If the pin reads a HIGH signal, the interrupt is triggered.
+
 ## The Monitor Board
 
 The Monitor Board is based on [Pimoroni’s RGB Keyboard Base](https://shop.pimoroni.com/products/pico-rgb-keypad-base) add-on for the Raspberry Pi Pico. It also uses a custom display board based on two HT16K33-driven four-digit, seven-segment LED displays.
 
-The Monitor code is menu driven. It provides code entry, program running and memory inspection.
+The Monitor code is menu driven. It provides code entry, program execution and memory inspection functions.
 
 ### Main Menu
 
@@ -54,7 +62,7 @@ Pressing the magenta button cycles the display through the following outputs:
 
 * Current address (PC register) and that memory location’s contents.
 * The Condition Code register bits as a binary value.
-* The Direct Page register on the left; the A and B registers on the right.
+* The A, B and Direct Page registers in that order.
 * The X and Y registers.
 * The S and U registers.
 

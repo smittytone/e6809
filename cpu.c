@@ -11,13 +11,21 @@
 
 
 /*
+ *  GLOBALS
+ */
+REG_6809    reg;
+uint8_t     mem[KB64];
+STATE_6809  state;
+
+
+/*
  * Setup
  */
 void init_cpu() {
     // Set simultator state
-    interrupt_set = 0;
     state.bus_state_pins = 0;
     state.interrupt_state = 0;
+    state.interrupts = 0;
     state.is_sync = false;
     state.wait_for_interrupt = false;
 
@@ -50,29 +58,29 @@ uint32_t process_next_instruction() {
 
     state.bus_state_pins = 0;
 
-    if (state.wait_for_interrupt || interrupt_set > 0) {
+    if (state.wait_for_interrupt || state.interrupts > 0) {
         // Process interrupts
-        if (interrupt_set > 0) {
+        if (state.interrupts > 0) {
             state.interrupt_state = IRQ_STATE_ASSERTED;
 
-            if (interrupt_set & NMI_BIT) {
+            if (state.interrupts & NMI_BIT) {
                 process_interrupt(NMI_BIT);
                 state.interrupt_state = IRQ_STATE_HANDLED;
             }
 
-            if ((interrupt_set & IRQ_BIT) && !is_cc_bit_set(I_BIT)) {
+            if ((state.interrupts & IRQ_BIT) && !is_cc_bit_set(I_BIT)) {
                 process_interrupt(IRQ_BIT);
                 state.interrupt_state = IRQ_STATE_HANDLED;
             }
 
-            if (interrupt_set & IRQ_BIT) interrupt_set &= !IRQ_BIT;
+            if (state.interrupts & IRQ_BIT) state.interrupts &= !IRQ_BIT;
 
-            if ((interrupt_set & FIRQ_BIT) && !is_cc_bit_set(F_BIT)) {
+            if ((state.interrupts & FIRQ_BIT) && !is_cc_bit_set(F_BIT)) {
                 process_interrupt(FIRQ_BIT);
                 state.interrupt_state = IRQ_STATE_HANDLED;
             }
 
-            if (interrupt_set & FIRQ_BIT) interrupt_set &= !FIRQ_BIT;
+            if (state.interrupts & FIRQ_BIT) state.interrupts &= !FIRQ_BIT;
 
             // CWAI and SYNC end if the IRQ was handled
             if (state.interrupt_state == IRQ_STATE_HANDLED) {
@@ -117,7 +125,7 @@ uint32_t process_next_instruction() {
             if (lsn == 0x0B) {
                 // Use this to break to monitor, unless we're
                 // actually processing an interrupt
-                if (interrupt_set == 0) return BREAK_TO_MONITOR;
+                if (state.interrupts == 0) return BREAK_TO_MONITOR;
                 rti();
             }
             if (lsn  < 0x04) lea(opcode);
@@ -2155,6 +2163,9 @@ void clear_all_registers() {
     reg.pc = 0x0000;
 }
 
+/*
+    Interrupt service routine handler.
+ */
 void process_interrupt(uint8_t irq) {
     if (irq == FIRQ_BIT) {
         clr_cc_bit(E_BIT);
@@ -2163,6 +2174,7 @@ void process_interrupt(uint8_t irq) {
         state.bus_state_pins = 0x02;
         reg.pc = (mem[FIRQ_VECTOR] << 8) | mem[FIRQ_VECTOR + 1];
         state.bus_state_pins = 0x00;
+        flash_led(2);
     }
 
     if (irq == IRQ_BIT) {
@@ -2172,6 +2184,7 @@ void process_interrupt(uint8_t irq) {
         state.bus_state_pins = 0x02;
         reg.pc = (mem[IRQ_VECTOR] << 8) | mem[IRQ_VECTOR + 1];
         state.bus_state_pins = 0x00;
+        flash_led(4);
     }
 
     if (irq == NMI_BIT) {
@@ -2182,5 +2195,6 @@ void process_interrupt(uint8_t irq) {
         state.bus_state_pins = 0x02;
         reg.pc = (mem[NMI_VECTOR] << 8) | mem[NMI_VECTOR + 1];
         state.bus_state_pins = 0x00;
+        flash_led(6);
     }
 }

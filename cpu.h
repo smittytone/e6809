@@ -99,8 +99,11 @@ typedef struct {
 typedef struct {
     bool        wait_for_interrupt;
     bool        is_sync;
+    uint8_t     interrupts;
+    // May drop these below
     uint8_t     bus_state_pins;
     uint8_t     interrupt_state;
+
 } STATE_6809;
 
 
@@ -222,15 +225,6 @@ void        process_interrupt(uint8_t irq);
 void init_cpu();
 void init_vectors(uint16_t* vectors);
 void reset_registers();
-
-
-/*
- * GLOBALS
- */
-extern      REG_6809    reg;
-extern      uint8_t     mem[KB64];
-extern      STATE_6809  state;
-extern      uint8_t     interrupt_set;
 
 
 #endif // _CPU_HEADER_

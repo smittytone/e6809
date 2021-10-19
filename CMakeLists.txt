@@ -11,7 +11,8 @@ add_executable(e6809
                cpu.c
                cpu_tests.c
                ht16k33.c
-               keypad.c)
+               keypad.c
+               monitor.c)
 
 pico_sdk_init()
 
