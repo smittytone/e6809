@@ -468,25 +468,20 @@ uint8_t keypress_to_value(uint16_t input) {
 void update_display() {
     uint16_t left = 0;
     uint16_t right = 0;
+    uint16_t address = 0;
+    uint16_t val = 0;
     switch(display_mode) {
         case 0:
-            display_left(is_running_full ? reg.pc : current_address);
-            display_right(is_running_full ? (uint16_t)mem[reg.pc] : (uint16_t)mem[current_address]);
-
-            #if DEBUG
-            printf("0x%04X -> 0x%02X\n", current_address, mem[current_address]);
-            #endif
+            address = is_running_full ? reg.pc : current_address;
+            val = is_running_full ? (uint16_t)mem[reg.pc] : (uint16_t)mem[current_address];
+            display_left(address);
+            display_right(val);
+            printf("0x%04X -> 0x%02X\n", address, val);
             return;
         case 1:
             display_cc();
             return;
         case 2:
-            /*
-            left = (reg.a << 8) | reg.b;
-            right = (uint16_t)reg.dp;
-            display_value(left,  DISPLAY_LEFT,  true, true);
-            display_value(right, DISPLAY_RIGHT, false, false);
-            */
             display_ab_dp();
             return;
         case 3:
