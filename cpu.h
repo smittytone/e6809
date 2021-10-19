@@ -36,6 +36,10 @@
 #define F_BIT                   6
 #define E_BIT                   7
 
+#define NMI_BIT                 0
+#define IRQ_BIT                 1
+#define FIRQ_BIT                2
+
 #define SIGN_BIT_8              7
 #define SIGN_BIT_16             15
 
@@ -52,6 +56,7 @@
 
 #define PUSH_TO_HARD_STACK      true
 
+#define START_VECTORS           0xFFF0
 #define SWI3_VECTOR             0xFFF2
 #define SWI2_VECTOR             0xFFF4
 #define FIRQ_VECTOR             0xFFF6
@@ -59,6 +64,20 @@
 #define SWI1_VECTOR             0xFFFA
 #define NMI_VECTOR              0xFFFC
 #define RESET_VECTOR            0xFFFE
+
+#define BUS_STATE_RUN_BA        0
+#define BUS_STATE_INT_BA        1
+#define BUS_STATE_SYN_BA        2
+#define BUS_STATE_HLT_BA        3
+#define BUS_STATE_RUN_BS        4
+#define BUS_STATE_INT_BS        5
+#define BUS_STATE_SYN_BS        6
+#define BUS_STATE_HLT_BS        7
+
+#define BREAK_TO_MONITOR        0xFF
+
+#define IRQ_STATE_ASSERTED      1
+#define IRQ_STATE_HANDLED       2
 
 
 /*
@@ -78,9 +97,12 @@ typedef struct {
 } REG_6809;
 
 typedef struct {
-    bool    wait_for_interrupt;
-    bool    is_sync;
+    bool        wait_for_interrupt;
+    bool        is_sync;
+    uint8_t     bus_state_pins;
+    uint8_t     interrupt_state;
 } STATE_6809;
+
 
 /*
  * PROTOTYPES
@@ -193,15 +215,22 @@ uint16_t    indexed_address(uint8_t post_byte);
 uint16_t    register_value(uint8_t source_reg);
 void        increment_register(uint8_t source_reg, int16_t amount);
 
+// IO
+void        process_interrupt(uint8_t irq);
+
 // Misc
+void init_cpu();
+void init_vectors(uint16_t* vectors);
 void reset_registers();
 
 
 /*
  * GLOBALS
  */
-extern REG_6809    reg;
-extern uint8_t     mem[KB64];
-extern STATE_6809  state;
+extern      REG_6809    reg;
+extern      uint8_t     mem[KB64];
+extern      STATE_6809  state;
+extern      uint8_t     interrupt_set;
+
 
 #endif // _CPU_HEADER_

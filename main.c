@@ -10,6 +10,12 @@
 #include "main.h"
 
 
+REG_6809    reg;
+uint8_t     mem[KB64];
+STATE_6809  state;
+uint8_t     interrupt_set;
+
+
 /*
  *      GLOBALS
  */
@@ -29,7 +35,7 @@ bool        using_board = false;
 uint8_t     buffer[32];
 uint8_t    *display_buffer[2] = {buffer, buffer + 16};
 uint8_t     display_address[2] = {0x71, 0x70};
-
+uint8_t     interrupts[3] = {PIN_6809_NMI, PIN_6809_IRQ, PIN_6809_FIRQ};
 
 /*
  *      ENTRY POINT
@@ -95,18 +101,29 @@ void boot_cpu() {
     #if DEBUG
     printf("Resetting the registers\n");
     #endif
-    reset_registers();
+
+    // Interrupt Vectors:
+    uint16_t vectors[] = {0x0400,       //   Restart
+                          0x0500,       //   NMI
+                          0x0500,       //   SWI
+                          0x0500,       //   IRQ
+                          0x0500,       //   FIRQ
+                          0x0500,       //   SWI2
+                          0x0500,       //   SWI3
+                          0x0000};      //   Reserved
+    init_vectors(vectors);
+    init_cpu();
 
     #if DEBUG
     printf("Initializing memory\n");
     #endif
-    for (uint32_t i = 0 ; i < 65536 ; i++) {
+    for (uint16_t i = 0 ; i < START_VECTORS ; ++i) {
         mem[i] = RTI;
     }
 
     #if DEBUG
     printf("Entering sample program at 0x4000\n");
-    #endif
+
     uint16_t start = 0x4000;
     uint8_t prog[] = {0x86,0xFF,0x8E,0x80,0x00,0xA7,0x80,0x8C,0x80,0x09,0x2D,0xF9,0x8E,0x40,0x00,0x6E,0x84};
     for (uint16_t i = 0 ; i < 17 ; i++) mem[start + i] = prog[i];
@@ -122,8 +139,17 @@ void boot_cpu() {
     {0x34,0x46,0x33,0x64,0xA6,0x42,0xAE,0x43,0xE6,0x80,0x34,0x04,0x34,0x04,0x4A,0x27,0x13,0xE6,0x80,0xE1,0xE4,0x2E,0x08,0xE1,0x61,0x2E,0x06,0xE7,0x61,0x20,0x02,0xE7,0xE4,0x4A,0x26,0xED,0xA6,0xE0,0xA7,0x45,0xA6,0xE0,0xA7,0x46,0x35,0xC6,0x32,0x7E,0x8E,0x80,0x42,0x34,0x10,0xB6,0x80,0x41,0x34,0x02,0x8D,0xC4,0xA6,0x63,0xE6,0x64,0x39,0x0A,0x01,0x02,0x03,0x04,0x00,0x06,0x07,0x09,0x08,0x0B};
     {0x86, 0x41, 0x8E, 0x04, 0x00, 0xA7, 0x80, 0x8C, 0x06, 0x00, 0x26, 0xF9, 0x1A, 0x0F, 0x3B};
     */
-}
 
+    #endif
+
+    // Set up interrupt pins
+    // TODO Keep here or place in CPU file?
+    for (uint8_t i = 0 ; i < 3 ; ++i) {
+        gpio_init(interrupts[i]);
+        gpio_set_dir(interrupts[i], GPIO_IN);
+        gpio_pull_down(interrupts[i]);
+    }
+}
 
 /*
     Initialise and run the main event loop. This primarily continually reads the
@@ -154,6 +180,8 @@ void ui_input_loop() {
         uint32_t now = time_us_32();
         uint16_t any_key = keypad_get_button_states();
         is_key_pressed = (any_key != 0);
+        interrupt_set = sample_interrupts();
+
         if (is_running_full) {
             // Execute the next instruction
             uint32_t result = process_next_instruction();
@@ -640,4 +668,13 @@ void display_value(uint16_t value, uint8_t index, bool is_16_bit, bool show_colo
 
     if (show_colon) ht16k33_show_colon(display_address[index], display_buffer[index], true);
     ht16k33_draw(display_address[index], display_buffer[index]);
+}
+
+
+uint8_t sample_interrupts() {
+    uint8_t irqs = 0;
+    for (uint8_t i = 0 ; i < 3 ; ++i) {
+        if (gpio_get(interrupts[i])) irqs |= (1 << i);
+    }
+    return irqs;
 }

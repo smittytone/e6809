@@ -10,22 +10,87 @@
 #include "main.h"
 
 
-REG_6809    reg;
-uint8_t     mem[KB64];
-STATE_6809  state;
+/*
+ * Setup
+ */
+void init_cpu() {
+    // Set simultator state
+    interrupt_set = 0;
+    state.bus_state_pins = 0;
+    state.interrupt_state = 0;
+    state.is_sync = false;
+    state.wait_for_interrupt = false;
 
+    // Set initial register values
+    reset_registers();
+}
+
+
+void init_vectors(uint16_t* vectors) {
+    uint16_t start = 0xFFFD;
+
+    for (uint8_t i = 0 ; i < 8 ; ++i) {
+        uint16_t vector = vectors[i];
+        mem[start++] = (vector >> 8) & 0xFF;
+        mem[start++] = (uint8_t)(vector & 0xFF);
+        start -= 4;
+    }
+}
 
 /*
  * Process Instructions
  */
 uint32_t process_next_instruction() {
+    // See Zaks p.250
 
     uint32_t cycles_used = 0;
 
-    if (state.wait_for_interrupt) {
+    // IF HALT
+    //      bus_state_pins = 3
+
+    state.bus_state_pins = 0;
+
+    if (state.wait_for_interrupt || interrupt_set > 0) {
         // Process interrupts
+        if (interrupt_set > 0) {
+            state.interrupt_state = IRQ_STATE_ASSERTED;
+
+            if (interrupt_set & NMI_BIT) {
+                process_interrupt(NMI_BIT);
+                state.interrupt_state = IRQ_STATE_HANDLED;
+            }
+
+            if ((interrupt_set & IRQ_BIT) && !is_cc_bit_set(I_BIT)) {
+                process_interrupt(IRQ_BIT);
+                state.interrupt_state = IRQ_STATE_HANDLED;
+            }
+
+            if (interrupt_set & IRQ_BIT) interrupt_set &= !IRQ_BIT;
+
+            if ((interrupt_set & FIRQ_BIT) && !is_cc_bit_set(F_BIT)) {
+                process_interrupt(FIRQ_BIT);
+                state.interrupt_state = IRQ_STATE_HANDLED;
+            }
+
+            if (interrupt_set & FIRQ_BIT) interrupt_set &= !FIRQ_BIT;
+
+            // CWAI and SYNC end if the IRQ was handled
+            if (state.interrupt_state == IRQ_STATE_HANDLED) {
+                state.wait_for_interrupt = false;
+                state.is_sync = false;
+            } else {
+                if (state.is_sync) {
+                    // SYNC continues processing on unhandled IRQ
+                    state.wait_for_interrupt = false;
+                    state.is_sync = false;
+                }
+            }
+        }
+
         return cycles_used;
     }
+
+    // 1 -> LIC -- signals on last cycle of instruction
 
     uint8_t opcode = get_next_byte();
     uint8_t extended_opcode = 0;
@@ -42,6 +107,29 @@ uint32_t process_next_instruction() {
     if (opcode != NOP) {
         uint8_t msn = (opcode & 0xF0) >> 4;
         uint8_t lsn = opcode & 0x0F;
+
+        // NOTE Run this first to favour SWIx, CWAI, RTI over others
+        //      See Zaks p.250
+        if (msn == 0x03) {
+            // These ops have only one, specific address mode each
+            if (lsn == 0x0F) swi(extended_opcode);
+            if (lsn == 0x0C) cwai();
+            if (lsn == 0x0B) {
+                // Use this to break to monitor, unless we're
+                // actually processing an interrupt
+                if (interrupt_set == 0) return BREAK_TO_MONITOR;
+                rti();
+            }
+            if (lsn  < 0x04) lea(opcode);
+            if (lsn == 0x04) push(true,  get_next_byte());
+            if (lsn == 0x06) push(false, get_next_byte());
+            if (lsn == 0x05) pull(true,  get_next_byte());
+            if (lsn == 0x07) pull(false, get_next_byte());
+            if (lsn == 0x09) rts();
+            if (lsn == 0x0A) abx();
+            if (lsn == 0x0D) mul();
+            return cycles_used;
+        }
 
         if (msn == 0x01) {
             // These ops all use inherent addressing
@@ -60,27 +148,6 @@ uint32_t process_next_instruction() {
         if (msn == 0x02 || opcode == BSR) {
             // All 0x02 ops are branch ops, but BSR is 0x8D
             do_branch(opcode, (extended_opcode != 0));
-            return cycles_used;
-        }
-
-        if (msn == 0x03) {
-            // These ops have only one, specific address mode each
-            if (lsn  < 0x04) lea(opcode);
-            if (lsn == 0x04) push(true,  get_next_byte());
-            if (lsn == 0x06) push(false, get_next_byte());
-            if (lsn == 0x05) pull(true,  get_next_byte());
-            if (lsn == 0x07) pull(false, get_next_byte());
-            if (lsn == 0x09) rts();
-            if (lsn == 0x0A) abx();
-            if (lsn == 0x0B) {
-                //rti();
-                return 99;  // Use this to break to monitor FOR NOW
-            }
-            if (lsn == 0x0C) cwai();
-            if (lsn == 0x0D) mul();
-
-            // Cover all values of SWIx
-            if (lsn == 0x0F) swi(extended_opcode);
             return cycles_used;
         }
 
@@ -977,7 +1044,7 @@ void swi(uint8_t number) {
 
 void sync() {
     // SYNC
-    // If interrupt is masked, or is < 3 cycled - continue
+    // If interrupt is masked, or is < 3 cycles - continue
     // If interrupt > 2 cycle, wait
     state.wait_for_interrupt = true;
     state.is_sync = true;
@@ -2063,13 +2130,57 @@ void increment_register(uint8_t source_reg, int16_t amount) {
 
 
 void reset_registers() {
+    // See Zaks p.250
+
+    // Zero DP
+    reg.dp = 0;
+
+    // Clear F and I bits
+    reg.cc &= 0xAf;
+
+    // Set PC from reset vector
+    reg.pc = (mem[RESET_VECTOR] << 8) | mem[RESET_VECTOR + 1];
+}
+
+
+void clear_all_registers() {
+    reg.dp = 0;
+    reg.cc = 0;
     reg.a = 0;
     reg.b = 0;
     reg.x = 0;
     reg.y = 0;
-    reg.s = 0xFFFF;
-    reg.u = 0xFFFF;
-    reg.pc = 0;
-    reg.cc = 0;
-    reg.dp = 0;
+    reg.s = 0x8000;
+    reg.u = 0x8000;
+    reg.pc = 0x0000;
+}
+
+void process_interrupt(uint8_t irq) {
+    if (irq == FIRQ_BIT) {
+        clr_cc_bit(E_BIT);
+        push(true, PUSH_PULL_CC_REG | PUSH_PULL_PC_REG);
+        set_cc_bit(F_BIT);
+        state.bus_state_pins = 0x02;
+        reg.pc = (mem[FIRQ_VECTOR] << 8) | mem[FIRQ_VECTOR + 1];
+        state.bus_state_pins = 0x00;
+    }
+
+    if (irq == IRQ_BIT) {
+        set_cc_bit(E_BIT);
+        push(true, PUSH_PULL_ALL_REGS);
+        set_cc_bit(I_BIT);
+        state.bus_state_pins = 0x02;
+        reg.pc = (mem[IRQ_VECTOR] << 8) | mem[IRQ_VECTOR + 1];
+        state.bus_state_pins = 0x00;
+    }
+
+    if (irq == NMI_BIT) {
+        set_cc_bit(E_BIT);
+        push(true, PUSH_PULL_ALL_REGS);
+        set_cc_bit(F_BIT);
+        set_cc_bit(I_BIT);
+        state.bus_state_pins = 0x02;
+        reg.pc = (mem[NMI_VECTOR] << 8) | mem[NMI_VECTOR + 1];
+        state.bus_state_pins = 0x00;
+    }
 }

@@ -77,6 +77,10 @@
 #define MENU_MODE_RUN_DONE          31
 #define INPUT_RUN_MASK              0xFFFF
 
+#define PIN_6809_NMI                22
+#define PIN_6809_IRQ                20
+#define PIN_6809_FIRQ               21
+
 
 /*
  *      PROTOTYPES
@@ -88,6 +92,7 @@ void        ui_input_loop();
 void        process_key(uint16_t);
 void        set_keys();
 uint8_t     keypress_to_value(uint16_t input);
+uint8_t     sample_interrupts();
 
 void        update_display();
 void        display_cc();
@@ -97,6 +102,10 @@ void        display_right(uint16_t value);
 void        display_value(uint16_t value, uint8_t index, bool is_16_bit, bool show_colon);
 
 void        run_tests();
+
+
+
+
 
 
 #endif // _E6809_HEADER_
