@@ -132,3 +132,28 @@ void flash_led(uint8_t count) {
         sleep_ms(250);
     }
 }
+
+
+void read_into_ram() {
+    // See https://kevinboone.me/picoflash.html?i=1
+    // 2MB Flash = 2,097,152
+    // Allow 1MB for app code, so start at
+    // XIP_BASE + 1,048,576
+    // RAM SIZE = 64KB = 65,536
+    char *p = (char *)XIP_BASE;
+    p += 1048576;
+
+    // Read 64KB into RAM
+    for (uint16_t i = 0 ; i < 65536 ; ++i) {
+        mem[i] = (uint8_t)(*p);
+    }
+}
+
+
+void save_ram() {
+    // See https://kevinboone.me/picoflash.html?i=1
+    uint32_t irqs = save_and_disable_interrupts();
+    flash_range_erase (RP2040_FLASH_DATA_START, RP2040_FLASH_DATA_SIZE);
+    flash_range_program (RP2040_FLASH_DATA_START, mem, RP2040_FLASH_DATA_SIZE);
+    restore_interrupts (irqs);
+}

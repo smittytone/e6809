@@ -25,6 +25,8 @@
 #include "hardware/i2c.h"
 #include "hardware/spi.h"
 #include "hardware/adc.h"
+#include "hardware/flash.h"
+#include "hardware/sync.h"
 #include "ops.h"
 #include "cpu.h"
 #include "cpu_tests.h"
@@ -42,6 +44,9 @@
 
 #define PIN_PICO_LED                25
 
+#define RP2040_FLASH_DATA_START     1048576
+#define RP2040_FLASH_DATA_SIZE      65536
+
 
 /*
  *      PROTOTYPES
@@ -51,6 +56,9 @@ uint8_t     sample_interrupts();
 void        flash_led(uint8_t count);
 void        run_tests();
 
+// EXPERIMENTAL
+void        read_into_ram();
+void        save_ram();
 
 /*
  * GLOBALS

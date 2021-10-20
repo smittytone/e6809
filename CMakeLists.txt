@@ -21,7 +21,9 @@ target_link_libraries(e6809
                       hardware_gpio
                       hardware_i2c
                       hardware_spi
-                      hardware_adc)
+                      hardware_adc
+                      hardware_flash
+                      hardware_sync)
 
 pico_enable_stdio_usb(e6809 1)
 pico_enable_stdio_uart(e6809 0)

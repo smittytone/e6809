@@ -79,6 +79,12 @@ void event_loop() {
 
     uint16_t the_key = 0;
 
+    uint8_t input_buffer[10];
+    uint8_t* buffer_ptr = input_buffer;
+    uint8_t buffer_index = 0;
+    char test_text[] = "HAIL";
+
+
     // Set the button colours and the display
     set_keys();
     update_display();
@@ -138,6 +144,17 @@ void event_loop() {
         } else {
             // pause to allow room for interrupts
             // TODO
+        }
+
+        int a = getchar_timeout_us(100);
+        if (a > -1) {
+            input_buffer[buffer_index] = (uint8_t)(a & 0xFF);
+            buffer_index++;
+            if (buffer_index > 9) buffer_index = 0;
+
+            if (memcmp(input_buffer, test_text, 4) == 0) {
+                load_code();
+            }
         }
     }
 }
@@ -583,4 +600,42 @@ void display_value(uint16_t value, uint8_t index, bool is_16_bit, bool show_colo
 
     if (show_colon) ht16k33_show_colon(display_address[index], display_buffer[index], true);
     ht16k33_draw(display_address[index], display_buffer[index]);
+}
+
+
+void load_code() {
+    uint8_t buffer[256];
+    uint8_t* buffer_ptr = buffer;
+
+    int prog_address = -1;
+    int prog_length = -1;
+    int byte_count = 0;
+    uint16_t addr_count = 0;
+
+    for (uint8_t i = 0 ; i < 256 ; ++i) buffer[i] = 0x00;
+
+    while (true) {
+        int c = getchar_timeout_us(100);
+        if (c > -1) {
+            *buffer_ptr = (uint8_t)(c & 0xFF);
+            buffer_ptr++;
+            if (buffer_ptr > buffer + 255) {
+                buffer_ptr = buffer;
+            }
+
+            if (buffer_ptr - buffer > 2 && prog_address != -1) {
+                prog_address = (buffer[0] << 8) | buffer[1];
+            }
+
+            if (buffer_ptr - buffer > 4 && prog_length != -1) {
+                prog_length = (buffer[2] << 8) | buffer[3];
+            }
+
+            if (prog_length > 0 && addr_count <= prog_length) {
+                mem[addr_count++] = c;
+            }
+
+            if (addr_count - start_address >= prog_length) break;
+        }
+    }
 }

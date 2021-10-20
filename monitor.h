@@ -74,4 +74,7 @@ void        display_left(uint16_t value);
 void        display_right(uint16_t value);
 void        display_value(uint16_t value, uint8_t index, bool is_16_bit, bool show_colon);
 
+void        load_code();
+
+
 #endif  // _MONITOR_HEADER_
