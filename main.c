@@ -21,7 +21,7 @@ uint8_t     interrupts[3] = {PIN_6809_NMI, PIN_6809_IRQ, PIN_6809_FIRQ};
  */
 int main() {
     // Enable STDIO
-    stdio_init_all();
+    stdio_usb_init();
 
     // Prepare the board
     bool is_using_monitor = init_board();
@@ -130,6 +130,7 @@ void flash_led(uint8_t count) {
         sleep_ms(250);
         gpio_put(PIN_PICO_LED, false);
         sleep_ms(250);
+        count--;
     }
 }
 

@@ -68,19 +68,19 @@ uint32_t process_next_instruction() {
                 state.interrupt_state = IRQ_STATE_HANDLED;
             }
 
-            if ((state.interrupts & IRQ_BIT) && !is_cc_bit_set(I_BIT)) {
-                process_interrupt(IRQ_BIT);
-                state.interrupt_state = IRQ_STATE_HANDLED;
-            }
-
-            if (state.interrupts & IRQ_BIT) state.interrupts &= !IRQ_BIT;
-
             if ((state.interrupts & FIRQ_BIT) && !is_cc_bit_set(F_BIT)) {
                 process_interrupt(FIRQ_BIT);
                 state.interrupt_state = IRQ_STATE_HANDLED;
             }
 
             if (state.interrupts & FIRQ_BIT) state.interrupts &= !FIRQ_BIT;
+
+            if ((state.interrupts & IRQ_BIT) && !is_cc_bit_set(I_BIT)) {
+                process_interrupt(IRQ_BIT);
+                state.interrupt_state = IRQ_STATE_HANDLED;
+            }
+
+            if (state.interrupts & IRQ_BIT) state.interrupts &= !IRQ_BIT;
 
             // CWAI and SYNC end if the IRQ was handled
             if (state.interrupt_state == IRQ_STATE_HANDLED) {
@@ -1030,7 +1030,6 @@ void swi(uint8_t number) {
     // Set e to 1 then push every register to the hardware stac
     set_cc_bit(E_BIT);
     push(true, PUSH_PULL_EVERY_REG);
-    state.wait_for_interrupt = false;
 
     if (number == 1) {
         // Set I and F
@@ -2171,6 +2170,7 @@ void process_interrupt(uint8_t irq) {
         clr_cc_bit(E_BIT);
         push(true, PUSH_PULL_CC_REG | PUSH_PULL_PC_REG);
         set_cc_bit(F_BIT);
+        set_cc_bit(I_BIT);
         state.bus_state_pins = 0x02;
         reg.pc = (mem[FIRQ_VECTOR] << 8) | mem[FIRQ_VECTOR + 1];
         state.bus_state_pins = 0x00;

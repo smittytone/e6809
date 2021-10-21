@@ -82,7 +82,7 @@ void event_loop() {
     uint8_t input_buffer[10];
     uint8_t* buffer_ptr = input_buffer;
     uint8_t buffer_index = 0;
-    char test_text[] = "HAIL";
+    const char test_text[] = "HAIL";
 
 
     // Set the button colours and the display
@@ -146,18 +146,30 @@ void event_loop() {
             // TODO
         }
 
-        int a = getchar_timeout_us(100);
-        if (a > -1) {
-            input_buffer[buffer_index] = (uint8_t)(a & 0xFF);
-            buffer_index++;
-            if (buffer_index > 9) buffer_index = 0;
+        if (!is_running_full) {
+            int c = getchar_timeout_us(10);
+            if (c != PICO_ERROR_TIMEOUT) {
+                // Check for a HAIL
+                input_buffer[buffer_index++] = (uint8_t)(c & 0xFF);
+                if (buffer_index > 3) buffer_index = 0;
 
-            if (memcmp(input_buffer, test_text, 4) == 0) {
-                load_code();
+                if (memcmp(input_buffer, test_text, 4) == 0) {
+                    load_code();
+
+                    // Clear buffer
+                    buffer_index = 0;
+                    for (uint16_t i = 0 ; i < 10 ; i++) {
+                        input_buffer[i] = 0x00;
+                    }
+
+                    stdio_flush();
+                }
             }
         }
     }
 }
+
+
 
 /*
     Process a key press to determine if it is valid - a lit button was pressed -
@@ -604,38 +616,53 @@ void display_value(uint16_t value, uint8_t index, bool is_16_bit, bool show_colo
 
 
 void load_code() {
-    uint8_t buffer[256];
-    uint8_t* buffer_ptr = buffer;
+    uint8_t load_buffer[256];
+    uint8_t buffer_ptr = 0;
 
     int prog_address = -1;
     int prog_length = -1;
-    int byte_count = 0;
+    uint16_t byte_count = 0;
     uint16_t addr_count = 0;
 
-    for (uint8_t i = 0 ; i < 256 ; ++i) buffer[i] = 0x00;
+    for (uint16_t i = 0 ; i < 256 ; i++) {
+        load_buffer[i] = 0x00;
+    }
 
+    uint32_t fail_time = time_us_32();
+
+    gpio_put(PIN_PICO_LED, true);
     while (true) {
-        int c = getchar_timeout_us(100);
-        if (c > -1) {
-            *buffer_ptr = (uint8_t)(c & 0xFF);
-            buffer_ptr++;
-            if (buffer_ptr > buffer + 255) {
-                buffer_ptr = buffer;
+        int c = getchar_timeout_us(0);
+        if (c != PICO_ERROR_TIMEOUT) {
+            uint32_t fail_time = 0;
+            load_buffer[buffer_ptr++] = (uint8_t)(c & 0xFF);
+            display_left(byte_count);
+
+            if (buffer_ptr > 1 && prog_address < 0) {
+                prog_address = (load_buffer[0] << 8) | load_buffer[1];
+                addr_count = prog_address;
             }
 
-            if (buffer_ptr - buffer > 2 && prog_address != -1) {
-                prog_address = (buffer[0] << 8) | buffer[1];
+            if (buffer_ptr > 3 && prog_length < 0) {
+                prog_length = (load_buffer[2] << 8) | load_buffer[3];
+                continue;
             }
 
-            if (buffer_ptr - buffer > 4 && prog_length != -1) {
-                prog_length = (buffer[2] << 8) | buffer[3];
+            if (prog_length > 0 && byte_count <= prog_length) {
+                // Write received bytes straight to memory
+                mem[addr_count++] = (uint8_t)(c & 0xFF);
+                byte_count++;
             }
 
-            if (prog_length > 0 && addr_count <= prog_length) {
-                mem[addr_count++] = c;
+            if (prog_length > 0 && byte_count > prog_length) return;
+        } else {
+            uint32_t now = time_us_32();
+            if (now - fail_time > 10000000) {
+                flash_led(5);
+                break;
             }
-
-            if (addr_count - start_address >= prog_length) break;
         }
     }
+
+    gpio_put(PIN_PICO_LED, false);
 }

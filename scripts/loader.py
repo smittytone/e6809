@@ -37,7 +37,7 @@ def get_file(file_name):
         while (b := f.read(1)):
             # Do stuff with byte.
             b_a += b
-    return bytes(b_a)
+    return b_a
 
 '''
 Display a message if verbose mode is enabled.
@@ -105,7 +105,6 @@ if __name__ == '__main__':
                     print("[ERROR] -s / --startaddress must be followed by a valid address")
                     sys.exit(1)
                 start_address = an_address
-                show_verbose("Code start address set to 0x{0:04X}".format(an_address))
                 arg_flag = True
             elif item in ("-d", "--device"):
                 if index + 1 >= len(sys.argv):
@@ -125,26 +124,44 @@ if __name__ == '__main__':
                     else:
                         print("[ERROR] File " + item + " is not a .rom file")
 
-    if bin_file and device:
-        data_bytes = get_file(bin_file)
-        #ser = serial.Serial(device)
+    if bin_file is None:
+        print("[ERROR] No .rom file specified")
+        sys.exit(1)
 
-        print(len(data_bytes))
-        print(device)
-        print(start_address)
-        sys.exit(0)
+    if device is None:
+        print("[ERROR] No e6809 device file specified")
+        sys.exit(1)
 
-        # Send Hail
-        ser.write(b'HAIL')
-        time.sleep(2)
-        # Send address
-        addr_bytes = bytearray(2)
-        addr_bytes[0] = (start_address >> 8) & 0xFF
-        addr_bytes[1] = start_address & 0xFF
-        ser.write(bytes(addr_bytes))
-        # Send length
-        addr_bytes[0] = (len(data_bytes) >> 8) & 0xFF
-        addr_bytes[1] = len(data_bytes) & 0xFF
-        ser.write(bytes(addr_bytes))
-        # Send data
-        ser.write(data_bytes)
+    ser = None
+    data_bytes = get_file(bin_file)
+    length = len(data_bytes)
+    addr_bytes = bytearray(4)
+    addr_bytes += data_bytes
+
+    try:
+        port = serial.Serial(port=device, baudrate=9600)
+    except:
+        print("[ERROR] An invalid e6809 device file was specified:",device)
+        sys.exit(1)
+
+    # Send Hail
+    print("Hailing...")
+    r = port.write(b'HAIL')
+    time.sleep(2)
+    print(r,"bytes sent")
+    # Send address
+    print("Start address:", start_address)
+    addr_bytes[0] = (start_address >> 8) & 0xFF
+    addr_bytes[1] = start_address & 0xFF
+    #r = port.write(addr_bytes)
+    #print(r,"bytes sent")
+    # Send length
+    print("Code length:", length, " TX length:",len(addr_bytes))
+    addr_bytes[2] = (length >> 8) & 0xFF
+    addr_bytes[3] = length & 0xFF
+    #r = port.write(addr_bytes)
+    #print(r,"bytes sent")
+    # Send data
+    print("Sending code...")
+    r = port.write(addr_bytes)
+    print(r,"bytes sent")
