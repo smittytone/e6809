@@ -147,7 +147,7 @@ void event_loop() {
         }
 
         if (!is_running_full) {
-            int c = getchar_timeout_us(10);
+            int c = getchar_timeout_us(0);
             if (c != PICO_ERROR_TIMEOUT) {
                 // Check for a HAIL
                 input_buffer[buffer_index++] = (uint8_t)(c & 0xFF);
@@ -158,11 +158,10 @@ void event_loop() {
 
                     // Clear buffer
                     buffer_index = 0;
-                    for (uint16_t i = 0 ; i < 10 ; i++) {
+                    for (uint8_t i = 0 ; i < 10 ; i++) {
                         input_buffer[i] = 0x00;
                     }
-
-                    stdio_flush();
+                    assert(input_buffer[buffer_index] == 0);
                 }
             }
         }
@@ -616,7 +615,7 @@ void display_value(uint16_t value, uint8_t index, bool is_16_bit, bool show_colo
 
 
 void load_code() {
-    uint8_t load_buffer[256];
+    uint8_t load_buffer[4];
     uint8_t buffer_ptr = 0;
 
     int prog_address = -1;
@@ -624,27 +623,31 @@ void load_code() {
     uint16_t byte_count = 0;
     uint16_t addr_count = 0;
 
-    for (uint16_t i = 0 ; i < 256 ; i++) {
+    for (uint16_t i = 0 ; i < 4 ; i++) {
         load_buffer[i] = 0x00;
     }
 
     uint32_t fail_time = time_us_32();
+    printf("HAIL\n");
 
     gpio_put(PIN_PICO_LED, true);
+
     while (true) {
         int c = getchar_timeout_us(0);
         if (c != PICO_ERROR_TIMEOUT) {
-            uint32_t fail_time = 0;
+            fail_time = 0;
             load_buffer[buffer_ptr++] = (uint8_t)(c & 0xFF);
             display_left(byte_count);
 
             if (buffer_ptr > 1 && prog_address < 0) {
                 prog_address = (load_buffer[0] << 8) | load_buffer[1];
-                addr_count = prog_address;
+                addr_count = (uint16_t)prog_address;
+                printf("got address\n");
             }
 
             if (buffer_ptr > 3 && prog_length < 0) {
                 prog_length = (load_buffer[2] << 8) | load_buffer[3];
+                printf("got length\n");
                 continue;
             }
 
@@ -654,10 +657,11 @@ void load_code() {
                 byte_count++;
             }
 
-            if (prog_length > 0 && byte_count > prog_length) return;
+            if (prog_length > 0 && byte_count > prog_length) break;
         } else {
             uint32_t now = time_us_32();
-            if (now - fail_time > 10000000) {
+            if (now - fail_time > 15000000) {
+                // TIMEOUT error
                 flash_led(5);
                 break;
             }

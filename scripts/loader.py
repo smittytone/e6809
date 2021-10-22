@@ -135,11 +135,10 @@ if __name__ == '__main__':
     ser = None
     data_bytes = get_file(bin_file)
     length = len(data_bytes)
-    addr_bytes = bytearray(4)
-    addr_bytes += data_bytes
+    send_bytes = bytearray(4)
 
     try:
-        port = serial.Serial(port=device, baudrate=9600)
+        port = serial.Serial(port=device, baudrate=19200)
     except:
         print("[ERROR] An invalid e6809 device file was specified:",device)
         sys.exit(1)
@@ -151,17 +150,35 @@ if __name__ == '__main__':
     print(r,"bytes sent")
     # Send address
     print("Start address:", start_address)
-    addr_bytes[0] = (start_address >> 8) & 0xFF
-    addr_bytes[1] = start_address & 0xFF
+    send_bytes[0] = (start_address >> 8) & 0xFF
+    send_bytes[1] = start_address & 0xFF
     #r = port.write(addr_bytes)
     #print(r,"bytes sent")
     # Send length
-    print("Code length:", length, " TX length:",len(addr_bytes))
-    addr_bytes[2] = (length >> 8) & 0xFF
-    addr_bytes[3] = length & 0xFF
-    #r = port.write(addr_bytes)
-    #print(r,"bytes sent")
-    # Send data
-    print("Sending code...")
-    r = port.write(addr_bytes)
+    send_bytes[2] = (length >> 8) & 0xFF
+    send_bytes[3] = length & 0xFF
+    r = port.write(send_bytes)
     print(r,"bytes sent")
+
+    # Send data in chunks
+    print("Code length:", length)
+    send_bytes = bytearray(8096)
+    counter = 0
+
+    while True:
+        if length - counter > 8096:
+            total = 8096
+        else:
+            total = length - counter
+            if total > 1: send_bytes = bytearray(total)
+
+        if total < 1:
+            break
+        else:
+            for i in range(0, total):
+                send_bytes[i] = data_bytes[counter]
+                counter +=1
+
+            r = port.write(send_bytes)
+            print(r,"bytes sent")
+            time.sleep(0.250)
