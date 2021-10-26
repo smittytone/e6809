@@ -31,7 +31,8 @@
 #define INPUT_MAIN_RUN              0x1000
 #define INPUT_MAIN_MEM_UP           0x0008
 #define INPUT_MAIN_MEM_DOWN         0x0001
-#define INPUT_MAIN_MASK             0xF009
+#define INPUT_MAIN_LOAD             0x0800
+#define INPUT_MAIN_MASK             0xF809
 
 #define MENU_MODE_STEP              10
 #define INPUT_STEP_NEXT             0x8000
@@ -76,5 +77,8 @@ void        display_value(uint16_t value, uint8_t index, bool is_16_bit, bool sh
 
 void        load_code();
 
+
+bool load_code_2();
+uint16_t get_block(uint8_t *buff);
 
 #endif  // _MONITOR_HEADER_

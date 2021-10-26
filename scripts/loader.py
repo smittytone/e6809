@@ -39,6 +39,86 @@ def get_file(file_name):
             b_a += b
     return b_a
 
+
+def await_ack_or_exit(uart):
+    #print("Awaiting ACK")
+    r = await_ack(uart)
+    if r == False:
+        uart.close()
+        print("No ACK")
+        sys.exit(1)
+
+
+def await_ack(uart, timeout=2000):
+    buffer = bytes()
+    now = (time.time_ns() // 1000000)
+    while ((time.time_ns() // 1000000) - now) < timeout:
+        if uart.in_waiting > 0:
+            buffer += uart.read(uart.in_waiting)
+            if "OK" in buffer.decode(): return True
+    return False
+
+
+def send_leader(uart):
+    out = bytearray(128)
+    for i in range(0, 128):
+        out[i] = 0x55
+    uart.write(out)
+
+
+def send_addr_block(uart, address):
+    out = bytearray(8)
+    out[0] = 0x55                   # Head
+    out[1] = 0x3C                   # Sync
+    out[2] = 0x00                   # Block Type
+    out[3] = 2                      # Data length
+    out[4] = (address >> 8) & 0xFF
+    out[5] = address & 0xFF
+
+    cs = 0
+    for i in range (2, 6):
+        cs += out[i]
+
+    out[6] = cs & 0xFF
+    out[7] = 0x55
+    r = uart.write(out)
+    print(r)
+
+def send_data_block(uart, bytes, counter):
+    length = len(bytes) - counter
+    if length > 255: length = 255
+    out = bytearray(length + 6)
+    out[0] = 0x55                   # Head
+    out[1] = 0x3C                   # Sync
+    out[2] = 0x01                   # Block Type
+    out[3] = length                 # Data length
+
+    # Set the data
+    for i in range(0, length):
+        out[i + 4] = bytes[counter + i]
+
+    # Compute checksum
+    cs = 0
+    for i in range (2, length + 6 - 2):
+        cs += out[i]
+    cs &= 0xFF
+    out[length + 6 - 2] = cs        # Checksum
+    out[length + 6 - 1] = 0x55      # Trailer
+    counter += length
+    r = uart.write(out)
+    return counter
+
+def send_trailer(uart):
+    out = bytearray(6)
+    out[0] = 0x55                   # Head
+    out[1] = 0x3C                   # Sync
+    out[2] = 0xFF                   # Block Type
+    out[3] = 0x00                   # Data length
+    out[4] = 0x00                   # Checksum
+    out[5] = 0x55                   # Trailer
+    r = uart.write(out)
+
+
 '''
 Display a message if verbose mode is enabled.
 
@@ -132,17 +212,32 @@ if __name__ == '__main__':
         print("[ERROR] No e6809 device file specified")
         sys.exit(1)
 
-    ser = None
+    port = None
     data_bytes = get_file(bin_file)
     length = len(data_bytes)
-    send_bytes = bytearray(4)
+    print(length,"bytes to send")
 
     try:
-        port = serial.Serial(port=device, baudrate=19200)
+        port = serial.Serial(port=device, baudrate=115200)
     except:
         print("[ERROR] An invalid e6809 device file was specified:",device)
         sys.exit(1)
 
+    send_addr_block(port, start_address)
+    await_ack_or_exit(port)
+
+    c = 0
+    while True:
+        print(c,"/",length - c)
+        c = send_data_block(port, data_bytes, c)
+        await_ack_or_exit(port)
+        if length - c <= 0: break
+
+    send_trailer(port)
+    await_ack_or_exit(port)
+    port.close()
+
+    """
     # Send Hail
     print("Hailing...")
     r = port.write(b'HAIL')
@@ -182,3 +277,4 @@ if __name__ == '__main__':
             r = port.write(send_bytes)
             print(r,"bytes sent")
             time.sleep(0.250)
+    """

@@ -146,6 +146,7 @@ void event_loop() {
             // TODO
         }
 
+        /*&
         if (!is_running_full) {
             int c = getchar_timeout_us(0);
             if (c != PICO_ERROR_TIMEOUT) {
@@ -165,6 +166,7 @@ void event_loop() {
                 }
             }
         }
+        */
     }
 }
 
@@ -382,6 +384,12 @@ void process_key(uint16_t input) {
                     display_left(current_address);
                     display_right(mem[current_address]);
                 }
+
+                if (input == INPUT_MAIN_LOAD) {
+                    load_code_2();
+                    display_left(current_address);
+                    display_right(mem[current_address]);
+                }
         }
     }
 
@@ -463,6 +471,7 @@ void set_keys() {
             keypad_set_led(12, 0x10, 0x20, 0x20);
             keypad_set_led(3,  0x00, 0x00, 0x40);
             keypad_set_led(0,  0x00, 0x00, 0x40);
+            keypad_set_led(11, 0x20, 0x00, 0x20);
             input_count = 1;
             input_mask = INPUT_MAIN_MASK;
             break;
@@ -615,25 +624,24 @@ void display_value(uint16_t value, uint8_t index, bool is_16_bit, bool show_colo
 
 
 void load_code() {
-    uint8_t load_buffer[4];
-    uint8_t buffer_ptr = 0;
+    uint8_t load_buffer[262];
+    uint16_t buffer_ptr = 0;
 
     int prog_address = -1;
     int prog_length = -1;
     uint16_t byte_count = 0;
     uint16_t addr_count = 0;
 
-    for (uint16_t i = 0 ; i < 4 ; i++) {
+    for (uint16_t i = 0 ; i < 262 ; i++) {
         load_buffer[i] = 0x00;
     }
 
     uint32_t fail_time = time_us_32();
-    printf("HAIL\n");
 
     gpio_put(PIN_PICO_LED, true);
 
     while (true) {
-        int c = getchar_timeout_us(0);
+        int c = getchar_timeout_us(1);
         if (c != PICO_ERROR_TIMEOUT) {
             fail_time = 0;
             load_buffer[buffer_ptr++] = (uint8_t)(c & 0xFF);
@@ -642,12 +650,12 @@ void load_code() {
             if (buffer_ptr > 1 && prog_address < 0) {
                 prog_address = (load_buffer[0] << 8) | load_buffer[1];
                 addr_count = (uint16_t)prog_address;
-                printf("got address\n");
+                printf("OK\ngot address\n");
             }
 
             if (buffer_ptr > 3 && prog_length < 0) {
                 prog_length = (load_buffer[2] << 8) | load_buffer[3];
-                printf("got length\n");
+                printf("OK\ngot length\n");
                 continue;
             }
 
@@ -669,4 +677,69 @@ void load_code() {
     }
 
     gpio_put(PIN_PICO_LED, false);
+}
+
+
+bool load_code_2() {
+    uint8_t load_buffer[262];
+    uint16_t buffer_ptr = 0;
+    uint16_t address = 0;
+    uint16_t saddress = 0;
+    uint32_t start = time_us_32();
+    bool got_leader = false;
+
+    gpio_put(PIN_PICO_LED, true);
+    while(true) {
+        buffer_ptr = get_block(load_buffer);
+        if (buffer_ptr > 0) {
+            if (load_buffer[0] == 0x55 && load_buffer[1] == 0x3C) {
+                uint8_t block_type = load_buffer[2];
+                if (block_type == 0x00) {
+                    if (load_buffer[3] != 0x02) return false;
+                    address = (load_buffer[4] << 8) | load_buffer[5];
+                    saddress = address;
+                }
+
+                if (block_type == 0x01) {
+                    uint16_t length = load_buffer[3];
+                    for (uint16_t i = 0 ; i < length ; ++i) {
+                        mem[address++] = load_buffer[4 + i];
+                    }
+                }
+
+                if (block_type == 0xFF) {
+                    // Done
+                    current_address = saddress;
+                    gpio_put(PIN_PICO_LED, false);
+                    return true;
+                }
+            }
+
+            buffer_ptr = 0;
+        }
+
+        if (time_us_32() - start > 30000000) break;
+    }
+
+    flash_led(5);
+    gpio_put(PIN_PICO_LED, false);
+    return false;
+}
+
+
+uint16_t get_block(uint8_t *buff) {
+    uint16_t buff_ptr = 0;
+    while (true) {
+        int c = getchar_timeout_us(10);
+        if (c != PICO_ERROR_TIMEOUT && buff_ptr < 262) {
+            buff[buff_ptr++] = (uint8_t)(c & 0xFF);
+            display_left(buff_ptr);
+        } else {
+            break;
+        }
+    }
+
+    sleep_ms(10);
+    printf("OK\n");
+    return buff_ptr;
 }
