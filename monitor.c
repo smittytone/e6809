@@ -386,7 +386,7 @@ void process_key(uint16_t input) {
                 }
 
                 if (input == INPUT_MAIN_LOAD) {
-                    load_code_2();
+                    load_code();
                     display_left(current_address);
                     display_right(mem[current_address]);
                 }
@@ -623,104 +623,74 @@ void display_value(uint16_t value, uint8_t index, bool is_16_bit, bool show_colo
 }
 
 
-void load_code() {
+bool load_code() {
     uint8_t load_buffer[262];
-    uint16_t buffer_ptr = 0;
-
-    int prog_address = -1;
-    int prog_length = -1;
-    uint16_t byte_count = 0;
-    uint16_t addr_count = 0;
-
-    for (uint16_t i = 0 ; i < 262 ; i++) {
-        load_buffer[i] = 0x00;
-    }
-
-    uint32_t fail_time = time_us_32();
-
-    gpio_put(PIN_PICO_LED, true);
-
-    while (true) {
-        int c = getchar_timeout_us(1);
-        if (c != PICO_ERROR_TIMEOUT) {
-            fail_time = 0;
-            load_buffer[buffer_ptr++] = (uint8_t)(c & 0xFF);
-            display_left(byte_count);
-
-            if (buffer_ptr > 1 && prog_address < 0) {
-                prog_address = (load_buffer[0] << 8) | load_buffer[1];
-                addr_count = (uint16_t)prog_address;
-                printf("OK\ngot address\n");
-            }
-
-            if (buffer_ptr > 3 && prog_length < 0) {
-                prog_length = (load_buffer[2] << 8) | load_buffer[3];
-                printf("OK\ngot length\n");
-                continue;
-            }
-
-            if (prog_length > 0 && byte_count <= prog_length) {
-                // Write received bytes straight to memory
-                mem[addr_count++] = (uint8_t)(c & 0xFF);
-                byte_count++;
-            }
-
-            if (prog_length > 0 && byte_count > prog_length) break;
-        } else {
-            uint32_t now = time_us_32();
-            if (now - fail_time > 15000000) {
-                // TIMEOUT error
-                flash_led(5);
-                break;
-            }
-        }
-    }
-
-    gpio_put(PIN_PICO_LED, false);
-}
-
-
-bool load_code_2() {
-    uint8_t load_buffer[262];
-    uint16_t buffer_ptr = 0;
+    uint16_t bytes_read = 0;
+    uint16_t block_count = 0;
     uint16_t address = 0;
-    uint16_t saddress = 0;
+    uint16_t start_addr = 0;
     uint32_t start = time_us_32();
-    bool got_leader = false;
 
+
+    // Light the LED to show we're clear to receive
     gpio_put(PIN_PICO_LED, true);
-    while(true) {
-        buffer_ptr = get_block(load_buffer);
-        if (buffer_ptr > 0) {
-            if (load_buffer[0] == 0x55 && load_buffer[1] == 0x3C) {
-                uint8_t block_type = load_buffer[2];
-                if (block_type == 0x00) {
-                    if (load_buffer[3] != 0x02) return false;
-                    address = (load_buffer[4] << 8) | load_buffer[5];
-                    saddress = address;
-                }
 
-                if (block_type == 0x01) {
-                    uint16_t length = load_buffer[3];
-                    for (uint16_t i = 0 ; i < length ; ++i) {
-                        mem[address++] = load_buffer[4 + i];
-                    }
-                }
+    while(true) {
+        bytes_read = get_block(load_buffer);
+        if (bytes_read > 0) {
+            block_count++;
+            if (load_buffer[0] == 0x55 && load_buffer[1] == 0x3C) {
+                // Got a valid block header
+                uint8_t block_type = load_buffer[2];
+                uint16_t block_len = load_buffer[3];
 
                 if (block_type == 0xFF) {
-                    // Done
-                    current_address = saddress;
+                    // Done -- signal the sender back and
+                    // turn off the LED
+                    printf("OK END\n");
                     gpio_put(PIN_PICO_LED, false);
+                    current_address = start_addr;
                     return true;
+                }
+
+                // Get the checksum on all blocks but the last
+                uint32_t checksum = 0;
+                for (uint16_t i = 2 ; i < 4 + block_len ; i++) {
+                    checksum += load_buffer[i];
+                }
+
+                // Break to error if the checksum is bad
+                if ((checksum & 0xFF) != load_buffer[4 + block_len]) break;
+
+                // Look for the address block
+                if (block_type == 0x00) {
+                    if (load_buffer[3] != 0x02) break;
+                    address = (load_buffer[4] << 8) | load_buffer[5];
+                    start_addr = address;
+
+                    // ACK the block
+                    printf("OK ADDRESS BLOCK: %i\n", start_addr);
+                }
+
+                // Look for a data block
+                if (block_type == 0x01) {
+                    for (uint16_t i = 0 ; i < block_len ; ++i) {
+                        mem[address++] = load_buffer[4 + i];
+                    }
+
+                    // ACK the block
+                    printf("OK DATA BYTES: %i,%i\n", block_count, block_len);
                 }
             }
 
-            buffer_ptr = 0;
+            bytes_read = 0;
         }
 
+        // Check for a timeout: break on fail
         if (time_us_32() - start > 30000000) break;
     }
 
+    // Signal an error and turn off the LED
     flash_led(5);
     gpio_put(PIN_PICO_LED, false);
     return false;
@@ -730,9 +700,9 @@ bool load_code_2() {
 uint16_t get_block(uint8_t *buff) {
     uint16_t buff_ptr = 0;
     while (true) {
-        int c = getchar_timeout_us(10);
+        int c = getchar_timeout_us(100);
         if (c != PICO_ERROR_TIMEOUT && buff_ptr < 262) {
-            buff[buff_ptr++] = (uint8_t)(c & 0xFF);
+            buff[buff_ptr++] = (c & 0xFF);
             display_left(buff_ptr);
         } else {
             break;
@@ -740,6 +710,5 @@ uint16_t get_block(uint8_t *buff) {
     }
 
     sleep_ms(10);
-    printf("OK\n");
     return buff_ptr;
 }

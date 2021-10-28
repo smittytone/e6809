@@ -55,15 +55,10 @@ def await_ack(uart, timeout=2000):
     while ((time.time_ns() // 1000000) - now) < timeout:
         if uart.in_waiting > 0:
             buffer += uart.read(uart.in_waiting)
-            if "OK" in buffer.decode(): return True
+            if "\n" in buffer.decode():
+                print(buffer[:-1].decode())
+                return True
     return False
-
-
-def send_leader(uart):
-    out = bytearray(128)
-    for i in range(0, 128):
-        out[i] = 0x55
-    uart.write(out)
 
 
 def send_addr_block(uart, address):
@@ -75,14 +70,14 @@ def send_addr_block(uart, address):
     out[4] = (address >> 8) & 0xFF
     out[5] = address & 0xFF
 
+    # Compute checksum
     cs = 0
     for i in range (2, 6):
         cs += out[i]
 
-    out[6] = cs & 0xFF
-    out[7] = 0x55
+    out[6] = cs & 0xFF              # Checksum
+    out[7] = 0x55                   # Trailer
     r = uart.write(out)
-    print(r)
 
 def send_data_block(uart, bytes, counter):
     length = len(bytes) - counter
@@ -96,6 +91,7 @@ def send_data_block(uart, bytes, counter):
     # Set the data
     for i in range(0, length):
         out[i + 4] = bytes[counter + i]
+        #print("{:02X} ".format(out[i + 4]), end="")
 
     # Compute checksum
     cs = 0
@@ -107,6 +103,7 @@ def send_data_block(uart, bytes, counter):
     counter += length
     r = uart.write(out)
     return counter
+
 
 def send_trailer(uart):
     out = bytearray(6)
@@ -128,6 +125,7 @@ Args:
 def show_verbose(message):
     if verbose is True: print(message)
 
+
 '''
 Pass on all supplied '.asm' files on for assembly, '.6809' or '.rom' files for disassembly.
 
@@ -146,16 +144,17 @@ def str_to_int(num_str):
     except ValueError:
         return False
 
-"""
+
+'''
 Show the utility version info
-"""
+'''
 def show_version():
     print("Loader 1.0.0 copyright (c) 2021 Tony Smith (@smittytone)")
 
 
-"""
+'''
 RUNTIME START
-"""
+'''
 if __name__ == '__main__':
 
     arg_flag = False
@@ -213,68 +212,29 @@ if __name__ == '__main__':
         sys.exit(1)
 
     port = None
-    data_bytes = get_file(bin_file)
-    length = len(data_bytes)
-    print(length,"bytes to send")
-
     try:
         port = serial.Serial(port=device, baudrate=115200)
     except:
         print("[ERROR] An invalid e6809 device file was specified:",device)
         sys.exit(1)
 
+    data_bytes = get_file(bin_file)
+    length = len(data_bytes)
+    print(length,"bytes to send")
+
+    # Send the header
     send_addr_block(port, start_address)
     await_ack_or_exit(port)
 
+    # Send the data
     c = 0
     while True:
-        print(c,"/",length - c)
+        #print(c,"/",length - c)
         c = send_data_block(port, data_bytes, c)
         await_ack_or_exit(port)
         if length - c <= 0: break
 
+    # Send the trailer
     send_trailer(port)
     await_ack_or_exit(port)
     port.close()
-
-    """
-    # Send Hail
-    print("Hailing...")
-    r = port.write(b'HAIL')
-    time.sleep(2)
-    print(r,"bytes sent")
-    # Send address
-    print("Start address:", start_address)
-    send_bytes[0] = (start_address >> 8) & 0xFF
-    send_bytes[1] = start_address & 0xFF
-    #r = port.write(addr_bytes)
-    #print(r,"bytes sent")
-    # Send length
-    send_bytes[2] = (length >> 8) & 0xFF
-    send_bytes[3] = length & 0xFF
-    r = port.write(send_bytes)
-    print(r,"bytes sent")
-
-    # Send data in chunks
-    print("Code length:", length)
-    send_bytes = bytearray(8096)
-    counter = 0
-
-    while True:
-        if length - counter > 8096:
-            total = 8096
-        else:
-            total = length - counter
-            if total > 1: send_bytes = bytearray(total)
-
-        if total < 1:
-            break
-        else:
-            for i in range(0, total):
-                send_bytes[i] = data_bytes[counter]
-                counter +=1
-
-            r = port.write(send_bytes)
-            print(r,"bytes sent")
-            time.sleep(0.250)
-    """

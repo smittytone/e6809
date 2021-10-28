@@ -75,10 +75,7 @@ void        display_left(uint16_t value);
 void        display_right(uint16_t value);
 void        display_value(uint16_t value, uint8_t index, bool is_16_bit, bool show_colon);
 
-void        load_code();
-
-
-bool load_code_2();
-uint16_t get_block(uint8_t *buff);
+bool        load_code();
+uint16_t    get_block(uint8_t *buff);
 
 #endif  // _MONITOR_HEADER_
