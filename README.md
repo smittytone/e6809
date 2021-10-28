@@ -26,6 +26,7 @@ The Monitor code is menu driven. It provides code entry, program execution and m
 
 * `0` — Step through memory, down.
 * `3` — Step through memory, up.
+* `B` - Load code via USB.
 * `C` — Run code.
 * `D` — Run code in single-step mode.
 * `E` — Enter a byte at the current address.
@@ -69,6 +70,20 @@ Pressing the magenta button cycles the display through the following outputs:
 ### The Run Menu
 
 When you are running code without automatically pausing between instructions, the keypad will glow white. Tap any key to halt the code. The keys will cease to glow. If the keys cease to glow without a key press, then the code has returned. Tap any key to return to the main menu.
+
+### Loading Code
+
+Use the `loader.py` utility in `/scripts` to send binary program data to the monitor.
+
+1. Press `B` (magenta) at the main menu to prepare the board for loading.
+2. Run `python loader.py -s <start_address> -d <device_name> <rom_file>`.
+
+`-s` specifies the 16-bit address at which the program will be stored. `-d` specifies the monitor board’s device file, eg. `/dev/cu.usbmodem1414301`, under macOS or Linux.
+
+The Pico LED will flash five times to signal a load error, if one occurred.
+
+You can use Spasm to generate assembled `.rom` files.
+
 
 ## Copyright
 

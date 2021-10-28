@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""
+'''
 Loader -- code loader for e6809 on Pico
 
 Version:
@@ -11,41 +11,39 @@ Copyright:
 
 License:
     MIT (terms attached to this repo)
-"""
+'''
 
-"""
+'''
 IMPORTS
-"""
+'''
 import os
 import sys
 import serial
 import time
 
 
-"""
+'''
 GLOBALS
-"""
+'''
 verbose = True
 
 
-"""
+'''
 FUNCTIONS
-"""
+'''
 def get_file(file_name):
     b_a = bytearray()
     with open(file_name, "rb") as f:
         while (b := f.read(1)):
-            # Do stuff with byte.
             b_a += b
     return b_a
 
 
 def await_ack_or_exit(uart):
-    #print("Awaiting ACK")
     r = await_ack(uart)
     if r == False:
         uart.close()
-        print("No ACK")
+        print("[ERROR] No ACK")
         sys.exit(1)
 
 
@@ -58,6 +56,7 @@ def await_ack(uart, timeout=2000):
             if "\n" in buffer.decode():
                 print(buffer[:-1].decode())
                 return True
+    # Error -- No Ack received
     return False
 
 
@@ -146,6 +145,14 @@ def str_to_int(num_str):
 
 
 '''
+Show the utility help
+'''
+def show_help():
+    show_version()
+    print("\nTODO\n")
+
+
+'''
 Show the utility version info
 '''
 def show_version():
@@ -174,13 +181,13 @@ if __name__ == '__main__':
                 show_help()
                 sys.exit(0)
             elif item in ("-q", "--quiet"):
-                show_verbose = False
+                verbose = False
             elif item in ("-s", "--startaddress"):
                 if index + 1 >= len(sys.argv):
                     print("[ERROR] -s / --startaddress must be followed by an address")
                     sys.exit(1)
                 an_address = str_to_int(sys.argv[index + 1])
-                if an_address is False:
+                if an_address is False or an_address < 0 or an_address > 0xFFFF:
                     print("[ERROR] -s / --startaddress must be followed by a valid address")
                     sys.exit(1)
                 start_address = an_address
@@ -197,6 +204,9 @@ if __name__ == '__main__':
                     sys.exit(1)
                 elif index != 0 and arg_flag is False:
                     # Handle any included .rom files
+                    if not os.path.exists(item):
+                        print("[ERROR] File " + item + " does not exist")
+                        sys.exit(1)
                     _, arg_file_ext = os.path.splitext(item)
                     if arg_file_ext in (".rom"):
                         bin_file = item
@@ -211,6 +221,7 @@ if __name__ == '__main__':
         print("[ERROR] No e6809 device file specified")
         sys.exit(1)
 
+    # Set the port or fail
     port = None
     try:
         port = serial.Serial(port=device, baudrate=115200)
@@ -218,6 +229,7 @@ if __name__ == '__main__':
         print("[ERROR] An invalid e6809 device file was specified:",device)
         sys.exit(1)
 
+    # Load the data
     data_bytes = get_file(bin_file)
     length = len(data_bytes)
     print(length,"bytes to send")
