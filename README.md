@@ -1,4 +1,4 @@
-# e6809 #
+# e6809
 
 An emulation of the Motorola 6809e 8-bit microprocessor designed to run on the a RP2040 microcontroller board, such as the Raspberry Pi Pico.
 
@@ -32,7 +32,7 @@ The Monitor code is menu driven. It provides code entry, program execution and m
 * `E` — Enter a byte at the current address.
 * `F` — Enter the current address.
 
-When you run code, whether without breaks or in single-step mode, the Program Counter is set to the current address. This can be set by entering it directly (hit the yellow key) or by stepping to the required address using the blue keys.
+When you run code, whether without breaks or in single-step mode, the Program Counter is set to the current address. This can be set by entering it directly (hit the yellow key) or by stepping to the required address using the upper blue keys.
 
 ### Confirm Menu
 
@@ -43,9 +43,9 @@ When you run code, whether without breaks or in single-step mode, the Program Co
 * `E` — Flip between address/value and register views.
 * `F` — Accept the current byte or address and return to previous menu.
 
-The orange button (shown above) is only illuminated when you have entered a byte value. Tap it to go straight to byte-entry mode, or hit green to store the byte and return to the main menu.
+The orange button (shown above) is only illuminated when you have entered a byte value. Tap it to store the byte and continue in byte-entry mode, or hit green to store the byte and return to the main menu. Hitting red ignores the entered byte value.
 
-The magenta button (not shown above) is only illuminated when you have paused running code. Tap it to change the display mode (see next section).
+The magenta button (not shown above; also key `E`) is only illuminated when you have paused running code. Tap it to change the display mode (see next section).
 
 ### Single-step Menu
 
@@ -54,7 +54,7 @@ The magenta button (not shown above) is only illuminated when you have paused ru
 * `0` — Step through memory, down.
 * `3` — Step through memory, up.
 * `D` — Reset display to current address.
-* `E` — Flip between address/value and register views.
+* `E` — MOve between address/value and register views.
 * `F` — Process instruction at current address.
 
 Using the memory step keys can take you away from the address referenced by the 6809e’s Program Counter register. Hit the orange button to align the display with the PC.
@@ -62,28 +62,46 @@ Using the memory step keys can take you away from the address referenced by the 
 Pressing the magenta button cycles the display through the following outputs:
 
 * Current address (PC register) and that memory location’s contents.
-* The Condition Code register bits as a binary value.
+* The Condition Code register bits (E, F, H, I, N, Z, V and C) as a binary value.
 * The A, B and Direct Page registers in that order.
 * The X and Y registers.
 * The S and U registers.
 
 ### The Run Menu
 
-When you are running code without automatically pausing between instructions, the keypad will glow white. Tap any key to halt the code. The keys will cease to glow. If the keys cease to glow without a key press, then the code has returned. Tap any key to return to the main menu.
+When you are running code without automatically pausing between instructions, the keypad will glow white. Tap any key to halt the code. The keys will cease to glow and the [Confirm Menu](#confirm-menu) will be shown. If the keys cease to glow without a key press, then the code has returned.
 
 ### Loading Code
 
-Use the `loader.py` utility in `/scripts` to send binary program data to the monitor.
+Use the `loader.py` utility in `/scripts` to send binary program data in the form of `.rom` files to the monitor. To upload a file:
 
 1. Press `B` (magenta) at the main menu to prepare the board for loading.
-2. Run `python loader.py -s <start_address> -d <device_name> <rom_file>`.
+2. On your computer, run `python loader.py -s <start_address> -d <device_name> <rom_file>`.
 
-`-s` specifies the 16-bit address at which the program will be stored. `-d` specifies the monitor board’s device file, eg. `/dev/cu.usbmodem1414301`, under macOS or Linux.
+`-s` specifies the 16-bit address at which the program will be stored. `-d` specifies the monitor board’s device file under macOS or Linux. For example:
 
-The Pico LED will flash five times to signal a load error, if one occurred.
+```shell
+python loader.py -s 0x8000 -d /dev/cu.usbmodem1414301 d32.rom
+```
 
-You can use Spasm to generate assembled `.rom` files.
+The Pico LED will flash five times to signal a load error, if one occurred. There is a 30s timeout after which the loading will stop and the main menu will be accessible again.
 
+You can use [Spasm](https://github.com/smittytone/Spasm) to generate assembled `.rom` files:
+
+```shell
+spasm.py -o test.rom test.asm
+```
+
+## To Do
+
+In no particular order...
+
+* Add Motorola PIA chip support.
+* Add 6809e start-up sequence when Monitor Board not present.
+* Clock-precise (1MHz) processing.
+* Support alterative memory maps, not just a flat 64KB space.
+* Support 64KB memory pages.
+* Add downloading of RAM contents via USB.
 
 ## Copyright
 
