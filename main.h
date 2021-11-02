@@ -33,6 +33,7 @@
 #include "keypad.h"
 #include "ht16k33.h"
 #include "monitor.h"
+#include "pia.h"
 
 
 /*
