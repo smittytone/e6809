@@ -110,7 +110,7 @@ void event_loop() {
             // Update the display
             update_display();
 
-            if (result == 99) {
+            if (result == BREAK_TO_MONITOR) {
                 // Code hit RTI -- show we're not running
                 // NOTE A key press then will take the
                 //      user to the main menu
@@ -218,8 +218,9 @@ void process_key(uint16_t input) {
                     // Run next instruction
                     uint32_t result = process_next_instruction();
 
-                    if (result == 99) {
+                    if (result == BREAK_TO_MONITOR) {
                         // Code hit RTI -- jump back to the main menu
+                        printf("***\n");
                         mode = MENU_MODE_MAIN;
                         mode_changed = true;
                         is_running_steps = false;

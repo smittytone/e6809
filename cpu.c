@@ -125,7 +125,13 @@ uint32_t process_next_instruction() {
             if (lsn == 0x0B) {
                 // Use this to break to monitor, unless we're
                 // actually processing an interrupt
-                if (state.interrupts == 0) return BREAK_TO_MONITOR;
+                if (state.interrupts == 0) {
+                    printf("Breaking to monitor on RTI\n");
+                    return BREAK_TO_MONITOR;
+                } else {
+                    printf("Returning on 1/%i interrupts\n", state.interrupts);
+                }
+
                 rti();
             }
             if (lsn  < 0x04) lea(opcode);
