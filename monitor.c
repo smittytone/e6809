@@ -32,19 +32,19 @@ uint8_t    *display_buffer[2] = {buffer, buffer + 16};
 uint8_t     display_address[2] = {0x71, 0x70};
 
 
-/*
+/**
     Bring up the monitor board if it is present.
 
     - Returns: `true` if the board is present and enabled, otherwise `false`.
  */
 bool init_board() {
-    #if DEBUG
+    #ifdef DEBUG
     printf("Configuring the monitor board\n");
     #endif
 
     // Set up the keypad -- this sets up I2C0 @ 400,000bps
     if (!keypad_init()) {
-        #if DEBUG
+        #ifdef DEBUG
         printf("No monitor board found\n");
         #endif
         return false;
@@ -60,13 +60,13 @@ bool init_board() {
 }
 
 
-/*
+/**
     Initialise and run the main event loop. This primarily continually reads the
     keypad, allowing for debounces on press and release actions. Buttons are
     triggered only on release.
  */
 void event_loop() {
-    #if DEBUG
+    #ifdef DEBUG
     printf("Entering UI at main menu\n");
     #endif
 
@@ -146,7 +146,7 @@ void event_loop() {
             // TODO
         }
 
-        /*&
+        /*
         if (!is_running_full) {
             int c = getchar_timeout_us(0);
             if (c != PICO_ERROR_TIMEOUT) {
@@ -172,7 +172,7 @@ void event_loop() {
 
 
 
-/*
+/**
     Process a key press to determine if it is valid - a lit button was pressed -
     and to then trigger the action the key represents.
 
@@ -184,6 +184,7 @@ void process_key(uint16_t input) {
     input &= input_mask;
     if (input != 0) {
         // Check the key's action according to the menu mode
+        bool show_on_completion = false;
         switch (mode) {
             case MENU_MAIN_ADDR:
             case MENU_MAIN_BYTE:
@@ -220,7 +221,6 @@ void process_key(uint16_t input) {
 
                     if (result == BREAK_TO_MONITOR) {
                         // Code hit RTI -- jump back to the main menu
-                        printf("***\n");
                         mode = MENU_MODE_MAIN;
                         mode_changed = true;
                         is_running_steps = false;
@@ -229,14 +229,7 @@ void process_key(uint16_t input) {
                         if (do_display_pc) current_address = reg.pc;
                     }
 
-                    update_display();
-
-                    if (result == 99) {
-                        // If the code completed, add a long minus sign to the right display
-                        ht16k33_set_glyph(display_address[1], display_buffer[1], 0x40, 0, false);
-                        ht16k33_set_glyph(display_address[1], display_buffer[1], 0x40, 1, false);
-                        ht16k33_draw(display_address[1], display_buffer[1]);
-                    }
+                    if (result == 99) show_on_completion = true;
                 }
 
                 if (input == INPUT_STEP_SHOW_CC) {
@@ -248,14 +241,12 @@ void process_key(uint16_t input) {
                     // 4 - S : U registers
                     display_mode++;
                     if (display_mode > 4) display_mode = 0;
-                    update_display();
                 }
 
                 if (input == INPUT_STEP_SHOW_AD) {
                     // Jump to current value of PC register
                     do_display_pc = true;
                     current_address = reg.pc;
-                    update_display();
                 }
 
                 if (input == INPUT_STEP_MEM_UP || input == INPUT_STEP_MEM_DOWN) {
@@ -264,7 +255,6 @@ void process_key(uint16_t input) {
                     //      key in the menu to continue tracking the PC register
                     current_address += (input == INPUT_STEP_MEM_UP ? 1 : -1);
                     do_display_pc = false;
-                    update_display();
                 }
 
                 if (input == INPUT_STEP_EXIT) {
@@ -273,9 +263,15 @@ void process_key(uint16_t input) {
                     mode_changed = true;
                     is_running_steps = false;
                     current_address = start_address;
-                    update_display();
                 }
 
+                update_display();
+                if (show_on_completion) {
+                    // If the code completed, add a long minus sign to the right display
+                    ht16k33_set_glyph(display_address[1], display_buffer[1], 0x40, 0, false);
+                    ht16k33_set_glyph(display_address[1], display_buffer[1], 0x40, 1, false);
+                    ht16k33_draw(display_address[1], display_buffer[1]);
+                }
                 break;
             case MENU_MODE_CONFIRM:
                 // Confirm value entry menu
@@ -397,7 +393,7 @@ void process_key(uint16_t input) {
     if (mode_changed) set_keys();
 }
 
-/*
+/**
     Prime the keypad for the current menu mode, setting key colours,
     masking the keys that can be pressed, and, for data-entry screens,
     the number of digits that can be entered.
@@ -482,7 +478,7 @@ void set_keys() {
     mode_changed = false;
 }
 
-/*
+/**
     Convert the key press value into an actual value.
 
     - Parameters:
@@ -500,7 +496,7 @@ uint8_t keypress_to_value(uint16_t input) {
     return 0;
 }
 
-/*
+/**
     Update the display by mode.
  */
 void update_display() {
@@ -535,7 +531,7 @@ void update_display() {
     display_value(right, DISPLAY_RIGHT, true, false);
 }
 
-/*
+/**
     Display the CC register as eight binary digits.
  */
 void display_cc() {
@@ -554,7 +550,7 @@ void display_cc() {
     ht16k33_draw(display_address[DISPLAY_RIGHT], display_buffer[DISPLAY_RIGHT]);
 }
 
-/*
+/**
     Display the A, B and DP registers evenly spaced on the display.
  */
 void display_ab_dp() {
@@ -577,7 +573,7 @@ void display_ab_dp() {
     ht16k33_draw(display_address[DISPLAY_RIGHT], display_buffer[DISPLAY_RIGHT]);
 }
 
-/*
+/**
     Display a 16-bit value on the left display.
 
     - Parameters:
@@ -587,7 +583,7 @@ void display_left(uint16_t value) {
     display_value(value, DISPLAY_LEFT, true, false);
 }
 
-/*
+/**
     Display an 8-bit value on the right display.
 
     - Parameters:
@@ -623,7 +619,12 @@ void display_value(uint16_t value, uint8_t index, bool is_16_bit, bool show_colo
     ht16k33_draw(display_address[index], display_buffer[index]);
 }
 
+/**
+    Load code via STDIO on USB and store in memory. The incoming data structure
+    indicates at what address this will start.
 
+    - Returns: `true` on a successful load, otherwise `false`.
+ */
 bool load_code() {
     uint8_t load_buffer[262];
     uint16_t bytes_read = 0;
@@ -698,6 +699,14 @@ bool load_code() {
 }
 
 
+/**
+    Read in a single transmitted block (up to 262 bytes).
+
+    - Parameters:
+        - buff: A pointer to the byte store buffer,
+
+    - Returns: The index of the last read byte in the buffer.
+ */
 uint16_t get_block(uint8_t *buff) {
     uint16_t buff_ptr = 0;
     while (true) {

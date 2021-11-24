@@ -18,7 +18,7 @@ uint8_t led_buffer[72]; // Dimension = H x W x 4 + 8
 uint8_t *led_data = led_buffer + 4;
 
 
-/*
+/**
     Initialise the keypad, setting the default brightness and
     bringing up the I2C0 and SPI0 peripherals. All key pixels
     initially set to white.
@@ -60,7 +60,7 @@ bool keypad_init() {
     return true;
 }
 
-/*
+/**
     Write the pixel colour data out to SPI.
  */
 void keypad_update_leds() {
@@ -69,7 +69,7 @@ void keypad_update_leds() {
     gpio_put(KEYPAD_PIN_LEDS_CS, 1);
 }
 
-/*
+/**
     Set the brightness for all pixels by writing the brightness bits
     to the LED data array for each pixel.
 
@@ -83,7 +83,7 @@ void keypad_set_brightness(float brightness) {
     }
 }
 
-/*
+/**
     Set the data for a single key's pixel, using the specified colour,
     and its co-ordinates on the key grid.
 
@@ -99,7 +99,7 @@ void keypad_set_led_at(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b) {
     keypad_set_led_data((x + (y * KEYPAD_WIDTH)) * 4, r, g, b);
 }
 
-/*
+/**
     Set the data for a single key's pixel, using the specified colour,
     and its key value.
 
@@ -114,7 +114,7 @@ void keypad_set_led(uint8_t i, uint8_t r, uint8_t g, uint8_t b) {
     keypad_set_led_data(i * 4, r, g, b);
 }
 
-/*
+/**
     Set the data for a single key's pixel, using the specified colour
     and its index in the data array.
 
@@ -131,7 +131,7 @@ void keypad_set_led_data(uint16_t o, uint8_t r, uint8_t g, uint8_t b) {
     led_data[o + 3] = r;
 }
 
-/*
+/**
     Turn on every key's pixel to the specified colour.
 
     - Parameters:
@@ -145,7 +145,7 @@ void keypad_set_all(uint8_t r, uint8_t g, uint8_t b) {
     }
 }
 
-/*
+/**
     Turn off every key's pixel.
  */
 void keypad_clear() {
@@ -154,7 +154,7 @@ void keypad_clear() {
     }
 }
 
-/*
+/**
     Read the TCA9555 IO expander to determine key states.
 
     - Returns: A 16-bit value in which each represents that key's state,
@@ -170,7 +170,7 @@ uint16_t keypad_get_button_states() {
     return ~((input_buffer[0]) | (input_buffer[1] << 8));
 }
 
-/*
+/**
     Check for the presence of the TCA9555 IO expander at 0x20.
     Will detect *any thing* at 0x20, however.
 

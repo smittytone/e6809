@@ -22,6 +22,10 @@ uint8_t     interrupts[3] = {PIN_6809_NMI, PIN_6809_IRQ, PIN_6809_FIRQ};
 int main() {
     // Enable STDIO
     stdio_usb_init();
+    #ifdef DEBUG
+    // Pause to allow the USB path to initialize
+    sleep_ms(2000);
+    #endif
 
     // Prepare the board
     bool is_using_monitor = init_board();
@@ -33,9 +37,17 @@ int main() {
     // monitor board or not (in which case run tests for now)
     if (is_using_monitor) {
         // Enter the monitor UI
+        #ifdef DEBUG
+        printf("Using monitor board\n");
+        #endif
+
         event_loop();
     } else {
         // Run tests -- for now
+        #ifdef DEBUG
+        printf("Running tests\n");
+        #endif
+
         test_main();
     }
 
@@ -43,13 +55,13 @@ int main() {
 }
 
 
-/*
+/**
     Bring up the virtual 6809e and 64KB of memory.
 
     In future, this will offer alternative memory layouts.
  */
 void boot_cpu() {
-    #if DEBUG
+    #ifdef DEBUG
     printf("Resetting the registers\n");
     #endif
 
@@ -65,14 +77,14 @@ void boot_cpu() {
     init_vectors(vectors);
     init_cpu();
 
-    #if DEBUG
+    #ifdef DEBUG
     printf("Initializing memory\n");
     #endif
     for (uint16_t i = 0 ; i < START_VECTORS ; ++i) {
         mem[i] = RTI;
     }
 
-    #if DEBUG
+    #ifdef DEBUG
     printf("Entering sample program at 0x4000\n");
 
     uint16_t start = 0x4000;
@@ -90,10 +102,9 @@ void boot_cpu() {
     {0x34,0x46,0x33,0x64,0xA6,0x42,0xAE,0x43,0xE6,0x80,0x34,0x04,0x34,0x04,0x4A,0x27,0x13,0xE6,0x80,0xE1,0xE4,0x2E,0x08,0xE1,0x61,0x2E,0x06,0xE7,0x61,0x20,0x02,0xE7,0xE4,0x4A,0x26,0xED,0xA6,0xE0,0xA7,0x45,0xA6,0xE0,0xA7,0x46,0x35,0xC6,0x32,0x7E,0x8E,0x80,0x42,0x34,0x10,0xB6,0x80,0x41,0x34,0x02,0x8D,0xC4,0xA6,0x63,0xE6,0x64,0x39,0x0A,0x01,0x02,0x03,0x04,0x00,0x06,0x07,0x09,0x08,0x0B};
     {0x86, 0x41, 0x8E, 0x04, 0x00, 0xA7, 0x80, 0x8C, 0x06, 0x00, 0x26, 0xF9, 0x1A, 0x0F, 0x3B};
     */
-
     #endif
 
-    #if DEBUG
+    #ifdef DEBUG
     printf("Setting interrupt vectors\n");
     #endif
     // Set up interrupt pins
@@ -111,7 +122,7 @@ void boot_cpu() {
 }
 
 
-/*
+/**
     Sample the interrupt pins and return a bitfield.
     This will be called by the
  */
@@ -135,6 +146,9 @@ void flash_led(uint8_t count) {
 }
 
 
+/*
+ * EXPERIMENTAL
+ */
 void read_into_ram() {
     // See https://kevinboone.me/picoflash.html?i=1
     // 2MB Flash = 2,097,152

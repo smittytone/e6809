@@ -23,14 +23,14 @@ const uint8_t POS[4] = {0, 2, 6, 8};
  *      I2C FUNCTIONS
  */
 
-/*
+/**
     Convenience function to write a single byte to the matrix
  */
 void i2c_write_byte(uint8_t address, uint8_t byte) {
     i2c_write_blocking(I2C_PORT, address, &byte, 1, false);
 }
 
-/*
+/**
     Convenience function to write a 'count' bytes to the matrix
  */
 void i2c_write_block(uint8_t address, uint8_t *data, uint8_t count) {
@@ -42,7 +42,7 @@ void i2c_write_block(uint8_t address, uint8_t *data, uint8_t count) {
  *      HT16K33 SEGMENT LED FUNCTIONS
  */
 
-/*
+/**
     Initialise the display.
     NOTE Assumes the display is on I2C0.
 
@@ -57,7 +57,7 @@ void ht16k33_init(uint8_t address, uint8_t *buffer) {
     ht16k33_draw(address, buffer);
 }
 
-/*
+/**
     Power the display on or off.
 
     - Parameters:
@@ -69,7 +69,7 @@ void ht16k33_power(uint8_t address, uint8_t on) {
     i2c_write_byte(address, on == ON ? HT16K33_GENERIC_DISPLAY_ON : HT16K33_GENERIC_SYSTEM_OFF);
 }
 
-/*
+/**
     Power the display on or off.
 
     - Parameters:
@@ -82,7 +82,7 @@ void ht16k33_brightness(uint8_t address, uint8_t brightness) {
     i2c_write_byte(address, HT16K33_GENERIC_CMD_BRIGHTNESS | brightness);
 }
 
-/*
+/**
     Clear the display.
     Writes to the buffer, but not the device: call `draw()` after.
 
@@ -95,7 +95,7 @@ void ht16k33_clear(uint8_t address, uint8_t *buffer) {
     for (uint8_t i = 0 ; i < 16 ; ++i) buffer[i] = 0;
 }
 
-/*
+/**
     Writes the buffer to the device.
 
     - Parameters:
@@ -118,7 +118,7 @@ void ht16k33_draw(uint8_t address, uint8_t *buffer) {
     i2c_write_block(address, tx_buffer, sizeof(tx_buffer));
 }
 
-/*
+/**
     Set the specified digit to a hex number.
 
     - Parameters:
@@ -135,7 +135,7 @@ void ht16k33_set_number(uint8_t address, uint8_t *buffer, uint16_t number, uint8
     if (number > 9) ht16k33_set_alpha(address, buffer, 'a' + (number - 10), digit, has_dot);
 }
 
-/*
+/**
     Set the specified digit to a character from the driver's
     character set -- see `CHARSET`, above.
 
@@ -167,7 +167,7 @@ void ht16k33_set_alpha(uint8_t address, uint8_t *buffer, char chr, uint8_t digit
     if (has_dot) buffer[POS[digit]] |= 0x80;
 }
 
-/*
+/**
     Set the specified digit to an arbitrary glyph, one bit per segment.
 
     - Parameters:
@@ -183,7 +183,7 @@ void ht16k33_set_glyph(uint8_t address, uint8_t *buffer, uint8_t glyph, uint8_t 
     if (has_dot) buffer[POS[digit]] |= 0x80;
 }
 
-/*
+/**
     Show or hide the display's colon symbol.
 
     - Parameters:
