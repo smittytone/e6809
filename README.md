@@ -22,26 +22,26 @@ The Monitor code is menu driven. It provides code entry, program execution and m
 
 ### Main Menu
 
-![](./images/monitor_main.png)
+![Monitor main menu](./images/monitor_main.png)
 
-* `0` — Step through memory, down.
-* `3` — Step through memory, up.
+* `0` — Step through memory, down.
+* `3` — Step through memory, up.
 * `B` - Load code via USB.
-* `C` — Run code.
-* `D` — Run code in single-step mode.
-* `E` — Enter a byte at the current address.
-* `F` — Enter the current address.
+* `C` — Run code.
+* `D` — Run code in single-step mode.
+* `E` — Enter a byte at the current address.
+* `F` — Enter the current address.
 
 When you run code, whether without breaks or in single-step mode, the Program Counter is set to the current address. This can be set by entering it directly (hit the yellow key) or by stepping to the required address using the upper blue keys.
 
 ### Confirm Menu
 
-![](./images/monitor_confirm_data.png)
+![Monitor confirm menu](./images/monitor_confirm_data.png)
 
-* `C` — Exit to main menu.
-* `E` — Accept the current byte and continue in data-entry mode.
-* `E` — Flip between address/value and register views.
-* `F` — Accept the current byte or address and return to previous menu.
+* `C` — Exit to main menu.
+* `E` — Accept the current byte and continue in data-entry mode.
+* `E` — Flip between address/value and register views.
+* `F` — Accept the current byte or address and return to previous menu.
 
 The orange button (shown above) is only illuminated when you have entered a byte value. Tap it to store the byte and continue in byte-entry mode, or hit green to store the byte and return to the main menu. Hitting red ignores the entered byte value.
 
@@ -49,13 +49,13 @@ The magenta button (not shown above; also key `E`) is only illuminated when you 
 
 ### Single-step Menu
 
-![](./images/monitor_step.png)
+![Monitor code-step menu](./images/monitor_step.png)
 
-* `0` — Step through memory, down.
-* `3` — Step through memory, up.
-* `D` — Reset display to current address.
-* `E` — MOve between address/value and register views.
-* `F` — Process instruction at current address.
+* `0` — Step through memory, down.
+* `3` — Step through memory, up.
+* `D` — Reset display to current address.
+* `E` — MOve between address/value and register views.
+* `F` — Process instruction at current address.
 
 Using the memory step keys can take you away from the address referenced by the 6809e’s Program Counter register. Hit the orange button to align the display with the PC.
 
@@ -99,7 +99,7 @@ In no particular order...
 * Add Motorola PIA chip support.
 * Add 6809e start-up sequence when Monitor Board not present.
 * Clock-precise (1MHz) processing.
-* Support alterative memory maps, not just a flat 64KB space.
+* Support alternative memory maps, not just a flat 64KB space.
 * Support 64KB memory pages.
 * Add downloading of RAM contents via USB.
 
