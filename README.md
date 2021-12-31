@@ -26,7 +26,7 @@ The Monitor code is menu driven. It provides code entry, program execution and m
 
 * `0` — Step through memory, down.
 * `3` — Step through memory, up.
-* `B` - Load code via USB.
+* `B` — Load code via USB.
 * `C` — Run code.
 * `D` — Run code in single-step mode.
 * `E` — Enter a byte at the current address.
