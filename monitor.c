@@ -65,7 +65,7 @@ bool init_board() {
     keypad, allowing for debounces on press and release actions. Buttons are
     triggered only on release.
  */
-void event_loop() {
+void monitor_event_loop() {
     #ifdef DEBUG
     printf("Entering UI at main menu\n");
     #endif
@@ -145,31 +145,8 @@ void event_loop() {
             // pause to allow room for interrupts
             // TODO
         }
-
-        /*
-        if (!is_running_full) {
-            int c = getchar_timeout_us(0);
-            if (c != PICO_ERROR_TIMEOUT) {
-                // Check for a HAIL
-                input_buffer[buffer_index++] = (uint8_t)(c & 0xFF);
-                if (buffer_index > 3) buffer_index = 0;
-
-                if (memcmp(input_buffer, test_text, 4) == 0) {
-                    load_code();
-
-                    // Clear buffer
-                    buffer_index = 0;
-                    for (uint8_t i = 0 ; i < 10 ; i++) {
-                        input_buffer[i] = 0x00;
-                    }
-                    assert(input_buffer[buffer_index] == 0);
-                }
-            }
-        }
-        */
     }
 }
-
 
 
 /**
@@ -393,6 +370,7 @@ void process_key(uint16_t input) {
     if (mode_changed) set_keys();
 }
 
+
 /**
     Prime the keypad for the current menu mode, setting key colours,
     masking the keys that can be pressed, and, for data-entry screens,
@@ -478,6 +456,7 @@ void set_keys() {
     mode_changed = false;
 }
 
+
 /**
     Convert the key press value into an actual value.
 
@@ -495,6 +474,7 @@ uint8_t keypress_to_value(uint16_t input) {
 
     return 0;
 }
+
 
 /**
     Update the display by mode.
@@ -573,6 +553,7 @@ void display_ab_dp() {
     ht16k33_draw(display_address[DISPLAY_RIGHT], display_buffer[DISPLAY_RIGHT]);
 }
 
+
 /**
     Display a 16-bit value on the left display.
 
@@ -583,6 +564,7 @@ void display_left(uint16_t value) {
     display_value(value, DISPLAY_LEFT, true, false);
 }
 
+
 /**
     Display an 8-bit value on the right display.
 
@@ -592,6 +574,7 @@ void display_left(uint16_t value) {
 void display_right(uint16_t value) {
     display_value(value, DISPLAY_RIGHT, false, false);
 }
+
 
 /*
     Display an 8- or 16-bit value on a display, specified by index:
@@ -618,6 +601,7 @@ void display_value(uint16_t value, uint8_t index, bool is_16_bit, bool show_colo
     if (show_colon) ht16k33_show_colon(display_address[index], display_buffer[index], true);
     ht16k33_draw(display_address[index], display_buffer[index]);
 }
+
 
 /**
     Load code via STDIO on USB and store in memory. The incoming data structure
@@ -689,7 +673,7 @@ bool load_code() {
         }
 
         // Check for a timeout: break on fail
-        if (time_us_32() - start > 30000000) break;
+        if (time_us_32() - start > UPLOAD_TIMEOUT_US) break;
     }
 
     // Signal an error and turn off the LED

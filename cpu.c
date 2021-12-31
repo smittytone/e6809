@@ -22,7 +22,7 @@ STATE_6809  state;
  * Setup
  */
 void init_cpu() {
-    // Set simultator state
+    // Set simulator state
     state.bus_state_pins = 0;
     state.interrupt_state = 0;
     state.interrupts = 0;
@@ -165,7 +165,7 @@ uint32_t process_next_instruction() {
             return cycles_used;
         }
 
-        // Set the address mode as far as we can
+        // Set the addressing mode as far as we can
         if (msn == 0x08 || msn == 0x0C) address_mode = MODE_IMMEDIATE;
         if (msn == 0x00 || msn == 0x09 || msn == 0x0D) address_mode = MODE_DIRECT;
         if (msn == 0x06 || msn == 0x0A || msn == 0x0E) address_mode = MODE_INDEXED;
@@ -1068,11 +1068,7 @@ void tst(uint8_t op, uint8_t mode) {
     //      test B,
     //      test M
     if (mode == MODE_INHERENT) {
-        if (op == TSTA) {
-            test(reg.a);
-        } else {
-            test(reg.b);
-        }
+        test(op == TSTA ? reg.a : reg.b);
     } else {
         uint16_t address = address_from_mode(mode);
         test(get_byte(address));

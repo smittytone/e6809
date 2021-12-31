@@ -41,7 +41,7 @@ int main() {
         printf("Using monitor board\n");
         #endif
 
-        event_loop();
+        monitor_event_loop();
     } else {
         // Run tests -- for now
         #ifdef DEBUG
@@ -158,7 +158,7 @@ void read_into_ram() {
     char *p = (char *)XIP_BASE;
     p += 1048576;
 
-    // Read 64KB into RAM
+    // Read 64KB from Flash into RAM
     for (uint16_t i = 0 ; i < 65536 ; ++i) {
         mem[i] = (uint8_t)(*p);
     }

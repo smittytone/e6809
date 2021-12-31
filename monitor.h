@@ -15,7 +15,8 @@
 /*
  *  CONSTANTS
  */
-#define DEBOUNCE_TIME_US            5000
+#define DEBOUNCE_TIME_US            5000        // 5ms
+#define UPLOAD_TIMEOUT_US           20000000    // 20s
 
 #define DISPLAY_LEFT                0
 #define DISPLAY_RIGHT               1
@@ -63,7 +64,7 @@
  */
 bool        init_board();
 
-void        event_loop();
+void        monitor_event_loop();
 void        process_key(uint16_t);
 void        set_keys();
 uint8_t     keypress_to_value(uint16_t input);
