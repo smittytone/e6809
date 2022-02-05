@@ -16,7 +16,6 @@ License:
 '''
 IMPORTS
 '''
-import serial
 from os import path
 from sys import exit, argv
 from time import time_ns
@@ -274,6 +273,7 @@ if __name__ == '__main__':
     # Set the port or fail
     port = None
     try:
+        import serial
         port = serial.Serial(port=device, baudrate=115200)
     except:
         print("[ERROR] An invalid e6809 device file was specified:",device)
