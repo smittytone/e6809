@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <FileRef
+      location = "group:CMakeLists.txt">
+   </FileRef>
+   <FileRef
+      location = "group:ops.h">
+   </FileRef>
+   <FileRef
+      location = "group:main.h">
+   </FileRef>
+   <FileRef
+      location = "group:main.c">
+   </FileRef>
+   <FileRef
+      location = "group:cpu.h">
+   </FileRef>
+   <FileRef
+      location = "group:cpu.c">
+   </FileRef>
+   <FileRef
+      location = "group:monitor.h">
+   </FileRef>
+   <FileRef
+      location = "group:monitor.c">
+   </FileRef>
+   <FileRef
+      location = "group:cpu_tests.h">
+   </FileRef>
+   <FileRef
+      location = "group:cpu_tests.c">
+   </FileRef>
+   <FileRef
+      location = "group:ht16k33.h">
+   </FileRef>
+   <FileRef
+      location = "group:ht16k33.c">
+   </FileRef>
+   <FileRef
+      location = "group:keypad.h">
+   </FileRef>
+   <FileRef
+      location = "group:keypad.c">
+   </FileRef>
+   <FileRef
+      location = "group:pia.h">
+   </FileRef>
+   <FileRef
+      location = "group:pia.c">
+   </FileRef>
+   <FileRef
+      location = "group:README.md">
+   </FileRef>
+</Workspace>
