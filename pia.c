@@ -4,7 +4,7 @@
  *
  * @version     1.0.0
  * @author      smittytone
- * @copyright   2021
+ * @copyright   2022
  * @licence     MIT
  *
  */

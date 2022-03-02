@@ -105,6 +105,6 @@ In no particular order...
 
 ## Copyright
 
-Emulation software copyright &copy; 2021 Tony Smith (@smittytone)
+Emulation software copyright &copy; 2022 Tony Smith (@smittytone)
 
 6809e ISA copyright &copy; 1977 Motorola &mdash; and, by sequential ownership, NXP Semiconductor.
