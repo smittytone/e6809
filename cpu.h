@@ -36,6 +36,11 @@
 #define F_BIT                   6
 #define E_BIT                   7
 
+#define REG_X                   0
+#define REG_Y                   1
+#define REG_U                   2
+#define REG_S                   3
+
 #define NMI_BIT                 0
 #define IRQ_BIT                 1
 #define FIRQ_BIT                2

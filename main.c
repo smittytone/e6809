@@ -13,11 +13,11 @@
 /*
  *  GLOBALS
  */
-uint8_t     interrupts[3] = {PIN_6809_NMI, PIN_6809_IRQ, PIN_6809_FIRQ};
+uint8_t interrupts[3] = {PIN_6809_NMI, PIN_6809_IRQ, PIN_6809_FIRQ};
 
 
 /*
- *      ENTRY POINT
+ * ENTRY POINT
  */
 int main() {
     // Enable STDIO
@@ -56,9 +56,8 @@ int main() {
 
 
 /**
-    Bring up the virtual 6809e and 64KB of memory.
-
-    In future, this will offer alternative memory layouts.
+ * @brief Bring up the virtual 6809e and 64KB of memory.
+ *        In future, this will offer alternative memory layouts.
  */
 void boot_cpu() {
     #ifdef DEBUG
@@ -123,8 +122,8 @@ void boot_cpu() {
 
 
 /**
-    Sample the interrupt pins and return a bitfield.
-    This will be called by the
+ * @brief Sample the interrupt pins and return a bitfield.
+ *        This will be called by the
  */
 uint8_t sample_interrupts() {
     uint8_t irqs = 0;
@@ -135,6 +134,11 @@ uint8_t sample_interrupts() {
 }
 
 
+/**
+ * @brief Flash the Pico LED.
+ *
+ * @param count: The number of blinks in the sequence.
+ */
 void flash_led(uint8_t count) {
     while (count > 0) {
         gpio_put(PIN_PICO_LED, true);

@@ -12,7 +12,7 @@
 
 
 /*
- *      GLOBALS
+ * GLOBALS
  */
 uint8_t     display_mode = 0;
 uint8_t     input_count = 0;
@@ -33,9 +33,9 @@ uint8_t     display_address[2] = {0x71, 0x70};
 
 
 /**
-    Bring up the monitor board if it is present.
-
-    - Returns: `true` if the board is present and enabled, otherwise `false`.
+ * @brief Bring up the monitor board if it is present.
+ *
+ * @retval `true` if the board is present and enabled, otherwise `false`.
  */
 bool init_board() {
     #ifdef DEBUG
@@ -61,9 +61,11 @@ bool init_board() {
 
 
 /**
-    Initialise and run the main event loop. This primarily continually reads the
-    keypad, allowing for debounces on press and release actions. Buttons are
-    triggered only on release.
+ * @brief Initialise and run the main event loop.
+ *
+ * This primarily continually reads the keypad, allowing for
+ * debounces on press and release actions.
+ * Buttons are triggered only on release.
  */
 void monitor_event_loop() {
     #ifdef DEBUG
@@ -83,7 +85,6 @@ void monitor_event_loop() {
     uint8_t* buffer_ptr = input_buffer;
     uint8_t buffer_index = 0;
     const char test_text[] = "HAIL";
-
 
     // Set the button colours and the display
     set_keys();
@@ -150,11 +151,10 @@ void monitor_event_loop() {
 
 
 /**
-    Process a key press to determine if it is valid - a lit button was pressed -
-    and to then trigger the action the key represents.
-
-    - Parameters:
-        - input: The key press value read from the keypad.
+ * @brief Process a key press to determine if it is valid - a lit button was pressed -
+ *        and to then trigger the action the key represents.
+ *
+ * @param input: The key press value read from the keypad.
  */
 void process_key(uint16_t input) {
     // Make sure the key pressed was a valid one
@@ -372,9 +372,9 @@ void process_key(uint16_t input) {
 
 
 /**
-    Prime the keypad for the current menu mode, setting key colours,
-    masking the keys that can be pressed, and, for data-entry screens,
-    the number of digits that can be entered.
+ * @brief Prime the keypad for the current menu mode, setting key colours,
+ *        masking the keys that can be pressed, and, for data-entry screens,
+ *        the number of digits that can be entered.
  */
 void set_keys() {
     // Clear the keyboard
@@ -458,12 +458,11 @@ void set_keys() {
 
 
 /**
-    Convert the key press value into an actual value.
-
-    - Parameters:
-        - input: The key press value read from the keypad.
-
-    - Returns: The actual value represented by the pressed key.
+ * @brief Convert the key press value into an actual value.
+ *
+ * @param input: The key press value read from the keypad.
+ *
+ * @retval The actual value represented by the pressed key.
  */
 uint8_t keypress_to_value(uint16_t input) {
     // NOTE Assumes one key press and exits at the first
@@ -477,7 +476,7 @@ uint8_t keypress_to_value(uint16_t input) {
 
 
 /**
-    Update the display by mode.
+ * @brief Update the display by mode.
  */
 void update_display() {
     uint16_t left = 0;
@@ -512,7 +511,7 @@ void update_display() {
 }
 
 /**
-    Display the CC register as eight binary digits.
+ * @brief Display the CC register as eight binary digits.
  */
 void display_cc() {
     ht16k33_clear(display_address[DISPLAY_LEFT],  display_buffer[DISPLAY_LEFT]);
@@ -531,7 +530,7 @@ void display_cc() {
 }
 
 /**
-    Display the A, B and DP registers evenly spaced on the display.
+ * @brief Display the A, B and DP registers evenly spaced on the display.
  */
 void display_ab_dp() {
     ht16k33_clear(display_address[DISPLAY_LEFT],  display_buffer[DISPLAY_LEFT]);
@@ -555,10 +554,9 @@ void display_ab_dp() {
 
 
 /**
-    Display a 16-bit value on the left display.
-
-    - Parameters:
-        - value: The 16-bit value to display.
+ * @brief Display a 16-bit value on the left display.
+ *
+ * @param value: The 16-bit value to display.
  */
 void display_left(uint16_t value) {
     display_value(value, DISPLAY_LEFT, true, false);
@@ -566,24 +564,22 @@ void display_left(uint16_t value) {
 
 
 /**
-    Display an 8-bit value on the right display.
-
-    - Parameters:
-        - value: The 8-bit value to display.
+ * @brief Display an 8-bit value on the right display.
+ *
+ * @param value: The 8-bit value to display.
  */
 void display_right(uint16_t value) {
     display_value(value, DISPLAY_RIGHT, false, false);
 }
 
 
-/*
-    Display an 8- or 16-bit value on a display, specified by index:
-    0 = left, 1 = right.
-
-    - Parameters:
-        - value:     The value to display.
-        - index:     The display's index, 0 or 1.
-        - is_16_bit: Whether the value is 16-bit (`true`) or 8-bit (`false`).
+/**
+ * @brief Display an 8- or 16-bit value on a display, specified by index:
+ *        0 = left, 1 = right.
+ *
+ * @param value:     The value to display.
+ * @param index:     The display's index, 0 or 1.
+ * @param is_16_bit: Whether the value is 16-bit (`true`) or 8-bit (`false`).
  */
 void display_value(uint16_t value, uint8_t index, bool is_16_bit, bool show_colon) {
     if (value > 0xFFFF) value = 0x0000;
@@ -604,10 +600,10 @@ void display_value(uint16_t value, uint8_t index, bool is_16_bit, bool show_colo
 
 
 /**
-    Load code via STDIO on USB and store in memory. The incoming data structure
-    indicates at what address this will start.
-
-    - Returns: `true` on a successful load, otherwise `false`.
+ * @brief Load code via STDIO on USB and store in memory. The incoming data structure
+ *        indicates at what address this will start.
+ *
+ * @retval `true` on a successful load, otherwise `false`.
  */
 bool load_code() {
     uint8_t load_buffer[262];
@@ -684,12 +680,11 @@ bool load_code() {
 
 
 /**
-    Read in a single transmitted block (up to 262 bytes).
-
-    - Parameters:
-        - buff: A pointer to the byte store buffer,
-
-    - Returns: The index of the last read byte in the buffer.
+ * @brief Read in a single transmitted block (up to 262 bytes).
+ *
+ * @param buff: A pointer to the byte store buffer,
+ *
+ * @retval The index of the last read byte in the buffer.
  */
 uint16_t get_block(uint8_t *buff) {
     uint16_t buff_ptr = 0;
