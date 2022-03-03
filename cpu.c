@@ -1366,10 +1366,18 @@ void tst(uint8_t op, uint8_t mode) {
  */
 
 
+/**
+ * @brief Simulates addition of two unsigned 8-bit values in a binary ALU.
+ *        Checks for half-carry, carry and overflow.
+ *        Affects H, C, V.
+ *
+ * @param value_1:   The addee.
+ * @param value_2:   The adder.
+ * @param use_carry: Include any previous carry.
+ *
+ * @retval The addition.
+ */
 uint8_t alu(uint8_t value_1, uint8_t value_2, bool use_carry) {
-    // Simulates addition of two unsigned 8-bit values in a binary ALU
-    // Checks for half-carry, carry and overflow
-    // Affects H, C, V
     uint8_t binary_1[8], binary_2[8], answer[8];
     bool bit_carry = false;
     bool bit_6_carry = false;
@@ -1425,6 +1433,17 @@ uint8_t alu(uint8_t value_1, uint8_t value_2, bool use_carry) {
     return final;
 }
 
+
+/**
+ * @brief Add two unsigned 16-bit values.
+ *        `alu()` affects H, C, V.
+ *
+ * @param value_1:   The addee.
+ * @param value_2:   The adder.
+ * @param use_carry: Include any previous carry.
+ *
+ * @retval The addition.
+ */
 uint16_t alu_16(uint16_t value_1, uint16_t value_2, bool use_carry) {
     // Add the LSBs
     uint8_t v_1 = value_1 & 0xFF;
@@ -1438,41 +1457,77 @@ uint16_t alu_16(uint16_t value_1, uint16_t value_2, bool use_carry) {
     return ((subtotal << 8) + total);
 }
 
+
+/**
+ * @brief Add two unsigned 8-bit values with no carry.
+ *        Affects H, N, Z, V, C -- `alu()` sets H, V, C,.
+ *
+ * @param value:  The addee.
+ * @param amount: The adder.
+ *
+ * @retval The addition.
+ */
 uint8_t add_no_carry(uint8_t value, uint8_t amount) {
-    // Adds two 8-bit values
-	// Affects H, N, Z, V, C
-    //         'alu()' sets H, V, C
     uint8_t answer = alu(value, amount, false);
     set_cc_nz(answer, false);
     return answer;
 }
 
+
+/**
+ * @brief Add two unsigned 8-bit values plus carry.
+ *        Affects H, N, Z, V, C -- `alu()` sets H, V, C,.
+ *
+ * @param value:  The addee.
+ * @param amount: The adder.
+ *
+ * @retval The addition.
+ */
 uint8_t add_with_carry(uint8_t value, uint8_t amount) {
-    // Adds two 8-bit values plus CC C
-    // Affects H, N, Z, V, C
-    //         'alu()' sets H, V, C
     uint8_t answer = alu(value, amount, true);
     set_cc_nz(answer, false);
     return answer;
 }
 
+
+/**
+ * @brief Subtract two 8-bit values without carry: REG = REG - M.
+ *
+ * @param value:  The addee.
+ * @param amount: The adder.
+ *
+ * @retval The subtraction.
+ */
 uint8_t subtract(uint8_t value, uint8_t amount) {
-    // Subtract without Carry
-    // REG = REG - M
     return base_sub(value, amount, false);
 }
 
+
+/**
+ * @brief Subtract two 8-bit values with carry (borrow): REG = REG - M - C.
+ *
+ * @param value:  The addee.
+ * @param amount: The adder.
+ *
+ * @retval The subtraction.
+ */
 uint8_t sub_with_carry(uint8_t value, uint8_t amount) {
-    // Subtract with Carry (borrow)
-    // REG = REG - M - C
     return base_sub(value, amount, true);
 }
 
+
+/**
+ * @brief Generic 8-bit subtraction function.
+ *        Affects N, Z, V, C -- V, C set by 'negate()'
+ *                           -- V, C (H) set by 'alu()'
+ *
+ * @param value:     The addee.
+ * @param amount:    The adder.
+ * @param use_carry: `true` to include the carry in the sum.
+ *
+ * @retval The subtraction.
+ */
 uint8_t base_sub(uint8_t value, uint8_t amount, bool use_carry) {
-    // Generic subtract
-    // Affects N, Z, V, C
-    //         V, C set by 'negate()'
-    //         V, C (H) set by 'alu()'
     bool carry_set = is_bit_set(reg.cc, C_BIT);
     uint8_t comp = twos_complement(amount);
     uint8_t answer = alu(value, comp, false);
@@ -1491,12 +1546,18 @@ uint8_t base_sub(uint8_t value, uint8_t amount, bool use_carry) {
     return answer;
 }
 
-uint16_t subtract_16(uint16_t value, uint16_t amount) {
-    // Subtract amount from value
-    // Affects N, Z, V, C
-    //         N, Z, V, C affected by 'complement()'
-    //         V, C are set by 'alu()'
 
+/**
+ * @brief Generic 16-bit subtraction function.
+ *        Affects N, Z, V, C -- N, Z, V, C set by 'complement()'
+ *                           -- V, C (H) set by 'alu()'
+ *
+ * @param value:     The addee.
+ * @param amount:    The adder.
+ *
+ * @retval The subtraction.
+ */
+uint16_t subtract_16(uint16_t value, uint16_t amount) {
     // Complement the value at M:M + 1
     uint8_t msb = ones_complement((amount >> 8) & 0xFF);
     uint8_t lsb = ones_complement(amount & 0xFF);
@@ -1525,12 +1586,19 @@ uint16_t subtract_16(uint16_t value, uint16_t amount) {
     return answer;
 }
 
+
+/**
+ * @brief Returns 2's complement of 8-bit value.
+ *        Affects N, Z, V, C -- C, V (H) set by `alu()`
+ *                           -- V set only if `value` is 0x80 (see Zaks p 167)
+ *
+ * @param value: The value to complement.
+ * @param ignore: ????
+ *
+ * @retval The 2's complement.
+ */
 uint8_t negate(uint8_t value, bool ignore) {
-    // Returns 2's complement of 8-bit value
-    // Affects Z, N, V, C
-    //         C, V (H) set by 'alu()'
-    //         V set only if value is 0x80 (see Zaks p 167)
-    // Preserve 'value' to set V bit
+    // Preserve `value` to set V bit
     uint8_t cc = reg.cc;
 
     // Flip value's bits to make the 1s complenent
@@ -1548,15 +1616,27 @@ uint8_t negate(uint8_t value, bool ignore) {
     return answer;
 }
 
+
+/**
+ * @brief Generic calculation of the 1's complement of an 8-bit value.
+ *        Does not affect CC.
+ *
+ * @param value: The value to complement.
+ *
+ * @retval The 1's complement.
+ */
 uint8_t ones_complement(uint8_t value) {
     // Flip value's bits to make the 1s complenent
-    // NOTE This call does not affect CC
     for (uint32_t i = 0 ; i < 8 ; i++) {
-        value = value ^ (1 << i);
+        value ^= (1 << i);
     }
     return value;
 }
 
+
+/**
+ * @brief Is this necessary?
+ */
 uint8_t twos_complement(uint8_t value) {
     // Flip value's bits to make the 1s complenent
     // NOTE This call does not affect CC
@@ -1568,10 +1648,16 @@ uint8_t twos_complement(uint8_t value) {
     return value + 1;
 }
 
+
+/**
+ * @brief Returns 1's complement of 8-bit value.
+ *        Affects N, Z, V, C -- V, C take fixed values: 0, 1.
+ *
+ * @param value: The value to complement.
+ *
+ * @retval The 1's complement.
+ */
 uint8_t complement(uint8_t value) {
-    // One's complement the passed value
-    // Affects N, Z, V, C
-    //         V, C take fixed values: 0, 1
     value = ones_complement(value);
     set_cc_nz(value, false);
     clr_cc_bit(V_BIT);
@@ -1579,57 +1665,96 @@ uint8_t complement(uint8_t value) {
     return value;
 }
 
+
+/**
+ * @brief Compare two values by subtracting the second from the first.
+ *        Result is discarded: we only care about the effect on CC.
+ *        Affects N, Z, V, C -- C, V (H) set by `alu()` via `base_sub()`,
+ *                           -- `base_sub()` sets N, Z.
+ *
+ * @param value:  The first value.
+ * @param amount: The second value.
+ */
 void compare(uint8_t value, uint8_t amount) {
-    // Compare two values by subtracting the second from the first.
-    // Result is discarded
-    // Affects N, Z, V, C
-    //         C, V (H) set by 'alu()' via 'base_sub()'
-    //         'base_sub()' sets N, Z
     uint8_t answer = base_sub(value, amount, false);
 }
 
 
+/**
+ * @brief ANDs the two supplied values.
+ *        Affects N, Z, V -- V is always cleared.
+ *
+ * @param value:  The first value.
+ * @param amount: The second value.
+ *
+ * @retval The result.
+ */
 uint8_t do_and(uint8_t value, uint8_t amount) {
-    // ANDs the two supplied values
-    // Affects N, Z, V
-    //         V is always cleared
     clr_cc_bit(V_BIT);
     uint8_t answer = value & amount;
     set_cc_nz(answer, false);
     return answer;
 }
 
+
+/**
+ * @brief ORs the two supplied values.
+ *        Affects N, Z, V -- V is always cleared.
+ *
+ * @param value:  The first value.
+ * @param amount: The second value.
+ *
+ * @retval The result.
+ */
 uint8_t do_or(uint8_t value, uint8_t amount) {
-    // OR
-    // Affects N, Z, V
-    //         V is always cleared
     clr_cc_bit(V_BIT);
     uint8_t answer = value | amount;
     set_cc_nz(answer, false);
     return answer;
 }
 
+
+/**
+ * @brief XORs the two supplied values.
+ *        Affects N, Z, V -- V is always cleared.
+ *
+ * @param value:  The first value.
+ * @param amount: The second value.
+ *
+ * @retval The result.
+ */
 uint8_t do_xor(uint8_t value, uint8_t amount) {
-    // Perform an exclusive OR
-    // Affects N, Z, V
-    //         V always cleared
     clr_cc_bit(V_BIT);
     uint8_t answer = value ^ amount;
     set_cc_nz(answer, false);
     return answer;
 }
 
+
+/**
+ * @brief Generic arithmetic shift right.
+ *        Affects N, Z, C.
+ *
+ * @param value: The value.
+ *
+ * @retval The result.
+ */
 uint8_t arith_shift_right(uint8_t value) {
-    // Arithmetic shift right
-    // Affects N, Z, C
     uint8_t answer = partial_shift_right(value);
     set_cc_nz(answer, false);
     return answer;
 }
 
+
+/**
+ * @brief Generic logical shift left.
+ *        Affects N, Z, V, C.
+ *
+ * @param value: The value.
+ *
+ * @retval The result.
+ */
 uint8_t logic_shift_left(uint8_t value) {
-    // Logical shift left
-    // Affects N, Z, V, C
     reg.cc &= MASK_NZVC;
     if (is_bit_set(value, 7)) set_cc_bit(C_BIT);
     if (is_bit_set(value, 7) != is_bit_set(value, 6)) set_cc_bit(V_BIT);
@@ -1648,10 +1773,16 @@ uint8_t logic_shift_left(uint8_t value) {
     return value;
 }
 
+
+/**
+ * @brief Generic logical shift right.
+ *        Affects N, Z, C -- N is always cleared.
+ *
+ * @param value: The value.
+ *
+ * @retval The result.
+ */
 uint8_t logic_shift_right(uint8_t value) {
-    // Logical shift right
-    // Affects N, Z, C
-    //         N is always cleared
     uint8_t answer = partial_shift_right(value);
 
     // Clear bit 7
@@ -1660,8 +1791,15 @@ uint8_t logic_shift_right(uint8_t value) {
     return answer;
 }
 
+
+/**
+ * @brief Code common to LSR and ASR.
+ *
+ * @param value: The value.
+ *
+ * @retval The result.
+ */
 uint8_t partial_shift_right(uint8_t value) {
-    // Code common to LSR and ASR
     reg.cc &= MASK_NZC;
     if (is_bit_set(value, 0)) set_cc_bit(C_BIT);
 
@@ -1676,10 +1814,16 @@ uint8_t partial_shift_right(uint8_t value) {
     return value;
 }
 
-uint8_t rotate_left(uint8_t value) {
-    // Rotate left
-    // Affects N, Z, V, C
 
+/**
+ * @brief Rotate left.
+ *        Affects N, Z, V, C -- C becomes bit 7 of original operand.
+ *
+ * @param value: The value.
+ *
+ * @retval The result.
+ */
+uint8_t rotate_left(uint8_t value) {
     // C becomes bit 7 of original operand
     bool carry = is_cc_bit_set(C_BIT);
     reg.cc &= MASK_NZVC;
@@ -1707,10 +1851,16 @@ uint8_t rotate_left(uint8_t value) {
     return value;
 }
 
-uint8_t rotate_right(uint8_t value) {
-    // Rotate right
-    // Affects N, Z, C
 
+/**
+ * @brief Rotate right.
+ *        Affects N, Z, C -- C becomes bit 0 of original operand.
+ *
+ * @param value: The value.
+ *
+ * @retval The result.
+ */
+uint8_t rotate_right(uint8_t value) {
     // C becomes bit 0 of original operand
     bool carry = is_cc_bit_set(C_BIT);
     reg.cc &= MASK_NZC;
@@ -1734,6 +1884,7 @@ uint8_t rotate_right(uint8_t value) {
     set_cc_nz(value, false);
     return value;
 }
+
 
 uint8_t decrement(uint8_t value) {
     // Subtract 1 from the operand
