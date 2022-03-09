@@ -14,7 +14,7 @@ add_compile_definitions(DEBUG=1)
 include(pico_sdk_import.cmake)
 
 project(${PROJECT_NAME}
-        LANGUAGES C ASM
+        LANGUAGES C CXX ASM
         VERSION 1.0.0
         DESCRIPTION "Motorola 6809e simulator")
 
@@ -41,4 +41,3 @@ target_link_libraries(${PROJECT_NAME}
 pico_enable_stdio_usb(${PROJECT_NAME} 1)
 pico_enable_stdio_uart(${PROJECT_NAME} 0)
 pico_add_extra_outputs(${PROJECT_NAME})
-#example_auto_set_url(e6809)
