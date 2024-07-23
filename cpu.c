@@ -3,7 +3,7 @@
  *
  * @version     1.0.0
  * @author      smittytone
- * @copyright   2022
+ * @copyright   2024
  * @licence     MIT
  *
  */
@@ -75,24 +75,32 @@ uint32_t process_next_instruction() {
         if (state.interrupts > 0) {
             state.interrupt_state = IRQ_STATE_ASSERTED;
 
-            if (state.interrupts & NMI_BIT) {
+            if (is_bit_set(state.interrupts, NMI_BIT)) {
                 process_interrupt(NMI_BIT);
                 state.interrupt_state = IRQ_STATE_HANDLED;
             }
 
-            if ((state.interrupts & FIRQ_BIT) && !is_cc_bit_set(F_BIT)) {
-                process_interrupt(FIRQ_BIT);
-                state.interrupt_state = IRQ_STATE_HANDLED;
+            if (is_bit_set(state.interrupts, FIRQ_BIT)) {
+                // Clear bit
+                state.interrupts &= ~(1 << FIRQ_BIT);
+                
+                // Process if appropriate CC bit set
+                if (!is_cc_bit_set(F_BIT)) {
+                    process_interrupt(FIRQ_BIT);
+                    state.interrupt_state = IRQ_STATE_HANDLED;
+                }
             }
 
-            if (state.interrupts & FIRQ_BIT) state.interrupts &= !FIRQ_BIT;
+            if (is_bit_set(state.interrupts, IRQ_BIT)) {
+                // Clear bit
+                state.interrupts &= ~(1 << IRQ_BIT);
 
-            if ((state.interrupts & IRQ_BIT) && !is_cc_bit_set(I_BIT)) {
-                process_interrupt(IRQ_BIT);
-                state.interrupt_state = IRQ_STATE_HANDLED;
+                // Process if appropriate CC bit set
+                if (!is_cc_bit_set(I_BIT)) {
+                    process_interrupt(IRQ_BIT);
+                    state.interrupt_state = IRQ_STATE_HANDLED;
+                }
             }
-
-            if (state.interrupts & IRQ_BIT) state.interrupts &= !IRQ_BIT;
 
             // CWAI and SYNC end if the IRQ was handled
             if (state.interrupt_state == IRQ_STATE_HANDLED) {

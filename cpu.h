@@ -3,7 +3,7 @@
  *
  * @version     1.0.0
  * @author      smittytone
- * @copyright   2022
+ * @copyright   2024
  * @licence     MIT
  *
  */
@@ -91,7 +91,7 @@
 typedef struct {
     uint8_t  a;
     uint8_t  b;
-    uint16_t d; // Only used for TFR/EXG ops which require a pointer to a unit16_7
+    uint16_t d; // Only used for TFR/EXG ops which require a pointer to a unit16_t
     uint16_t x;
     uint16_t y;
     uint16_t s;
@@ -108,7 +108,6 @@ typedef struct {
     // May drop these below
     uint8_t     bus_state_pins;
     uint8_t     interrupt_state;
-
 } STATE_6809;
 
 

@@ -4,7 +4,14 @@ An emulation of the Motorola 6809e 8-bit microprocessor designed to run on the a
 
 It is intended for standalone usage — though not as a drop in replacement for an original 6808e — and within a microprocessor kit design called the Monitor Board.
 
-This is a work in progress, and not yet released to the public.
+There are two versions:
+
+1. Mac — [branch `mac`](https://github.com/smittytone/e6809/tree/mac)
+1. Raspberry Pi Pico - [branch `pico`](https://github.com/smittytone/e6809/tree/pico)
+
+Current development activity is centred on the `pico` branch. The `main` branch will probably not be updated and may even be removed.
+
+**This is a work in progress. Expect errors and breakage**.
 
 ## The CPU
 
@@ -105,6 +112,6 @@ In no particular order...
 
 ## Copyright
 
-Emulation software copyright &copy; 2022 Tony Smith (@smittytone)
+Emulation software copyright &copy; 2024 Tony Smith (@smittytone)
 
 6809e ISA copyright &copy; 1977 Motorola &mdash; and, by sequential ownership, NXP Semiconductor.
