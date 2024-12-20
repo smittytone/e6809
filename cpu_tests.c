@@ -7,15 +7,44 @@
  * @licence     MIT
  *
  */
-#include "main.h"
+#include <stdlib.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+
+#include "ops.h"
+#include "cpu.h"
+#include "cpu_tests.h"
 
 
+/*
+ * STATICS
+ */
+static void test_addressing(void);
+static void test_alu(void);
+static void test_index(void);
+static void test_logic(void);
+static void test_reg(void);
+static void test_branch(void);
+static void test_setup(void);
+static void test_report(uint16_t code, uint32_t err_count);
+static void expected(uint16_t wanted, uint16_t got);
+
+
+/*
+ * GLOBALS
+ */
 uint32_t errors = 0;
 uint32_t passes = 0;
 uint32_t tests = 0;
 
+extern REG_6809     reg;
+extern uint8_t      mem[KB64];
+extern STATE_6809   state;
 
-void test_main() {
+
+void test_main(void) {
+
     tests = 0;
     errors = 0;
     passes = 0;
@@ -34,9 +63,10 @@ void test_main() {
 }
 
 
-void test_addressing() {
+static void test_addressing(void) {
 
     uint16_t result;
+    uint32_t current_errors = errors;
 
     // Immediate
     test_setup();
@@ -75,13 +105,16 @@ void test_addressing() {
     } else {
         errors++;
     }
+    
+    test_report(0, errors - current_errors);
 }
 
 
-void test_alu() {
+static void test_alu(void) {
 
     uint8_t result;
-
+    uint32_t current_errors = errors;
+    
     // ADC
     // Zaks p.122
     test_setup();
@@ -91,6 +124,7 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0x3700, (uint16_t)((result << 8) | reg.cc));
     }
 
     // Leventhal p.22-3
@@ -101,6 +135,7 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0xB72A, (uint16_t)((result << 8) | reg.cc));
     }
 
     // ADD 8-bit
@@ -112,6 +147,7 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0x2B11, (uint16_t)((result << 8) | reg.cc));
     }
 
     // Leventhal p.22-3
@@ -121,6 +157,7 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0xAF08, (uint16_t)((result << 8) | reg.cc));
     }
 
     // ADD 16-bit
@@ -136,6 +173,8 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0x0331, (uint16_t)((reg.a << 8) | reg.b));
+        expected(0x00, (uint16_t)reg.cc);
     }
 
     // Leventhal p.22-6
@@ -150,6 +189,8 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0x2066, (uint16_t)((reg.a << 8) | reg.b));
+        expected(0x00, (uint16_t)reg.cc);
     }
 
     // CMP 8-bit
@@ -160,6 +201,7 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0x08, (uint16_t)reg.cc);
     }
 
     // Zaks p.150
@@ -170,6 +212,7 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0x59, (uint16_t)reg.cc);
     }
 
     // CMP 16-bit
@@ -187,6 +230,8 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0x24, (uint16_t)reg.cc);
+        expected(0x5410, reg.x);
     }
 
     // Leventhal p.22-29
@@ -202,6 +247,8 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0x09, (uint16_t)(reg.cc & 0x0F));
+        expected(0x1AB0, reg.x);
     }
 
     // COM
@@ -212,6 +259,7 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0xDC09, (uint16_t)((result << 8) | reg.cc));
     }
 
     // Zaks p.152
@@ -222,6 +270,7 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0x6401, (uint16_t)((result << 8) | reg.cc));
     }
 
     // DAA
@@ -233,6 +282,7 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0x86, (uint16_t)reg.a);
     }
 
     // Zaks p.154
@@ -247,6 +297,7 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0x3131, (uint16_t)((result << 8) | reg.cc));
     }
 
     // Leventhal p.22-33
@@ -257,6 +308,7 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0x39F1, (uint16_t)((result << 8) | reg.cc));
     }
 
     // INC
@@ -267,6 +319,7 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0x3600, (uint16_t)((result << 8) | reg.cc));
     }
 
     test_setup();
@@ -275,6 +328,7 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0x800A, (uint16_t)((result << 8) | reg.cc));
     }
 
     // Leventhal p.22-38
@@ -285,6 +339,7 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0xC109, (uint16_t)((result << 8) | reg.cc));
     }
 
     // MUL
@@ -297,6 +352,8 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0x04B0, (uint16_t)((reg.a << 8) | reg.b));
+        expected(0x01, (uint16_t)reg.cc);
     }
 
     // Levenathal p.22-52
@@ -309,6 +366,8 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0x2A0F, (uint16_t)((reg.a << 8) | reg.b));
+        expected(0x0A, (uint16_t)reg.cc);
     }
 
     // NEG
@@ -321,6 +380,7 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0x0D21, (uint16_t)((result << 8) | reg.cc));
     }
 
     // Leventhal p.22-53
@@ -331,6 +391,7 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0xC60F, (uint16_t)((result << 8) | (reg.cc & 0x0F)));
     }
 
     // SBC
@@ -342,6 +403,7 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0x3120, (uint16_t)((result << 8) | reg.cc));
     }
 
     // Leventhal p.22-64
@@ -357,6 +419,7 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0xDF08, (uint16_t)((reg.b << 8) | reg.cc));
     }
 
     // SUB 8-bit
@@ -368,15 +431,17 @@ void test_alu() {
         passes++;
     } else {
         errors++;
+        expected(0xE269, (uint16_t)((result << 8) | reg.cc));
     }
 
     // Leventhal p.183
     test_setup();
     result = subtract(0xE3, 0xA0);
-    if (result == 0x43 && (reg.cc & 0xF) == 0x00) {
+    if (result == 0x43 && (reg.cc & 0x0F) == 0x00) {
         passes++;
     } else {
         errors++;
+        expected(0x4300, (uint16_t)((result << 8) | (reg.cc & 0x0F)));
     }
 
     /*
@@ -395,11 +460,15 @@ void test_alu() {
         errors++;   // FAILS ON CC (C BIT)
     }
     */
+    
+    test_report(1, errors - current_errors);
 }
 
 
-void test_index() {
+static void test_index(void) {
 
+    uint32_t current_errors = errors;
+    
     // ABX
     // Zaks p.121
     test_setup();
@@ -453,12 +522,16 @@ void test_index() {
     } else {
         errors++;
     }
+    
+    test_report(2, errors - current_errors);
 }
 
 
-void test_logic() {
-    uint8_t result;
+static void test_logic(void) {
 
+    uint8_t result;
+    uint32_t current_errors = errors;
+    
     // AND
     // Zaks p.125
     test_setup();
@@ -468,6 +541,7 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0x0B30, (uint16_t)((result << 8) | reg.cc));
     }
 
     // Leventhal p.22-7
@@ -478,6 +552,7 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0x1001, (uint16_t)((result << 8) | reg.cc));
     }
 
     // ANDCC
@@ -489,6 +564,7 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0x29, (uint16_t)reg.cc);
     }
 
     // Leventhal p.22-8
@@ -510,6 +586,7 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0x4A03, (uint16_t)((result << 8) | reg.cc));
     }
 
     // Zaks p.164
@@ -519,6 +596,7 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0x7003, (uint16_t)((result << 8) | reg.cc));
     }
 
     // Leventhal p.22-9
@@ -528,6 +606,7 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0xF40A, (uint16_t)((result << 8) | reg.cc));
     }
 
     // ASR
@@ -538,6 +617,7 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0xF209, (uint16_t)((result << 8) | reg.cc));
     }
 
     // Leventhal p22-10
@@ -547,6 +627,7 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0xE509, (uint16_t)((result << 8) | reg.cc));
     }
 
     // BIT
@@ -560,6 +641,7 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0xA6F9, (uint16_t)((result << 8) | reg.cc));
     }
 
     // CLR
@@ -571,6 +653,7 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0x0004, (uint16_t)((result << 8) | reg.cc));
     }
 
     // Leventhal p.22-27
@@ -581,6 +664,7 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0x0004, (uint16_t)((result << 8) | reg.cc));
     }
 
     // EOR
@@ -592,6 +676,7 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0x6A01, (uint16_t)((result << 8) | reg.cc));
     }
 
     // Leventhal p.22-35
@@ -602,6 +687,7 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0x43F1, (uint16_t)((result << 8) | reg.cc));
     }
 
     // LSR
@@ -614,6 +700,7 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0x1F02, (uint16_t)((result << 8) | reg.cc));
     }
 
     // OR
@@ -625,6 +712,7 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0xDF49, (uint16_t)((result << 8) | reg.cc));
     }
 
     // Leventhal p.169
@@ -635,6 +723,7 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0xEB09, (uint16_t)((result << 8) | reg.cc));
     }
 
     // ORCC
@@ -646,6 +735,7 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0x53, (uint16_t)reg.cc);
     }
 
     test_setup();
@@ -655,6 +745,7 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0xD3, (uint16_t)reg.cc);
     }
 
     // ROL
@@ -667,6 +758,7 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0x1303, (uint16_t)((result << 8) | reg.cc));
     }
 
     // Leventhal p.22-60
@@ -683,6 +775,7 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0x5C00, (uint16_t)((reg.a << 8) | reg.cc));
     }
 
     // ROR
@@ -695,13 +788,17 @@ void test_logic() {
         passes++;
     } else {
         errors++;
+        expected(0xC409, (uint16_t)((result << 8) | reg.cc));
     }
 
+    test_report(3, errors - current_errors);
 }
 
 
-void test_reg() {
+static void test_reg(void) {
 
+    uint32_t current_errors = errors;
+    
     // CWAI
     // TODO
 
@@ -925,11 +1022,15 @@ void test_reg() {
     } else {
         errors++;
     }
+    
+    test_report(4, errors - current_errors);
 }
 
 
-void test_branch() {
+static void test_branch(void) {
 
+    uint32_t current_errors = errors;
+    
     // JMP
     test_setup();
     reg.pc = 0x00FF;
@@ -942,6 +1043,7 @@ void test_branch() {
         passes++;
     } else {
         errors++;
+        expected(0xFFFF, reg.pc);
     }
 
     // Zaks p.159
@@ -954,6 +1056,7 @@ void test_branch() {
         passes++;
     } else {
         errors++;
+        expected(0xB290, reg.pc);
     }
 
     // Leventhal p.22-40
@@ -968,6 +1071,7 @@ void test_branch() {
         passes++;
     } else {
         errors++;
+        expected(0xD1E5, reg.pc);
     }
 
 
@@ -987,6 +1091,9 @@ void test_branch() {
         passes++;
     } else {
         errors++;
+        expected(0x320D, reg.pc);
+        expected(0x03F0, reg.s);
+        expected(0x10CD, (uint16_t)((reg.a << 8) | reg.b));
     }
 
     // RTS
@@ -998,7 +1105,6 @@ void test_branch() {
     } else {
         errors++;
     }
-
 
     // JSR
     // Leventhal p.22-14
@@ -1016,6 +1122,9 @@ void test_branch() {
         passes++;
     } else {
         errors++;
+        expected(0xE1A3, reg.pc);
+        expected(0x089E, reg.s);
+        expected(0xE56E, (uint16_t)((reg.a << 8) | reg.b));
     }
 
     // RTS
@@ -1026,6 +1135,8 @@ void test_branch() {
         passes++;
     } else {
         errors++;
+        expected(0xE56E, reg.pc);
+        expected(0x08A0, reg.s);
     }
 
 
@@ -1047,6 +1158,8 @@ void test_branch() {
         passes++;
     } else {
         errors++;
+        expected(reg.x, reg.pc);
+        expected(0xD0, (uint16_t)reg.cc);
     }
 
     test_setup();
@@ -1059,6 +1172,8 @@ void test_branch() {
         passes++;
     } else {
         errors++;
+        expected(reg.x, reg.pc);
+        expected(0x80, (uint16_t)reg.cc);
     }
 
     test_setup();
@@ -1071,8 +1186,9 @@ void test_branch() {
         passes++;
     } else {
         errors++;
+        expected(reg.x, reg.pc);
+        expected(0x80, (uint16_t)reg.cc);
     }
-
 
     // TFR
     test_setup();
@@ -1082,11 +1198,37 @@ void test_branch() {
         passes++;
     } else {
         errors++;
+        expected(reg.a, (uint16_t)reg.cc);
+    }
+    
+    test_report(5, errors - current_errors);
+}
+
+
+static void test_setup(void) {
+
+    tests++;
+    reset_registers();
+}
+
+
+static void test_report(uint16_t code, uint32_t err_count) {
+    
+    const char *names[6];
+    names[0] = "Addressing";
+    names[1] = "ALU";
+    names[2] = "Index";
+    names[3] = "Logic";
+    names[4] = "Registers";
+    names[5] = "Branch Ops";
+    
+    if (code < 6) {
+        printf("%02d errors in %s (see above)\n", err_count, names[code]);
     }
 }
 
 
-void test_setup() {
-    tests++;
-    reset_registers();
+static void expected(uint16_t wanted, uint16_t got) {
+    
+    printf("  %02d. Expected %04X got %04X\n", tests, wanted, got);
 }
