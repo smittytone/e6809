@@ -11,7 +11,7 @@ There are two versions:
 
 Current development activity is centred on the `pico` branch. The `main` branch will probably not be updated and may even be removed.
 
-**This is a work in progress. Expect errors and breakage**.
+**This is a work in progress which I tackle occasionally. Expect errors, breakage and a slow response to bug reports!**
 
 ## The CPU
 
