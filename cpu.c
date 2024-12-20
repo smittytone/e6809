@@ -7,8 +7,59 @@
  * @licence     MIT
  *
  */
+// C
+#include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+// Pico
+#include "pico/stdlib.h"
+#include "pico/binary_info.h"
+#include "hardware/gpio.h"
+#include "hardware/i2c.h"
+#include "hardware/spi.h"
+#include "hardware/adc.h"
+#include "hardware/flash.h"
+#include "hardware/sync.h"
+// App
+#include "ops.h"
+#include "cpu.h"
+#include "cpu_tests.h"
+#include "keypad.h"
+#include "ht16k33.h"
+#include "monitor.h"
+#include "pia.h"
 #include "main.h"
 
+
+/*
+ * STATICS
+ */
+static void     do_branch(uint8_t bop, bool is_long);
+// Memory access
+static uint8_t  get_next_byte(void);
+static uint8_t  get_byte(uint16_t address);
+static void     set_byte(uint16_t address, uint8_t value);
+static void     move_pc(int16_t amount);
+static bool     is_bit_set(uint16_t value, uint8_t bit);
+// Condition code register bit-level getters and setters
+static bool     is_cc_bit_set(uint8_t bit);
+static void     set_cc_bit(uint8_t bit);
+static void     clr_cc_bit(uint8_t bit);
+static void     flp_cc_bit(uint8_t bit);
+static void     clr_cc_nzv(void);
+static void     set_cc_nz(uint16_t value, bool is_16_bit);
+static void     set_cc_after_clr(void);
+static void     set_cc_after_load(uint16_t value, bool is_16_bit);
+static void     set_cc_after_store(uint16_t value, bool is_16_bit);
+// Addressing Functions
+static uint16_t address_from_next_two_bytes(void);
+static uint16_t address_from_dpr(int16_t offset);
+static uint16_t indexed_address(uint8_t post_byte);
+static uint16_t register_value(uint8_t source_reg);
+static void     increment_register(uint8_t source_reg, int16_t amount);
+// IO
+static void     process_interrupt(uint8_t irq);
 
 /*
  * GLOBALS
@@ -25,7 +76,8 @@ STATE_6809  state;
 /**
  * @brief Initalise the virtual 6809.
  */
-void init_cpu() {
+void init_cpu(void) {
+
     // Set simulator state
     state.bus_state_pins = 0;
     state.interrupt_state = 0;
@@ -44,6 +96,7 @@ void init_cpu() {
  * @param vectors: Pointer to the vector address table.
  */
 void init_vectors(uint16_t* vectors) {
+
     uint16_t start = 0xFFFD;
 
     for (uint8_t i = 0 ; i < 8 ; ++i) {
@@ -60,7 +113,8 @@ void init_vectors(uint16_t* vectors) {
  *
  * @retval The number of CPU cycles consumed, or a break signal on RTI/RTS.
  */
-uint32_t process_next_instruction() {
+uint32_t process_next_instruction(void) {
+
     // See Zaks p.250
 
     uint32_t cycles_used = 0;
@@ -298,7 +352,7 @@ uint32_t process_next_instruction() {
         if (lsn == 0x0C) {
             if (msn < 0x08) {
                 inc(opcode, address_mode);
-            } else if (msn > 0x0C) {
+            } else if (msn > 0x0B) {
                 // LDD
                 ld_16(opcode, address_mode, extended_opcode);
             } else {
@@ -311,7 +365,7 @@ uint32_t process_next_instruction() {
         if (lsn == 0x0D) {
             if (msn < 0x08) {
                 tst(opcode, address_mode);
-            } else if (msn > 0x0C) {
+            } else if (msn > 0x0B) {
                 // STD
                 st_16(opcode, address_mode, extended_opcode);
             } else {
@@ -347,7 +401,7 @@ uint32_t process_next_instruction() {
  * @param bop:     The branch opcode.
  * @param is_long: `true` if its a long branch op, otherwise `false`.
  */
-void do_branch(uint8_t bop, bool is_long) {
+static void do_branch(uint8_t bop, bool is_long) {
 
     int16_t offset = 0;
 
@@ -405,7 +459,8 @@ void do_branch(uint8_t bop, bool is_long) {
  *
  * @retval The byte value.
  */
-uint8_t get_next_byte() {
+uint8_t get_next_byte(void) {
+
     return mem[reg.pc++];
 }
 
@@ -418,6 +473,7 @@ uint8_t get_next_byte() {
  * @retval The byte value.
  */
 uint8_t get_byte(uint16_t address) {
+
     return mem[address];
 }
 
@@ -429,6 +485,7 @@ uint8_t get_byte(uint16_t address) {
  * @param value:   The byte value.
  */
 void set_byte(uint16_t address, uint8_t value) {
+
     mem[address] = value;
 }
 
@@ -439,6 +496,7 @@ void set_byte(uint16_t address, uint8_t value) {
  * @param amount: The increment or decrement.
  */
 void move_pc(int16_t amount) {
+
     reg.pc += amount;
 }
 
@@ -452,6 +510,7 @@ void move_pc(int16_t amount) {
  * @retval `true` if the bit is 1, otherwise `false`.
  */
 bool is_bit_set(uint16_t value, uint8_t bit) {
+
     return ((value & (1 << bit)) != 0);
 }
 
@@ -461,25 +520,29 @@ bool is_bit_set(uint16_t value, uint8_t bit) {
  */
 
 bool is_cc_bit_set(uint8_t bit) {
+
     return (((reg.cc >> bit) & 1) == 1);
 }
 
 void set_cc_bit(uint8_t bit) {
+
     reg.cc |= (1 << bit);
 }
 
 void clr_cc_bit(uint8_t bit) {
+
     reg.cc &= ~(1 << bit);
 }
 
 void flp_cc_bit(uint8_t bit) {
+
     reg.cc ^= (1 << bit);
 }
 
 /**
  * @brief The N, V and Z bits are frequently cleared, so clear bits 1-3.
  */
-void clr_cc_nzv() {
+void clr_cc_nzv(void) {
     reg.cc &= MASK_NZV;
 }
 
@@ -491,6 +554,7 @@ void clr_cc_nzv() {
  * @param is_16_bit: `true` if the value is 16 bits long.
  */
 void set_cc_nz(uint16_t value, bool is_16_bit) {
+
     reg.cc &= MASK_NZ;
     if (value == 0) set_cc_bit(Z_BIT);
     if (is_bit_set(value, (is_16_bit ? SIGN_BIT_16 : SIGN_BIT_8))) set_cc_bit(N_BIT);
@@ -501,7 +565,8 @@ void set_cc_nz(uint16_t value, bool is_16_bit) {
  * @brief Clear N, V, C. Set Z.
  *        Affects N, Z, V, C
  */
-void set_cc_after_clr() {
+void set_cc_after_clr(void) {
+
     reg.cc &= MASK_NZVC;
     set_cc_bit(Z_BIT);
 }
@@ -515,6 +580,7 @@ void set_cc_after_clr() {
  * @param is_16_bit: `true` if the value is 16 bits long.
  */
 void set_cc_after_load(uint16_t value, bool is_16_bit) {
+
     clr_cc_nzv();
     set_cc_nz(value, is_16_bit);
 }
@@ -528,7 +594,7 @@ void set_cc_after_load(uint16_t value, bool is_16_bit) {
  * @param is_16_bit: `true` if the value is 16 bits long.
  */
 void set_cc_after_store(uint16_t value, bool is_16_bit) {
-    //
+    
     set_cc_after_load(value, is_16_bit);
 }
 
@@ -541,7 +607,8 @@ void set_cc_after_store(uint16_t value, bool is_16_bit) {
  * @brief ABX: B + X -> X (unsigned)
  *        Affects NONE
  */
-void abx() {
+void abx(void) {
+
     reg.x += (uint16_t)reg.b;
 }
 
@@ -554,6 +621,7 @@ void abx() {
  * @param mode: The addressing mode.
  */
 void adc(uint8_t op, uint8_t mode) {
+
     uint16_t address = address_from_mode(mode);
     if (op < ADCB_immed) {
         reg.a = add_with_carry(reg.a, get_byte(address));
@@ -571,6 +639,7 @@ void adc(uint8_t op, uint8_t mode) {
  * @param mode: The addressing mode.
  */
 void add(uint8_t op, uint8_t mode) {
+
     uint16_t address = address_from_mode(mode);
     if (op < ADDB_immed) {
         reg.a = add_no_carry(reg.a, get_byte(address));
@@ -589,6 +658,7 @@ void add(uint8_t op, uint8_t mode) {
  * @param mode: The addressing mode.
  */
 void add_16(uint8_t op, uint8_t mode) {
+
     // Should not affect H, so preserve it
     bool h_is_set = is_bit_set(reg.cc, H_BIT);
 
@@ -631,6 +701,7 @@ void add_16(uint8_t op, uint8_t mode) {
  * @param mode: The addressing mode.
  */
 void and(uint8_t op, uint8_t mode) {
+
     uint16_t address = address_from_mode(mode);
     if (op < ANDB_immed) {
         reg.a = do_and(reg.a, get_byte(address));
@@ -646,6 +717,7 @@ void and(uint8_t op, uint8_t mode) {
  * @param value: The value to AND CC with.
  */
 void andcc(uint8_t value) {
+
     reg.cc &= value;
 }
 
@@ -661,6 +733,7 @@ void andcc(uint8_t value) {
  * @param mode: The addressing mode.
  */
 void asl(uint8_t op, uint8_t mode) {
+
     if (mode == MODE_INHERENT) {
         if (op == ASLA) {
             reg.a = logic_shift_left(reg.a);
@@ -683,6 +756,7 @@ void asl(uint8_t op, uint8_t mode) {
  * @param mode: The addressing mode.
  */
 void asr(uint8_t op, uint8_t mode) {
+
     if (mode == MODE_INHERENT) {
         if (op == ASRA) {
             reg.a = arith_shift_right(reg.a);
@@ -706,6 +780,7 @@ void asr(uint8_t op, uint8_t mode) {
  * @param mode: The addressing mode.
  */
 void bit(uint8_t op, uint8_t mode) {
+
     uint16_t address = address_from_mode(mode);
     uint8_t ignored = do_and((op < BITB_immed ? reg.a : reg.b), get_byte(address));
 }
@@ -720,6 +795,7 @@ void bit(uint8_t op, uint8_t mode) {
  * @param mode: The addressing mode.
  */
 void clr(uint8_t op, uint8_t mode) {
+
     if (mode == MODE_INHERENT) {
         if (op == CLRA) {
             reg.a = 0;
@@ -743,6 +819,7 @@ void clr(uint8_t op, uint8_t mode) {
  * @param mode: The addressing mode.
  */
 void cmp(uint8_t op, uint8_t mode) {
+
     uint16_t address = address_from_mode(mode);
     compare((op < CMPB_immed ? reg.a : reg.b), get_byte(address));
 }
@@ -759,11 +836,12 @@ void cmp(uint8_t op, uint8_t mode) {
  * @param mode: The addressing mode.
  */
 void cmp_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
+
     // Get the effective address of the data
-    uint16_t address = (uint16_t)address_from_mode(mode);
+    uint16_t address = address_from_mode(mode);
 
     // 'addressFromMode:' assumes an 8-bit read, so we need to increase PC by 1
-    reg.pc++;
+    if (mode == MODE_IMMEDIATE) reg.pc++;
 
     // Set a pointer to the target register, D by default
     uint16_t d = (reg.a << 8) + reg.b;
@@ -789,6 +867,7 @@ void cmp_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
  * @param mode: The addressing mode.
  */
 void com(uint8_t op, uint8_t mode) {
+
     if (mode == MODE_INHERENT) {
         if (op == 0x43) {
             reg.a = complement(reg.a);
@@ -807,7 +886,8 @@ void com(uint8_t op, uint8_t mode) {
  *        AND CC with the operand, set e, then push every register,
  *        including CC to the hardware stack.
  */
-void cwai() {
+void cwai(void) {
+
     reg.cc &= get_next_byte();
     set_cc_bit(E_BIT);
     push(PUSH_TO_HARD_STACK, PUSH_PULL_EVERY_REG);
@@ -818,7 +898,8 @@ void cwai() {
 /**
  * @brief DAA: Decimal Adjust after Addition.
  */
-void daa() {
+void daa(void) {
+
     bool carry = is_bit_set(reg.cc, C_BIT);
     clr_cc_bit(C_BIT);
 
@@ -849,6 +930,7 @@ void daa() {
  * @param mode: The addressing mode.
  */
 void dec(uint8_t op, uint8_t mode) {
+
     if (mode == MODE_INHERENT) {
         if (op == DECA) {
             reg.a = decrement(reg.a);
@@ -870,6 +952,7 @@ void dec(uint8_t op, uint8_t mode) {
  * @param mode: The addressing mode.
  */
 void eor(uint8_t op, uint8_t mode) {
+
     uint16_t address = address_from_mode(mode);
     if (op < EORB_immed) {
         reg.a = do_xor(reg.a, get_byte(address));
@@ -888,6 +971,7 @@ void eor(uint8_t op, uint8_t mode) {
  * @param mode: The addressing mode.
  */
 void inc(uint8_t op, uint8_t mode) {
+
     if (mode == MODE_INHERENT) {
         if (op == INCA) {
             reg.a = increment(reg.a);
@@ -907,8 +991,8 @@ void inc(uint8_t op, uint8_t mode) {
  * @param mode: The addressing mode.
  */
 void jmp(uint8_t mode) {
-    uint16_t address = address_from_mode(mode);
-    reg.pc = mode == MODE_INDEXED ? address : ((get_byte(address) << 8) | get_byte(address + 1));
+
+    reg.pc = address_from_mode(mode);
 }
 
 
@@ -922,6 +1006,7 @@ void jmp(uint8_t mode) {
  * @param mode: The addressing mode.
  */
 void jsr(uint8_t mode) {
+
     uint16_t address = address_from_mode(mode);
     reg.s--;
     set_byte(reg.s, (reg.pc & 0xFF));
@@ -939,6 +1024,7 @@ void jsr(uint8_t mode) {
  * @param mode: The addressing mode.
  */
 void ld(uint8_t op, uint8_t mode) {
+
     uint16_t address = address_from_mode(mode);
     if (op < LDB_immed) {
         reg.a = get_byte(address);
@@ -962,6 +1048,7 @@ void ld(uint8_t op, uint8_t mode) {
  * @param ex_op: `true` if the opcode is two bytes long.
  */
 void ld_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
+
     uint16_t address = address_from_mode(mode);
 
     // 'address_from_mode()' assumes an 8-bit read, so we need to increase PC by 1
@@ -1001,6 +1088,7 @@ void ld_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
  * @param op:    The opcode.
  */
 void lea(uint8_t op) {
+
     load_effective(indexed_address(get_next_byte()), (op & 0x03));
 }
 
@@ -1014,6 +1102,7 @@ void lea(uint8_t op) {
  * @param mode: The addressing mode.
  */
 void lsr(uint8_t op, uint8_t mode) {
+
     if (mode == MODE_INHERENT) {
         if (op == LSRA) {
             reg.a = logic_shift_right(reg.a);
@@ -1031,7 +1120,8 @@ void lsr(uint8_t op, uint8_t mode) {
  * @brief MUL: A x B -> D (unsigned)
  *        Affects Z, C.
  */
-void mul() {
+void mul(void) {
+
     reg.cc &= MASK_ZC;
     uint16_t d = reg.a * reg.b;
     if (is_bit_set(d, 7)) set_cc_bit(C_BIT);
@@ -1051,6 +1141,7 @@ void mul() {
  * @param mode: The addressing mode.
  */
 void neg(uint8_t op, uint8_t mode) {
+
     if (mode == MODE_INHERENT) {
         if (op == NEGA) {
             reg.a = negate(reg.a, false);
@@ -1072,6 +1163,7 @@ void neg(uint8_t op, uint8_t mode) {
  * @param mode: The addressing mode.
  */
 void orr(uint8_t op, uint8_t mode) {
+
     uint16_t address = address_from_mode(mode);
     if (op < ORB_immed) {
         reg.a = do_or(reg.a, get_byte(address));
@@ -1087,6 +1179,7 @@ void orr(uint8_t op, uint8_t mode) {
  * @param value: The value to OR CC with.
  */
 void orcc(uint8_t value) {
+
     reg.cc |= value;
 }
 
@@ -1100,6 +1193,7 @@ void orcc(uint8_t value) {
  * @param mode: The addressing mode.
  */
 void rol(uint8_t op, uint8_t mode) {
+
     if (mode == MODE_INHERENT) {
         if (op == ROLA) {
             reg.a = rotate_left(reg.a);
@@ -1122,6 +1216,7 @@ void rol(uint8_t op, uint8_t mode) {
  * @param mode: The addressing mode.
  */
 void ror(uint8_t op, uint8_t mode) {
+
     if (mode == MODE_INHERENT) {
         if (op == RORA) {
             reg.a = rotate_right(reg.a);
@@ -1139,7 +1234,8 @@ void ror(uint8_t op, uint8_t mode) {
  * @brief RTI: Pull CC from the hardware stack; if E is set, pull all the registers
  *             from the hardware stack, otherwise pull the PC register only.
  */
-void rti() {
+void rti(void) {
+
     pull(true, PUSH_PULL_CC_REG);
     if (is_cc_bit_set(E_BIT)) {
         pull(true, PUSH_PULL_ALL_REGS);
@@ -1152,7 +1248,8 @@ void rti() {
 /**
  * @brief RTS: Pull the PC from the hardware stack.
  */
-void rts() {
+void rts(void) {
+
     pull(true, PUSH_PULL_PC_REG);
 }
 
@@ -1165,6 +1262,7 @@ void rts() {
  * @param mode: The addressing mode.
  */
 void sbc(uint8_t op, uint8_t mode) {
+
     uint16_t address = address_from_mode(mode);
     if (op < SBCB_immed) {
         reg.a = sub_with_carry(reg.a, get_byte(address));
@@ -1178,7 +1276,8 @@ void sbc(uint8_t op, uint8_t mode) {
  * @brief SEX: sign-extend B into A,
  *             Affects N, Z.
  */
-void sex() {
+void sex(void) {
+
     reg.cc &= MASK_NZ;
     reg.a = 0;
     if (is_bit_set(reg.b, SIGN_BIT_8)) {
@@ -1199,6 +1298,7 @@ void sex() {
  * @param mode: The addressing mode.
  */
 void st(uint8_t op, uint8_t mode) {
+
     uint16_t address = address_from_mode(mode);
     if (op < STB_direct) {
         set_byte(address, reg.a);
@@ -1222,20 +1322,21 @@ void st(uint8_t op, uint8_t mode) {
  * @param ex_op: `true` if the opcode is two bytes long.
  */
 void st_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
+
     // Get the effective address of the data
     uint16_t address = address_from_mode(mode);
 
     // Set a pointer to the target register
-    bool touched_d = false;
+    //bool touched_d = false;
     uint16_t *reg_ptr;
     if (op < STD_direct) {
         reg_ptr = ex_op == OPCODE_EXTENDED_1 ? &reg.y : &reg.x;
     } else if ((op & 0x0F) == 0x0F) {
         reg_ptr = ex_op == OPCODE_EXTENDED_1 ? &reg.s : &reg.u;
     } else {
-        reg.d = (reg.a << 8) | reg.d;
+        reg.d = (reg.a << 8) | reg.b;
         reg_ptr = &reg.d;
-        touched_d = true;
+        //touched_d = true;
     }
 
     // Write the target register out
@@ -1245,11 +1346,12 @@ void st_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
     // Update the CC register
     set_cc_after_store(*reg_ptr, true);
 
-    // If the op touched D re-set the components
+    /* If the op touched D re-set the components
     if (touched_d) {
         reg.b = reg.d & 0xFF;
         reg.a = (reg.d >> 8) & 0xFF;
     }
+    */
 }
 
 
@@ -1261,6 +1363,7 @@ void st_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
  * @param mode: The addressing mode.
  */
 void sub(uint8_t op, uint8_t mode) {
+
     uint16_t address = address_from_mode(mode);
     if (op < SUBB_immed) {
         reg.a = subtract(reg.a, get_byte(address));
@@ -1279,6 +1382,7 @@ void sub(uint8_t op, uint8_t mode) {
  * @param ex_op: `true` if the opcode is two bytes long.
  */
 void sub_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
+
     reg.cc &= MASK_NZV;
     uint8_t cc = reg.cc;
 
@@ -1316,6 +1420,7 @@ void sub_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
  * @param number: The SWI number (1-3).
  */
 void swi(uint8_t number) {
+
     // Set e to 1 then push every register to the hardware stac
     set_cc_bit(E_BIT);
     push(true, PUSH_PULL_EVERY_REG);
@@ -1345,7 +1450,8 @@ void swi(uint8_t number) {
  * If interrupt is masked, or is < 3 cycles - continue.
  * If interrupt > 2 cycle, wait.
  */
-void sync() {
+void sync(void) {
+
     state.wait_for_interrupt = true;
     state.is_sync = true;
 }
@@ -1360,6 +1466,7 @@ void sync() {
  * @param mode: The addressing mode.
  */
 void tst(uint8_t op, uint8_t mode) {
+
     if (mode == MODE_INHERENT) {
         test(op == TSTA ? reg.a : reg.b);
     } else {
@@ -1386,6 +1493,7 @@ void tst(uint8_t op, uint8_t mode) {
  * @retval The addition.
  */
 uint8_t alu(uint8_t value_1, uint8_t value_2, bool use_carry) {
+
     uint8_t binary_1[8], binary_2[8], answer[8];
     bool bit_carry = false;
     bool bit_6_carry = false;
@@ -1453,6 +1561,7 @@ uint8_t alu(uint8_t value_1, uint8_t value_2, bool use_carry) {
  * @retval The addition.
  */
 uint16_t alu_16(uint16_t value_1, uint16_t value_2, bool use_carry) {
+
     // Add the LSBs
     uint8_t v_1 = value_1 & 0xFF;
     uint8_t v_2 = value_2 & 0xFF;
@@ -1476,6 +1585,7 @@ uint16_t alu_16(uint16_t value_1, uint16_t value_2, bool use_carry) {
  * @retval The addition.
  */
 uint8_t add_no_carry(uint8_t value, uint8_t amount) {
+
     uint8_t answer = alu(value, amount, false);
     set_cc_nz(answer, false);
     return answer;
@@ -1492,6 +1602,7 @@ uint8_t add_no_carry(uint8_t value, uint8_t amount) {
  * @retval The addition.
  */
 uint8_t add_with_carry(uint8_t value, uint8_t amount) {
+
     uint8_t answer = alu(value, amount, true);
     set_cc_nz(answer, false);
     return answer;
@@ -1507,6 +1618,7 @@ uint8_t add_with_carry(uint8_t value, uint8_t amount) {
  * @retval The subtraction.
  */
 uint8_t subtract(uint8_t value, uint8_t amount) {
+
     return base_sub(value, amount, false);
 }
 
@@ -1520,6 +1632,7 @@ uint8_t subtract(uint8_t value, uint8_t amount) {
  * @retval The subtraction.
  */
 uint8_t sub_with_carry(uint8_t value, uint8_t amount) {
+
     return base_sub(value, amount, true);
 }
 
@@ -1536,6 +1649,7 @@ uint8_t sub_with_carry(uint8_t value, uint8_t amount) {
  * @retval The subtraction.
  */
 uint8_t base_sub(uint8_t value, uint8_t amount, bool use_carry) {
+
     bool carry_set = is_bit_set(reg.cc, C_BIT);
     uint8_t comp = twos_complement(amount);
     uint8_t answer = alu(value, comp, false);
@@ -1566,6 +1680,7 @@ uint8_t base_sub(uint8_t value, uint8_t amount, bool use_carry) {
  * @retval The subtraction.
  */
 uint16_t subtract_16(uint16_t value, uint16_t amount) {
+
     // Complement the value at M:M + 1
     uint8_t msb = ones_complement((amount >> 8) & 0xFF);
     uint8_t lsb = ones_complement(amount & 0xFF);
@@ -1606,6 +1721,7 @@ uint16_t subtract_16(uint16_t value, uint16_t amount) {
  * @retval The 2's complement.
  */
 uint8_t negate(uint8_t value, bool ignore) {
+
     // Preserve `value` to set V bit
     uint8_t cc = reg.cc;
 
@@ -1634,6 +1750,7 @@ uint8_t negate(uint8_t value, bool ignore) {
  * @retval The 1's complement.
  */
 uint8_t ones_complement(uint8_t value) {
+
     // Flip value's bits to make the 1s complenent
     for (uint32_t i = 0 ; i < 8 ; i++) {
         value ^= (1 << i);
@@ -1646,6 +1763,7 @@ uint8_t ones_complement(uint8_t value) {
  * @brief Is this necessary?
  */
 uint8_t twos_complement(uint8_t value) {
+
     // Flip value's bits to make the 1s complenent
     // NOTE This call does not affect CC
     for (uint32_t i = 0 ; i < 8 ; i++) {
@@ -1666,6 +1784,7 @@ uint8_t twos_complement(uint8_t value) {
  * @retval The 1's complement.
  */
 uint8_t complement(uint8_t value) {
+
     value = ones_complement(value);
     set_cc_nz(value, false);
     clr_cc_bit(V_BIT);
@@ -1684,6 +1803,7 @@ uint8_t complement(uint8_t value) {
  * @param amount: The second value.
  */
 void compare(uint8_t value, uint8_t amount) {
+
     uint8_t answer = base_sub(value, amount, false);
 }
 
@@ -1698,6 +1818,7 @@ void compare(uint8_t value, uint8_t amount) {
  * @retval The result.
  */
 uint8_t do_and(uint8_t value, uint8_t amount) {
+
     clr_cc_bit(V_BIT);
     uint8_t answer = value & amount;
     set_cc_nz(answer, false);
@@ -1715,6 +1836,7 @@ uint8_t do_and(uint8_t value, uint8_t amount) {
  * @retval The result.
  */
 uint8_t do_or(uint8_t value, uint8_t amount) {
+
     clr_cc_bit(V_BIT);
     uint8_t answer = value | amount;
     set_cc_nz(answer, false);
@@ -1732,6 +1854,7 @@ uint8_t do_or(uint8_t value, uint8_t amount) {
  * @retval The result.
  */
 uint8_t do_xor(uint8_t value, uint8_t amount) {
+
     clr_cc_bit(V_BIT);
     uint8_t answer = value ^ amount;
     set_cc_nz(answer, false);
@@ -1748,6 +1871,7 @@ uint8_t do_xor(uint8_t value, uint8_t amount) {
  * @retval The result.
  */
 uint8_t arith_shift_right(uint8_t value) {
+
     uint8_t answer = partial_shift_right(value);
     set_cc_nz(answer, false);
     return answer;
@@ -1763,6 +1887,7 @@ uint8_t arith_shift_right(uint8_t value) {
  * @retval The result.
  */
 uint8_t logic_shift_left(uint8_t value) {
+
     reg.cc &= MASK_NZVC;
     if (is_bit_set(value, 7)) set_cc_bit(C_BIT);
     if (is_bit_set(value, 7) != is_bit_set(value, 6)) set_cc_bit(V_BIT);
@@ -1791,6 +1916,7 @@ uint8_t logic_shift_left(uint8_t value) {
  * @retval The result.
  */
 uint8_t logic_shift_right(uint8_t value) {
+
     uint8_t answer = partial_shift_right(value);
 
     // Clear bit 7
@@ -1808,6 +1934,7 @@ uint8_t logic_shift_right(uint8_t value) {
  * @retval The result.
  */
 uint8_t partial_shift_right(uint8_t value) {
+
     reg.cc &= MASK_NZC;
     if (is_bit_set(value, 0)) set_cc_bit(C_BIT);
 
@@ -1832,6 +1959,7 @@ uint8_t partial_shift_right(uint8_t value) {
  * @retval The result.
  */
 uint8_t rotate_left(uint8_t value) {
+
     // C becomes bit 7 of original operand
     bool carry = is_cc_bit_set(C_BIT);
     reg.cc &= MASK_NZVC;
@@ -1869,6 +1997,7 @@ uint8_t rotate_left(uint8_t value) {
  * @retval The result.
  */
 uint8_t rotate_right(uint8_t value) {
+
     // C becomes bit 0 of original operand
     bool carry = is_cc_bit_set(C_BIT);
     reg.cc &= MASK_NZC;
@@ -1895,6 +2024,7 @@ uint8_t rotate_right(uint8_t value) {
 
 
 uint8_t decrement(uint8_t value) {
+
     // Subtract 1 from the operand
     // Affects: N, Z, V
     //          V set only if value is $80
@@ -1909,6 +2039,7 @@ uint8_t decrement(uint8_t value) {
 }
 
 uint8_t increment(uint8_t value) {
+
     // Add 1 to the operand
     // Affects N, Z, V
 
@@ -1923,6 +2054,7 @@ uint8_t increment(uint8_t value) {
 
 
 uint8_t *set_reg_ptr(uint8_t reg_code) {
+
     switch(reg_code) {
         case 0x09:
             return &reg.b;
@@ -1991,6 +2123,7 @@ void transfer_decode2(uint8_t reg_code, bool is_swap) {
 
 
 void transfer_decode(uint8_t reg_code, bool is_swap) {
+
     // 'reg_code' contains an 8-bit number that identifies the two registers
     // to be swapped. Top four bits give source, bottom four bits give
     // the destination.
@@ -2095,6 +2228,7 @@ void transfer_decode(uint8_t reg_code, bool is_swap) {
 
 
 uint8_t exchange(uint8_t value, uint8_t reg_code) {
+
     // Returns the value *from* the register identified by 'reg_code'
     // after placing the passed value into that register
     uint8_t return_value = 0x00;
@@ -2126,6 +2260,7 @@ uint8_t exchange(uint8_t value, uint8_t reg_code) {
 
 
 uint16_t exchange_16(uint16_t value, uint8_t reg_code) {
+
     // Returns the value *from* the register identified by 'reg_code'
     // after placing the passed value into that register
     uint16_t return_value = 0x0000;
@@ -2166,6 +2301,7 @@ uint16_t exchange_16(uint16_t value, uint8_t reg_code) {
 
 
 void load_effective(uint16_t amount, uint8_t reg_code) {
+
     // Put passed value into an 8-bit register
     // Affects Z -- but only for X and Y registers
     uint16_t* reg_ptr = &reg.x;
@@ -2191,6 +2327,7 @@ void load_effective(uint16_t amount, uint8_t reg_code) {
 
 
 void push(bool to_hardware, uint8_t post_byte) {
+
     // Push the specified registers (in 'post_byte') to the hardware or user stack
     // ('to_hardware' should be true for S, false for U)
     // See 'Programming the 6809' p.171-2
@@ -2262,6 +2399,7 @@ void push(bool to_hardware, uint8_t post_byte) {
 
 
 void pull(bool from_hardware, uint8_t post_byte) {
+
     // Pull the specified registers (in 'post_byte') from the hardware or user stack
     // ('from_hardware' should be true for S, false for U)
     // See 'Programming the 6809' p.173-4
@@ -2334,6 +2472,7 @@ void pull(bool from_hardware, uint8_t post_byte) {
 }
 
 void test(uint8_t value) {
+
     // Tests value for zero or negative
 	// Affects N, Z, V
     //         V is always cleared
@@ -2358,6 +2497,7 @@ void test(uint8_t value) {
  * @retval The calculated address.
  */
 uint16_t address_from_mode(uint8_t mode) {
+
     uint16_t address = 0;
     if (mode == MODE_IMMEDIATE) {
         // The effective address is the next byte,
@@ -2373,6 +2513,7 @@ uint16_t address_from_mode(uint8_t mode) {
         reg.pc++;
     } else if (mode == MODE_INDEXED) {
         // Indexed addressing, inc. extended indirect
+        // NOTE Moves PC on as required: see `indexed_address()`
         uint8_t post_byte = get_next_byte();
         address = indexed_address(post_byte);
     } else {
@@ -2392,7 +2533,8 @@ uint16_t address_from_mode(uint8_t mode) {
  *
  * @retval The calculated address.
  */
-uint16_t address_from_next_two_bytes() {
+uint16_t address_from_next_two_bytes(void) {
+
     uint8_t msb = get_next_byte();
     uint8_t lsb = get_next_byte();
     return (msb << 8) | lsb;
@@ -2410,6 +2552,7 @@ uint16_t address_from_next_two_bytes() {
  * @retval The calculated address.
  */
 uint16_t address_from_dpr(int16_t offset) {
+
     uint16_t address = reg.pc;
     address += offset;
     return (reg.dp << 8) | get_byte(address);
@@ -2425,6 +2568,7 @@ uint16_t address_from_dpr(int16_t offset) {
  * @retval The calculated address.
  */
 uint16_t indexed_address(uint8_t post_byte) {
+
     // Determine the source register
     uint8_t source_reg = ((post_byte & 0x60) >> 5);
 
@@ -2597,6 +2741,7 @@ uint16_t indexed_address(uint8_t post_byte) {
  * @retval The register's stored value.
  */
 uint16_t register_value(uint8_t source_reg) {
+
     if (source_reg == REG_X) return reg.x;
     if (source_reg == REG_Y) return reg.y;
     if (source_reg == REG_U) return reg.u;
@@ -2613,6 +2758,7 @@ uint16_t register_value(uint8_t source_reg) {
  * @param amount:     The increment/decrement value.
  */
 void increment_register(uint8_t source_reg, int16_t amount) {
+
     uint16_t *reg_ptr = &reg.x;
     if (source_reg == REG_Y) reg_ptr = &reg.y;
     if (source_reg == REG_U) reg_ptr = &reg.u;
@@ -2629,7 +2775,8 @@ void increment_register(uint8_t source_reg, int16_t amount) {
  *
  * See Zaks p.250
  */
-void reset_registers() {
+void reset_registers(void) {
+
     // Zero DP
     reg.dp = 0;
 
@@ -2644,7 +2791,8 @@ void reset_registers() {
 /**
  * @brief Zero all registers.
  */
-void clear_all_registers() {
+void clear_all_registers(void) {
+
     reg.dp = 0;
     reg.cc = 0;
     reg.a = 0;
@@ -2662,6 +2810,7 @@ void clear_all_registers() {
  * @param irq: Interrupt type code.
  */
 void process_interrupt(uint8_t irq) {
+
     if (irq == FIRQ_BIT) {
         clr_cc_bit(E_BIT);
         push(true, PUSH_PULL_CC_REG | PUSH_PULL_PC_REG);
