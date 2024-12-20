@@ -8,7 +8,17 @@
  * @licence     MIT
  *
  */
-#include "main.h"
+
+// Pico
+#include "hardware/i2c.h"
+// App
+#include "ht16k33.h"
+
+
+/*
+ * STATICS
+ */
+static void ht16k33_power(uint8_t address, uint8_t on);
 
 
 /*
@@ -28,6 +38,7 @@ const uint8_t POS[4] = {0, 2, 6, 8};
  * @brief Convenience function to write a single byte to the matrix.
  */
 void i2c_write_byte(uint8_t address, uint8_t byte) {
+
     i2c_write_blocking(I2C_PORT, address, &byte, 1, false);
 }
 
@@ -35,6 +46,7 @@ void i2c_write_byte(uint8_t address, uint8_t byte) {
  * @brief Convenience function to write a 'count' bytes to the matrix
  */
 void i2c_write_block(uint8_t address, uint8_t *data, uint8_t count) {
+
     i2c_write_blocking(I2C_PORT, address, data, count, false);
 }
 
@@ -50,6 +62,7 @@ void i2c_write_block(uint8_t address, uint8_t *data, uint8_t count) {
  * @param buffer:  Pointer to the display code's data buffer.
  */
 void ht16k33_init(uint8_t address, uint8_t *buffer) {
+
     ht16k33_power(address, 1);
     ht16k33_brightness(address, 6);
     ht16k33_clear(address, buffer);
@@ -62,7 +75,8 @@ void ht16k33_init(uint8_t address, uint8_t *buffer) {
  * @Param address: The display's I2C address.
  * @Param on:      Whether to power up the display (`true`) or turn it off (`false`).
  */
-void ht16k33_power(uint8_t address, uint8_t on) {
+static void ht16k33_power(uint8_t address, uint8_t on) {
+
     i2c_write_byte(address, on == ON ? HT16K33_GENERIC_SYSTEM_ON : HT16K33_GENERIC_DISPLAY_OFF);
     i2c_write_byte(address, on == ON ? HT16K33_GENERIC_DISPLAY_ON : HT16K33_GENERIC_SYSTEM_OFF);
 }
@@ -74,6 +88,7 @@ void ht16k33_power(uint8_t address, uint8_t on) {
  * @param brightness: The brightness value, 1-15.
  */
 void ht16k33_brightness(uint8_t address, uint8_t brightness) {
+
     // Set the LED brightness
     if (brightness < 0 || brightness > 15) brightness = 15;
     i2c_write_byte(address, HT16K33_GENERIC_CMD_BRIGHTNESS | brightness);
@@ -87,6 +102,7 @@ void ht16k33_brightness(uint8_t address, uint8_t brightness) {
  * @param buffer:  Pointer to the display code's data buffer.
  */
 void ht16k33_clear(uint8_t address, uint8_t *buffer) {
+
     // Clear the display buffer and then write it out
     for (uint8_t i = 0 ; i < 16 ; ++i) buffer[i] = 0;
 }
@@ -98,6 +114,7 @@ void ht16k33_clear(uint8_t address, uint8_t *buffer) {
  * @param buffer:  Pointer to the display code's data buffer.
  */
 void ht16k33_draw(uint8_t address, uint8_t *buffer) {
+
     // Set up the buffer holding the data to be
     // transmitted to the LED
     uint8_t tx_buffer[17];
@@ -123,6 +140,7 @@ void ht16k33_draw(uint8_t address, uint8_t *buffer) {
  * @param has_dot: Illuminate the decimal point (`true`) or not (`false`).
  */
 void ht16k33_set_number(uint8_t address, uint8_t *buffer, uint16_t number, uint8_t digit, bool has_dot) {
+
     if (digit > 3) return;
     if (number > 15) return;
     if (number < 10) ht16k33_set_alpha(address, buffer, '0' + number, digit, has_dot);
@@ -140,6 +158,7 @@ void ht16k33_set_number(uint8_t address, uint8_t *buffer, uint16_t number, uint8
  * @param has_dot: Illuminate the decimal point (`true`) or not (`false`).
  */
 void ht16k33_set_alpha(uint8_t address, uint8_t *buffer, char chr, uint8_t digit, bool has_dot) {
+
     if (digit > 3) return;
 
     uint8_t char_val = 0xFF;
@@ -170,6 +189,7 @@ void ht16k33_set_alpha(uint8_t address, uint8_t *buffer, char chr, uint8_t digit
  * @param has_dot: Illuminate the decimal point (`true`) or not (`false`).
  */
 void ht16k33_set_glyph(uint8_t address, uint8_t *buffer, uint8_t glyph, uint8_t digit, bool has_dot) {
+
     if (glyph > 0x7F) return;
     buffer[POS[digit]] = glyph;
     if (has_dot) buffer[POS[digit]] |= 0x80;
@@ -183,5 +203,6 @@ void ht16k33_set_glyph(uint8_t address, uint8_t *buffer, uint8_t glyph, uint8_t 
  * @param how:    Show (`true`) or hide (`false`) the colon.
  */
 void ht16k33_show_colon(uint8_t address, uint8_t *buffer, bool show) {
+
     buffer[HT16K33_SEGMENT_COLON_ROW] = (show ? 0x02 : 0x00);
 }

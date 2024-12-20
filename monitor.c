@@ -8,7 +8,35 @@
  * @licence     MIT
  *
  */
+
+#include <stdbool.h>
+#include <stdio.h>
+// Pico
+#include "pico/stdlib.h"
+#include "hardware/gpio.h"
+// App
 #include "main.h"
+#include "cpu.h"
+#include "cpu_tests.h"
+#include "ht16k33.h"
+#include "keypad.h"
+#include "monitor.h"
+
+
+/*
+ * STATICS
+ */
+static void     process_key(uint16_t);
+static void     set_keys(void);
+static uint8_t  keypress_to_value(uint16_t input);
+static void     update_display(void);
+static void     display_cc(void);
+static void     display_ab_dp(void);
+static void     display_left(uint16_t value);
+static void     display_right(uint16_t value);
+static void     display_value(uint16_t value, uint8_t index, bool is_16_bit, bool show_colon);
+static bool     load_code(void);
+static uint16_t get_block(uint8_t *buff);
 
 
 /*
@@ -31,22 +59,27 @@ uint8_t     buffer[32];
 uint8_t    *display_buffer[2] = {buffer, buffer + 16};
 uint8_t     display_address[2] = {0x71, 0x70};
 
+extern      REG_6809    reg;
+extern      uint8_t     mem[KB64];
+extern      STATE_6809  state;
+
 
 /**
  * @brief Bring up the monitor board if it is present.
  *
  * @retval `true` if the board is present and enabled, otherwise `false`.
  */
-bool init_board() {
-    #ifdef DEBUG
+bool init_board(void) {
+
+#ifdef DEBUG
     printf("Configuring the monitor board\n");
-    #endif
+#endif
 
     // Set up the keypad -- this sets up I2C0 @ 400,000bps
     if (!keypad_init()) {
-        #ifdef DEBUG
+#ifdef DEBUG
         printf("No monitor board found\n");
-        #endif
+#endif
         return false;
     }
 
@@ -67,10 +100,11 @@ bool init_board() {
  * debounces on press and release actions.
  * Buttons are triggered only on release.
  */
-void monitor_event_loop() {
-    #ifdef DEBUG
+void monitor_event_loop(void) {
+
+#ifdef DEBUG
     printf("Entering UI at main menu\n");
-    #endif
+#endif
 
     bool is_key_pressed = false;
     bool can_key_release = false;
@@ -157,6 +191,7 @@ void monitor_event_loop() {
  * @param input: The key press value read from the keypad.
  */
 void process_key(uint16_t input) {
+
     // Make sure the key pressed was a valid one
     input &= input_mask;
     if (input != 0) {
@@ -364,6 +399,11 @@ void process_key(uint16_t input) {
                     display_left(current_address);
                     display_right(mem[current_address]);
                 }
+                
+                if (input == 0x0002) {
+                    printf("****** RUNNING CPU TESTS *****\n");
+                    test_main();
+                }
         }
     }
 
@@ -376,7 +416,8 @@ void process_key(uint16_t input) {
  *        masking the keys that can be pressed, and, for data-entry screens,
  *        the number of digits that can be entered.
  */
-void set_keys() {
+void set_keys(void) {
+
     // Clear the keyboard
     keypad_clear();
     keypad_update_leds();
@@ -448,7 +489,7 @@ void set_keys() {
             keypad_set_led(0,  0x00, 0x00, 0x40);
             keypad_set_led(11, 0x20, 0x00, 0x20);
             input_count = 1;
-            input_mask = INPUT_MAIN_MASK;
+            input_mask = INPUT_MAIN_MASK | 0x02;
             break;
     }
 
@@ -465,6 +506,7 @@ void set_keys() {
  * @retval The actual value represented by the pressed key.
  */
 uint8_t keypress_to_value(uint16_t input) {
+
     // NOTE Assumes one key press and exits at the first
     //      low bit that is set
     for (uint32_t i = 0 ; i < 16 ; ++i) {
@@ -478,7 +520,8 @@ uint8_t keypress_to_value(uint16_t input) {
 /**
  * @brief Update the display by mode.
  */
-void update_display() {
+void update_display(void) {
+
     uint16_t left = 0;
     uint16_t right = 0;
     uint16_t address = 0;
@@ -513,7 +556,8 @@ void update_display() {
 /**
  * @brief Display the CC register as eight binary digits.
  */
-void display_cc() {
+void display_cc(void) {
+
     ht16k33_clear(display_address[DISPLAY_LEFT],  display_buffer[DISPLAY_LEFT]);
     ht16k33_clear(display_address[DISPLAY_RIGHT], display_buffer[DISPLAY_RIGHT]);
 
@@ -532,7 +576,8 @@ void display_cc() {
 /**
  * @brief Display the A, B and DP registers evenly spaced on the display.
  */
-void display_ab_dp() {
+void display_ab_dp(void) {
+
     ht16k33_clear(display_address[DISPLAY_LEFT],  display_buffer[DISPLAY_LEFT]);
     ht16k33_clear(display_address[DISPLAY_RIGHT], display_buffer[DISPLAY_RIGHT]);
 
@@ -559,6 +604,7 @@ void display_ab_dp() {
  * @param value: The 16-bit value to display.
  */
 void display_left(uint16_t value) {
+
     display_value(value, DISPLAY_LEFT, true, false);
 }
 
@@ -569,6 +615,7 @@ void display_left(uint16_t value) {
  * @param value: The 8-bit value to display.
  */
 void display_right(uint16_t value) {
+
     display_value(value, DISPLAY_RIGHT, false, false);
 }
 
@@ -582,6 +629,7 @@ void display_right(uint16_t value) {
  * @param is_16_bit: Whether the value is 16-bit (`true`) or 8-bit (`false`).
  */
 void display_value(uint16_t value, uint8_t index, bool is_16_bit, bool show_colon) {
+
     if (value > 0xFFFF) value = 0x0000;
     if (!is_16_bit) value &= 0xFF;
     ht16k33_clear(display_address[index], display_buffer[index]);
@@ -605,7 +653,8 @@ void display_value(uint16_t value, uint8_t index, bool is_16_bit, bool show_colo
  *
  * @retval `true` on a successful load, otherwise `false`.
  */
-bool load_code() {
+bool load_code(void) {
+
     uint8_t load_buffer[262];
     uint16_t bytes_read = 0;
     uint16_t block_count = 0;
@@ -687,6 +736,7 @@ bool load_code() {
  * @retval The index of the last read byte in the buffer.
  */
 uint16_t get_block(uint8_t *buff) {
+
     uint16_t buff_ptr = 0;
     while (true) {
         int c = getchar_timeout_us(100);

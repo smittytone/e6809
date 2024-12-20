@@ -62,21 +62,8 @@
 /*
  *  PROTOTYPES
  */
-bool        init_board();
+bool init_board(void);
+void monitor_event_loop(void);
 
-void        monitor_event_loop();
-void        process_key(uint16_t);
-void        set_keys();
-uint8_t     keypress_to_value(uint16_t input);
-
-void        update_display();
-void        display_cc();
-void        display_ab_dp();
-void        display_left(uint16_t value);
-void        display_right(uint16_t value);
-void        display_value(uint16_t value, uint8_t index, bool is_16_bit, bool show_colon);
-
-bool        load_code();
-uint16_t    get_block(uint8_t *buff);
 
 #endif  // _MONITOR_HEADER_

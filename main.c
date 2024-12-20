@@ -7,13 +7,42 @@
  * @licence     MIT
  *
  */
+
+// C
+#include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+// Pico
+#include "pico/stdlib.h"
+#include "hardware/flash.h"
+#include "hardware/sync.h"
+// App
+#include "ops.h"
+#include "cpu.h"
+#include "cpu_tests.h"
+#include "monitor.h"
+#include "pia.h"
 #include "main.h"
+
+
+/*
+ *  FDs
+ */
+static void boot_cpu(void);
+// EXPERIMENTAL
+static void read_into_ram(void);
+static void save_ram(void);
 
 
 /*
  *  GLOBALS
  */
 uint8_t interrupts[3] = {PIN_6809_NMI, PIN_6809_IRQ, PIN_6809_FIRQ};
+
+extern REG_6809    reg;
+extern uint8_t     mem[KB64];
+extern STATE_6809  state;
 
 
 /*
@@ -22,10 +51,10 @@ uint8_t interrupts[3] = {PIN_6809_NMI, PIN_6809_IRQ, PIN_6809_FIRQ};
 int main() {
     // Enable STDIO
     stdio_usb_init();
-    #ifdef DEBUG
+#ifdef DEBUG
     // Pause to allow the USB path to initialize
     sleep_ms(2000);
-    #endif
+#endif
 
     // Prepare the board
     bool is_using_monitor = init_board();
@@ -37,16 +66,16 @@ int main() {
     // monitor board or not (in which case run tests for now)
     if (is_using_monitor) {
         // Enter the monitor UI
-        #ifdef DEBUG
+#ifdef DEBUG
         printf("Using monitor board\n");
-        #endif
+#endif
 
         monitor_event_loop();
     } else {
         // Run tests -- for now
-        #ifdef DEBUG
+#ifdef DEBUG
         printf("Running tests\n");
-        #endif
+#endif
 
         test_main();
     }
@@ -59,10 +88,11 @@ int main() {
  * @brief Bring up the virtual 6809e and 64KB of memory.
  *        In future, this will offer alternative memory layouts.
  */
-void boot_cpu() {
-    #ifdef DEBUG
+static void boot_cpu(void) {
+
+#ifdef DEBUG
     printf("Resetting the registers\n");
-    #endif
+#endif
 
     // Interrupt Vectors:
     uint16_t vectors[] = {0x0400,       //   Restart
@@ -76,14 +106,14 @@ void boot_cpu() {
     init_vectors(vectors);
     init_cpu();
 
-    #ifdef DEBUG
+#ifdef DEBUG
     printf("Initializing memory\n");
-    #endif
+#endif
     for (uint16_t i = 0 ; i < START_VECTORS ; ++i) {
         mem[i] = RTI;
     }
 
-    #ifdef DEBUG
+#ifdef DEBUG
     printf("Entering sample program at 0x4000\n");
 
     uint16_t start = 0x4000;
@@ -101,11 +131,11 @@ void boot_cpu() {
     {0x34,0x46,0x33,0x64,0xA6,0x42,0xAE,0x43,0xE6,0x80,0x34,0x04,0x34,0x04,0x4A,0x27,0x13,0xE6,0x80,0xE1,0xE4,0x2E,0x08,0xE1,0x61,0x2E,0x06,0xE7,0x61,0x20,0x02,0xE7,0xE4,0x4A,0x26,0xED,0xA6,0xE0,0xA7,0x45,0xA6,0xE0,0xA7,0x46,0x35,0xC6,0x32,0x7E,0x8E,0x80,0x42,0x34,0x10,0xB6,0x80,0x41,0x34,0x02,0x8D,0xC4,0xA6,0x63,0xE6,0x64,0x39,0x0A,0x01,0x02,0x03,0x04,0x00,0x06,0x07,0x09,0x08,0x0B};
     {0x86, 0x41, 0x8E, 0x04, 0x00, 0xA7, 0x80, 0x8C, 0x06, 0x00, 0x26, 0xF9, 0x1A, 0x0F, 0x3B};
     */
-    #endif
+#endif
 
-    #ifdef DEBUG
+#ifdef DEBUG
     printf("Setting interrupt vectors\n");
-    #endif
+#endif
     // Set up interrupt pins
     // TODO Keep here or place in CPU file?
     for (uint8_t i = 0 ; i < 3 ; ++i) {
@@ -125,7 +155,8 @@ void boot_cpu() {
  * @brief Sample the interrupt pins and return a bitfield.
  *        This will be called by the
  */
-uint8_t sample_interrupts() {
+uint8_t sample_interrupts(void) {
+
     uint8_t irqs = 0;
     for (uint8_t i = 0 ; i < 3 ; ++i) {
         if (gpio_get(interrupts[i])) irqs |= (1 << i);
@@ -140,6 +171,7 @@ uint8_t sample_interrupts() {
  * @param count: The number of blinks in the sequence.
  */
 void flash_led(uint8_t count) {
+
     while (count > 0) {
         gpio_put(PIN_PICO_LED, true);
         sleep_ms(250);
@@ -153,7 +185,8 @@ void flash_led(uint8_t count) {
 /*
  * EXPERIMENTAL
  */
-void read_into_ram() {
+static void read_into_ram(void) {
+
     // See https://kevinboone.me/picoflash.html?i=1
     // 2MB Flash = 2,097,152
     // Allow 1MB for app code, so start at
@@ -169,7 +202,8 @@ void read_into_ram() {
 }
 
 
-void save_ram() {
+static void save_ram(void) {
+
     // See https://kevinboone.me/picoflash.html?i=1
     uint32_t irqs = save_and_disable_interrupts();
     flash_range_erase (RP2040_FLASH_DATA_START, RP2040_FLASH_DATA_SIZE);

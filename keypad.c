@@ -8,7 +8,24 @@
  * @licence     MIT
  *
  */
-#include "main.h"
+
+#include <stdbool.h>
+// Pico
+#include "pico/stdlib.h"
+#include "hardware/gpio.h"
+#include "hardware/i2c.h"
+#include "hardware/spi.h"
+// App
+#include "ht16k33.h"
+#include "keypad.h"
+
+
+/*
+ * STATICS
+ */
+static bool check_board_presence(void);
+static void keypad_set_led_at(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b);
+static void keypad_set_led_data(uint16_t o, uint8_t r, uint8_t g, uint8_t b);
 
 
 /*
@@ -25,7 +42,8 @@ uint8_t *led_data = led_buffer + 4;
  *
  * @retval `true` if the board is detected, otherwise `false`.
  */
-bool keypad_init() {
+bool keypad_init(void) {
+
     for (uint32_t i = 0 ; i < sizeof(led_buffer) ; ++i) {
         led_buffer[i] = 0x00;
     }
@@ -60,14 +78,17 @@ bool keypad_init() {
     return true;
 }
 
+
 /**
  * @brief Write the pixel colour data out to SPI.
  */
-void keypad_update_leds() {
+void keypad_update_leds(void) {
+
     gpio_put(KEYPAD_PIN_LEDS_CS, 0);
     spi_write_blocking(spi0, led_buffer, sizeof(led_buffer));
     gpio_put(KEYPAD_PIN_LEDS_CS, 1);
 }
+
 
 /**
  * @brief Set the brightness for all pixels by writing the brightness bits
@@ -76,26 +97,13 @@ void keypad_update_leds() {
  * @param brightness: The pixels brightness, 0.0-1.0 exclusive.
  */
 void keypad_set_brightness(float brightness) {
+
     if (brightness < 0.0 || brightness > 1.0) return;
     for (uint16_t i = 0 ; i < NUM_KEYS ; ++i) {
         led_data[i * 4] = 0b11100000 | (uint8_t)(brightness * (float)0b11111);
     }
 }
 
-/**
- * @brief Set the data for a single key's pixel, using the specified colour,
- *        and its co-ordinates on the key grid.
- *
- * @param x: The pixel by its x coordinate, 0-3.
- * @param y: The pixel by its y coordinate, 0-3.
- * @param r: The red colour component, 0x00-FF.
- * @param g: The green colour component, 0x00-FF.
- * @param b: The blue colour component, 0x00-FF.
- */
-void keypad_set_led_at(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b) {
-    if (x < 0 || x >= KEYPAD_WIDTH || y < 0 || y >= KEYPAD_HEIGHT) return;
-    keypad_set_led_data((x + (y * KEYPAD_WIDTH)) * 4, r, g, b);
-}
 
 /**
  * @brief  Set the data for a single key's pixel, using the specified colour,
@@ -107,9 +115,72 @@ void keypad_set_led_at(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b) {
  * @param b: The blue colour component, 0x00-FF.
  */
 void keypad_set_led(uint8_t i, uint8_t r, uint8_t g, uint8_t b) {
+
     if (i < 0 || i >= NUM_KEYS) return;
     keypad_set_led_data(i * 4, r, g, b);
 }
+
+
+/**
+ * @brief Turn on every key's pixel to the specified colour.
+ *
+ * @param r: The red colour component, 0x00-FF.
+ * @param g: The green colour component, 0x00-FF.
+ * @param b: The blue colour component, 0x00-FF.
+ */
+void keypad_set_all(uint8_t r, uint8_t g, uint8_t b) {
+
+    for (uint16_t i = 0 ; i < NUM_KEYS ; ++i) {
+        keypad_set_led(i, r, g, b);
+    }
+}
+
+
+/**
+ * @brief Turn off every key's pixel.
+ */
+void keypad_clear(void) {
+
+    for (uint16_t i = 0 ; i < NUM_KEYS ; ++i) {
+        keypad_set_led(i, 0, 0, 0);
+    }
+}
+
+
+/**
+ * @brief Read the TCA9555 IO expander to determine key states.
+ *
+ * @retval A 16-bit value in which each represents that key's state,
+ *         eg. bit 0 is key `0`, bit 15 is key `F`.
+ */
+uint16_t keypad_get_button_states(void) {
+
+    uint8_t input_buffer[2];
+    uint8_t tca9555_reg = 0;
+    i2c_write_blocking(i2c0, KEYPAD_I2C_ADDRESS, &tca9555_reg, 1, true);
+    i2c_read_blocking(i2c0, KEYPAD_I2C_ADDRESS, input_buffer, 2, false);
+
+    // Read value is 0 = pressed, 1 = not pressed, so invert the return value
+    return ~((input_buffer[0]) | (input_buffer[1] << 8));
+}
+
+
+/**
+ * @brief Set the data for a single key's pixel, using the specified colour,
+ *        and its co-ordinates on the key grid.
+ *
+ * @param x: The pixel by its x coordinate, 0-3.
+ * @param y: The pixel by its y coordinate, 0-3.
+ * @param r: The red colour component, 0x00-FF.
+ * @param g: The green colour component, 0x00-FF.
+ * @param b: The blue colour component, 0x00-FF.
+ */
+static void keypad_set_led_at(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b) {
+
+    if (x < 0 || x >= KEYPAD_WIDTH || y < 0 || y >= KEYPAD_HEIGHT) return;
+    keypad_set_led_data((x + (y * KEYPAD_WIDTH)) * 4, r, g, b);
+}
+
 
 /**
  * @brief Set the data for a single key's pixel, using the specified colour
@@ -120,50 +191,14 @@ void keypad_set_led(uint8_t i, uint8_t r, uint8_t g, uint8_t b) {
  * @param g: The green colour component, 0x00-FF.
  * @param b: The blue colour component, 0x00-FF.
  */
-void keypad_set_led_data(uint16_t o, uint8_t r, uint8_t g, uint8_t b) {
+static void keypad_set_led_data(uint16_t o, uint8_t r, uint8_t g, uint8_t b) {
+
     led_data[o + 0] = 0xFF;
     led_data[o + 1] = b;
     led_data[o + 2] = g;
     led_data[o + 3] = r;
 }
 
-/**
- * @brief Turn on every key's pixel to the specified colour.
- *
- * @param r: The red colour component, 0x00-FF.
- * @param g: The green colour component, 0x00-FF.
- * @param b: The blue colour component, 0x00-FF.
- */
-void keypad_set_all(uint8_t r, uint8_t g, uint8_t b) {
-    for (uint16_t i = 0 ; i < NUM_KEYS ; ++i) {
-        keypad_set_led(i, r, g, b);
-    }
-}
-
-/**
- * @brief Turn off every key's pixel.
- */
-void keypad_clear() {
-    for (uint16_t i = 0 ; i < NUM_KEYS ; ++i) {
-        keypad_set_led(i, 0, 0, 0);
-    }
-}
-
-/**
- * @brief Read the TCA9555 IO expander to determine key states.
- *
- * @retval A 16-bit value in which each represents that key's state,
- *         eg. bit 0 is key `0`, bit 15 is key `F`.
- */
-uint16_t keypad_get_button_states() {
-    uint8_t input_buffer[2];
-    uint8_t tca9555_reg = 0;
-    i2c_write_blocking(i2c0, KEYPAD_I2C_ADDRESS, &tca9555_reg, 1, true);
-    i2c_read_blocking(i2c0, KEYPAD_I2C_ADDRESS, input_buffer, 2, false);
-
-    // Read value is 0 = pressed, 1 = not pressed, so invert the return value
-    return ~((input_buffer[0]) | (input_buffer[1] << 8));
-}
 
 /**
  * @brief Check for the presence of the TCA9555 IO expander at 0x20.
@@ -171,7 +206,8 @@ uint16_t keypad_get_button_states() {
  *
  * @retval `true` if the board is detected, otherwise `false`.
  */
-bool check_board_presence() {
+static bool check_board_presence(void) {
+
     uint8_t rxdata;
     int ret = i2c_read_blocking(i2c0, KEYPAD_I2C_ADDRESS, &rxdata, 1, false);
     return !(rxdata < 0);

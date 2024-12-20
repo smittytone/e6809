@@ -2,9 +2,6 @@
 <Workspace
    version = "1.0">
    <FileRef
-      location = "group:CMakeLists.txt">
-   </FileRef>
-   <FileRef
       location = "group:ops.h">
    </FileRef>
    <FileRef
@@ -54,5 +51,11 @@
    </FileRef>
    <FileRef
       location = "group:LICENSE.md">
+   </FileRef>
+   <FileRef
+      location = "group:CMakeLists.txt">
+   </FileRef>
+   <FileRef
+      location = "group:deploy.sh">
    </FileRef>
 </Workspace>

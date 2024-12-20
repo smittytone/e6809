@@ -8,7 +8,14 @@
  * @licence     MIT
  *
  */
-#include "main.h"
+
+#include <stdbool.h>
+// Pico
+#include "pico/stdlib.h"
+#include "hardware/gpio.h"
+// App
+#include "cpu.h"
+#include "pia.h"
 
 
 uint8_t     pia_pa_pins[]    = {6, 7, 8, 9, 10, 11, 12, 13};
@@ -27,8 +34,12 @@ bool        ca_2_can_interrupt = false;
 bool        ca_2_is_set_on_up = false;
 bool        ca_2_is_output = false;
 
+extern REG_6809    reg;
+extern uint8_t     mem[KB64];
+
 
 void pia_init(uint16_t cra, uint16_t ddra) {
+
     // Record register memory locations
     mem_control_a = cra;
     mem_datadir_a = ddra;
@@ -41,7 +52,8 @@ void pia_init(uint16_t cra, uint16_t ddra) {
 }
 
 
-void pia_reset() {
+void pia_reset(void) {
+
     enabled = true;
 
     // All output, all low
@@ -67,7 +79,8 @@ void pia_reset() {
 }
 
 
-void pia_init_gpio() {
+void pia_init_gpio(void) {
+
     // On RESET, set PA0-7, CA1, CA2 is inputs
     // See MC6821 Data Sheet p6
 
@@ -86,6 +99,7 @@ void pia_init_gpio() {
     Set the PA direction based on the DDR
  */
 void set_gpio_direction(uint8_t pin) {
+
     // Pico SDK for put() -- false is input, true is output
     uint8_t value = ((reg_datadir_a & (1 << pin)) >> pin);
     gpio_set_dir(pia_pa_pins[pin], (value == OUTPUT));
@@ -102,6 +116,7 @@ void set_gpio_direction(uint8_t pin) {
     - Returns: 1 for output, 0 for input
  */
 uint8_t get_gpio_direction(uint8_t pin) {
+
     return ((reg_datadir_a & (1 << pin)) >> pin);
 }
 
@@ -112,6 +127,7 @@ uint8_t get_gpio_direction(uint8_t pin) {
          *is* an output.
  */
 void set_gpio_output_state(uint8_t pin) {
+
     uint8_t value = ((reg_output_a & (1 << pin)) >> pin);
     gpio_put(pia_pa_pins[pin], (value == 1));
 }
@@ -121,6 +137,7 @@ void set_gpio_output_state(uint8_t pin) {
     accordingly.
  */
 void get_gpio_input_state(uint8_t pin) {
+
     if (gpio_get(pia_pa_pins[pin])) {
         reg_output_a |= (1 << pin);
     } else {
@@ -129,7 +146,8 @@ void get_gpio_input_state(uint8_t pin) {
 }
 
 
-void pia_update() {
+void pia_update(void) {
+
     if (!enabled) return;
 
     // Update CR
@@ -172,7 +190,8 @@ void pia_update() {
 }
 
 
-void pia_update_flags() {
+void pia_update_flags(void) {
+
     ca_1_can_interrupt = ((reg_control_a & 0x01) > 0);
 
     // Bit is 1, IRQ trigged on LOW to HIGH (up), else
@@ -198,14 +217,17 @@ void pia_update_flags() {
 }
 
 
-void pia_check_irqs() {
+void pia_check_irqs(void) {
 
+    // TODO
 }
+
 
 /*
     Set CA2 -- if it's an output -- to value of CR bit 3
  */
-void pia_set_pia_ca() {
+void pia_set_pia_ca(void) {
+
     if (ca_2_is_output & (reg_control_a & 0x10) > 0) {
         gpio_put(pia_ca_pins[1], (reg_control_a & 0x08 > 0));
     }

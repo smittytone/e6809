@@ -12,6 +12,10 @@
 #define _HT16K33_HEADER_
 
 
+#include <stdint.h>
+#include <stdbool.h>
+
+
 /*
  *      Constants
  */
@@ -45,7 +49,6 @@ void        i2c_write_block(uint8_t address, uint8_t *data, uint8_t count);
 
 // Display Functions
 void        ht16k33_init(uint8_t address, uint8_t *buffer);
-void        ht16k33_power(uint8_t address, uint8_t on);
 void        ht16k33_brightness(uint8_t address, uint8_t brightness);
 void        ht16k33_clear(uint8_t address, uint8_t *buffer);
 void        ht16k33_draw(uint8_t address, uint8_t *buffer);

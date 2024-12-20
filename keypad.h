@@ -13,6 +13,12 @@
 
 
 /*
+ * INCLUDES
+ */
+#include <stdint.h>
+
+
+/*
  * CONSTANTS
  */
 #define DEFAULT_BRIGHTNESS                  0.5f
@@ -31,19 +37,13 @@
 /*
  * PROTOTYPES
  */
-bool    keypad_init();
-void    keypad_update_leds();
-void    keypad_set_brightness(float brightness);
-
-void    keypad_set_led_at(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b);
-void    keypad_set_led(uint8_t i, uint8_t r, uint8_t g, uint8_t b);
-void    keypad_set_led_data(uint16_t o, uint8_t r, uint8_t g, uint8_t b);
-void    keypad_set_all(uint8_t r, uint8_t g, uint8_t b);
-void    keypad_clear();
-
-uint16_t keypad_get_button_states();
-
-bool    check_board_presence();
+bool        keypad_init(void);
+void        keypad_update_leds(void);
+void        keypad_set_brightness(float brightness);
+void        keypad_set_led(uint8_t i, uint8_t r, uint8_t g, uint8_t b);
+void        keypad_set_all(uint8_t r, uint8_t g, uint8_t b);
+void        keypad_clear(void);
+uint16_t    keypad_get_button_states(void);
 
 
 #endif  // _KEYPAD_HEADER_

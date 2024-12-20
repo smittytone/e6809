@@ -12,6 +12,12 @@
 
 
 /*
+ * INCLUDES
+ */
+#include <stdlib.h>
+
+
+/*
  * CONSTANTS
  */
 #define KB64                    65536
@@ -114,29 +120,9 @@ typedef struct {
 /*
  * PROTOTYPES
  */
-uint32_t    process_next_instruction();
-void        do_branch(uint8_t bop, bool is_long);
-
-// Memory access
-uint8_t     get_next_byte();
-uint8_t     get_byte(uint16_t address);
-void        set_byte(uint16_t address, uint8_t value);
-void        move_pc(int16_t amount);
-bool        is_bit_set(uint16_t value, uint8_t bit);
-
-// Condition code register bit-level getters and setters
-bool        is_cc_bit_set(uint8_t bit);
-void        set_cc_bit(uint8_t bit);
-void        clr_cc_bit(uint8_t bit);
-void        flp_cc_bit(uint8_t bit);
-void        clr_cc_nzv();
-void        set_cc_nz(uint16_t value, bool is_16_bit);
-void        set_cc_after_clr();
-void        set_cc_after_load(uint16_t value, bool is_16_bit);
-void        set_cc_after_store(uint16_t value, bool is_16_bit);
-
+uint32_t    process_next_instruction(void);
 // Op Primary Functions
-void        abx();
+void        abx(void);
 void        adc(uint8_t op, uint8_t mode);
 void        add(uint8_t op, uint8_t mode);
 void        add_16(uint8_t op, uint8_t mode);
@@ -149,8 +135,8 @@ void        clr(uint8_t op, uint8_t mode);
 void        cmp(uint8_t op, uint8_t mode);
 void        cmp_16(uint8_t op, uint8_t mode, uint8_t ex_op);
 void        com(uint8_t op, uint8_t mode);
-void        cwai();
-void        daa();
+void        cwai(void);
+void        daa(void);
 void        dec(uint8_t op, uint8_t mode);
 void        eor(uint8_t op, uint8_t mode);
 void        inc(uint8_t op, uint8_t mode);
@@ -160,24 +146,23 @@ void        ld(uint8_t op, uint8_t mode);
 void        ld_16(uint8_t op, uint8_t mode, uint8_t ex_op);
 void        lea(uint8_t op);
 void        lsr(uint8_t op, uint8_t mode);
-void        mul();
+void        mul(void);
 void        neg(uint8_t op, uint8_t mode);
 void        orr(uint8_t op, uint8_t mode);
 void        orcc(uint8_t value);
 void        rol(uint8_t op, uint8_t mode);
 void        ror(uint8_t op, uint8_t mode);
-void        rti();
-void        rts();
+void        rti(void);
+void        rts(void);
 void        sbc(uint8_t op, uint8_t mode);
-void        sex();
+void        sex(void);
 void        st(uint8_t op, uint8_t mode);
 void        st_16(uint8_t op, uint8_t mode, uint8_t ex_op);
 void        sub(uint8_t op, uint8_t mode);
 void        sub_16(uint8_t op, uint8_t mode, uint8_t ex_op);
 void        swi(uint8_t number);
-void        sync();
+void        sync(void);
 void        tst(uint8_t op, uint8_t mode);
-
 // Op Helper Functions
 uint8_t     alu(uint8_t value_1, uint8_t value_2, bool use_carry);
 uint16_t    alu_16(uint16_t value_1, uint16_t value_2, bool use_carry);
@@ -213,22 +198,12 @@ void        load_effective(uint16_t amount, uint8_t reg_code);
 void        push(bool to_hardware, uint8_t post_byte);
 void        pull(bool from_hardware, uint8_t post_byte);
 void        test(uint8_t value);
-
 // Addressing Functions
 uint16_t    address_from_mode(uint8_t mode);
-uint16_t    address_from_next_two_bytes();
-uint16_t    address_from_dpr(int16_t offset);
-uint16_t    indexed_address(uint8_t post_byte);
-uint16_t    register_value(uint8_t source_reg);
-void        increment_register(uint8_t source_reg, int16_t amount);
-
-// IO
-void        process_interrupt(uint8_t irq);
-
 // Misc
-void init_cpu();
+void init_cpu(void);
 void init_vectors(uint16_t* vectors);
-void reset_registers();
+void reset_registers(void);
 
 
 #endif // _CPU_HEADER_

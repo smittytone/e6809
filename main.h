@@ -14,26 +14,8 @@
 /*
  *      INCLUDES
  */
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include "pico/stdlib.h"
-#include "pico/binary_info.h"
-#include "hardware/gpio.h"
-#include "hardware/i2c.h"
-#include "hardware/spi.h"
-#include "hardware/adc.h"
-#include "hardware/flash.h"
-#include "hardware/sync.h"
-#include "ops.h"
-#include "cpu.h"
-#include "cpu_tests.h"
-#include "keypad.h"
-#include "ht16k33.h"
-#include "monitor.h"
-#include "pia.h"
+// C
+#include <stdint.h>
 
 
 /*
@@ -52,21 +34,8 @@
 /*
  *      PROTOTYPES
  */
-void        boot_cpu();
-uint8_t     sample_interrupts();
+uint8_t     sample_interrupts(void);
 void        flash_led(uint8_t count);
-void        run_tests();
-
-// EXPERIMENTAL
-void        read_into_ram();
-void        save_ram();
-
-/*
- * GLOBALS
- */
-extern      REG_6809    reg;
-extern      uint8_t     mem[KB64];
-extern      STATE_6809  state;
 
 
 #endif // _E6809_HEADER_
