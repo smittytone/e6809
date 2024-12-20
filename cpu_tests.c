@@ -1036,14 +1036,12 @@ static void test_branch(void) {
     reg.pc = 0x00FF;
     mem[0x00FF] = 0xAA;
     mem[0x0100] = 0xAA;
-    mem[0xAAAA] = 0xFF;
-    mem[0xAAAB] = 0xFF;
     jmp(MODE_EXTENDED);
-    if (reg.pc == 0xFFFF) {
+    if (reg.pc == 0xAAAA) {
         passes++;
     } else {
         errors++;
-        expected(0xFFFF, reg.pc);
+        expected(0xAAAA, reg.pc);
     }
 
     // Zaks p.159
@@ -1064,16 +1062,13 @@ static void test_branch(void) {
     reg.pc = 0x00FF;
     mem[0x00FF] = 0x3A;
     mem[0x0100] = 0x05;
-    mem[0x3A05] = 0xD1;
-    mem[0x3A06] = 0xE5;
     jmp(MODE_EXTENDED);
-    if (reg.pc == 0xD1E5) {
+    if (reg.pc == 0x3A05) {
         passes++;
     } else {
         errors++;
-        expected(0xD1E5, reg.pc);
+        expected(0x3A05, reg.pc);
     }
-
 
     // JSR
     // Zaks p.160
@@ -1104,6 +1099,8 @@ static void test_branch(void) {
         passes++;
     } else {
         errors++;
+        expected(0x10CD, reg.pc);
+        expected(0x03F2, reg.s);
     }
 
     // JSR
@@ -1139,18 +1136,17 @@ static void test_branch(void) {
         expected(0x08A0, reg.s);
     }
 
-
     // RTI
     // TODO
     // Zaks p.177
     // Leventhal p.22-61
-
 
     // SWI
     // Zaks p.185-7
     test_setup();
     mem[SWI1_VECTOR] = 0x20;
     mem[SWI1_VECTOR + 1] = 0x01;
+    reg.cc = 0x00;
     reg.s = 0xF000;
     reg.x = (mem[SWI1_VECTOR] << 8) | mem[SWI1_VECTOR + 1];
     swi(1);
@@ -1165,6 +1161,7 @@ static void test_branch(void) {
     test_setup();
     mem[SWI2_VECTOR] = 0x20;
     mem[SWI2_VECTOR + 1] = 0x01;
+    reg.cc = 0x00;
     reg.s = 0xF000;
     reg.x = (mem[SWI2_VECTOR] << 8) | mem[SWI2_VECTOR + 1];
     swi(2);
@@ -1223,7 +1220,7 @@ static void test_report(uint16_t code, uint32_t err_count) {
     names[5] = "Branch Ops";
     
     if (code < 6) {
-        printf("%02d errors in %s (see above)\n", err_count, names[code]);
+        printf("%02d errors in %s (see above). Test count: %03d\n", err_count, names[code], tests);
     }
 }
 
