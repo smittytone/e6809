@@ -1,4 +1,4 @@
-# e6809
+# e6809 0.0.2
 
 An emulation of the Motorola 6809e 8-bit microprocessor designed to run on the a RP2040 microcontroller board, such as the Raspberry Pi Pico.
 
@@ -6,10 +6,10 @@ It is intended for standalone usage — though not as a drop in replacement for 
 
 There are two versions:
 
-1. Mac — [branch `mac`](https://github.com/smittytone/e6809/tree/mac)
 1. Raspberry Pi Pico - [branch `main`](https://github.com/smittytone/e6809/tree/main)
+1. Mac — [branch `mac`](https://github.com/smittytone/e6809/tree/mac)
 
-Current development activity is centred on the `pico` branch. The `main` branch will probably not be updated and may even be removed.
+Current development activity is centred on the `main` branch. The `pico` branch will soon be removed. The `mac` branch is out of data and may be removed.
 
 **This is a work in progress which I tackle occasionally. Expect errors, breakage and a slow response to bug reports!**
 
