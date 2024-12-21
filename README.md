@@ -29,7 +29,7 @@ For the display board mount the two [Adafruit 0.56in 4-digit 7-segment](https://
 
 The board typically shows an 8-bit value (left four digits) and a 16-bit address (right four digits) both in hexadecimal.
 
-![Monitor main menu](./images/display_board.webp)
+![Monitor main menu](./images/display-board.webp)
 
 The Monitor code is menu driven. It provides code entry, program execution and memory inspection functions.
 
