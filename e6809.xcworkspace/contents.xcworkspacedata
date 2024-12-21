@@ -1,61 +1,83 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Workspace
    version = "1.0">
-   <FileRef
-      location = "group:ops.h">
-   </FileRef>
-   <FileRef
-      location = "group:main.h">
-   </FileRef>
-   <FileRef
-      location = "group:main.c">
-   </FileRef>
-   <FileRef
-      location = "group:cpu.h">
-   </FileRef>
-   <FileRef
-      location = "group:cpu.c">
-   </FileRef>
-   <FileRef
-      location = "group:monitor.h">
-   </FileRef>
-   <FileRef
-      location = "group:monitor.c">
-   </FileRef>
-   <FileRef
-      location = "group:cpu_tests.h">
-   </FileRef>
-   <FileRef
-      location = "group:cpu_tests.c">
-   </FileRef>
-   <FileRef
-      location = "group:ht16k33.h">
-   </FileRef>
-   <FileRef
-      location = "group:ht16k33.c">
-   </FileRef>
-   <FileRef
-      location = "group:keypad.h">
-   </FileRef>
-   <FileRef
-      location = "group:keypad.c">
-   </FileRef>
-   <FileRef
-      location = "group:pia.h">
-   </FileRef>
-   <FileRef
-      location = "group:pia.c">
-   </FileRef>
-   <FileRef
-      location = "group:README.md">
-   </FileRef>
-   <FileRef
-      location = "group:LICENSE.md">
-   </FileRef>
-   <FileRef
-      location = "group:CMakeLists.txt">
-   </FileRef>
-   <FileRef
-      location = "group:deploy.sh">
-   </FileRef>
+   <Group
+      location = "group:source"
+      name = "source">
+      <FileRef
+         location = "group:ops.h">
+      </FileRef>
+      <FileRef
+         location = "group:main.h">
+      </FileRef>
+      <FileRef
+         location = "group:main.c">
+      </FileRef>
+      <FileRef
+         location = "group:cpu.h">
+      </FileRef>
+      <FileRef
+         location = "group:cpu.c">
+      </FileRef>
+      <FileRef
+         location = "group:pia.h">
+      </FileRef>
+      <FileRef
+         location = "group:pia.c">
+      </FileRef>
+      <FileRef
+         location = "group:cpu_tests.h">
+      </FileRef>
+      <FileRef
+         location = "group:cpu_tests.c">
+      </FileRef>
+      <FileRef
+         location = "group:monitor.h">
+      </FileRef>
+      <FileRef
+         location = "group:monitor.c">
+      </FileRef>
+      <FileRef
+         location = "group:keypad.h">
+      </FileRef>
+      <FileRef
+         location = "group:keypad.c">
+      </FileRef>
+      <FileRef
+         location = "group:ht16k33.h">
+      </FileRef>
+      <FileRef
+         location = "group:ht16k33.c">
+      </FileRef>
+   </Group>
+   <Group
+      location = "group:scripts"
+      name = "scripts">
+      <FileRef
+         location = "group:d32.rom">
+      </FileRef>
+      <FileRef
+         location = "group:loader.py">
+      </FileRef>
+      <FileRef
+         location = "group:deploy.sh">
+      </FileRef>
+   </Group>
+   <Group
+      location = "container:"
+      name = "CMake">
+      <FileRef
+         location = "group:CMakeLists.txt">
+      </FileRef>
+   </Group>
+   <Group
+      location = "container:"
+      name = "Misc">
+      <FileRef
+         location = "group:README.md">
+      </FileRef>
+      <FileRef
+         location = "group:LICENSE.md">
+      </FileRef>
+   </Group>
 </Workspace>

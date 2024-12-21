@@ -19,24 +19,26 @@ project(${PROJECT_NAME}
         DESCRIPTION "Motorola 6809e simulator")
 
 add_executable(${PROJECT_NAME}
-               main.c
-               cpu.c
-               cpu_tests.c
-               ht16k33.c
-               keypad.c
-               monitor.c
-               pia.c)
+    source/main.c
+    source/cpu.c
+    source/cpu_tests.c
+    source/ht16k33.c
+    source/keypad.c
+    source/monitor.c
+    source/pia.c
+)
 
 pico_sdk_init()
 
 target_link_libraries(${PROJECT_NAME}
-                      pico_stdlib
-                      hardware_gpio
-                      hardware_i2c
-                      hardware_spi
-                      hardware_adc
-                      hardware_flash
-                      hardware_sync)
+    pico_stdlib
+    hardware_gpio
+    hardware_i2c
+    hardware_spi
+    hardware_adc
+    hardware_flash
+    hardware_sync
+)
 
 pico_enable_stdio_usb(${PROJECT_NAME} 1)
 pico_enable_stdio_uart(${PROJECT_NAME} 0)
