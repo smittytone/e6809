@@ -1,2 +1,3 @@
 build/*
 *.xcworkspace/xcuserdata/*
+.python/*
