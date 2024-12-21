@@ -2,7 +2,7 @@
  * e6809 for Raspberry Pi Pico
  * Monitor code
  *
- * @version     1.0.0
+ * @version     0.0.2
  * @author      smittytone
  * @copyright   2024
  * @licence     MIT

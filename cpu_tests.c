@@ -1,7 +1,7 @@
 /*
  * e6809 for Raspberry Pi Pico
  *
- * @version     1.0.0
+ * @version     0.0.2
  * @author      smittytone
  * @copyright   2024
  * @licence     MIT
@@ -254,6 +254,7 @@ static void test_alu(void) {
     // COM
     // Leventhal p.22-30
     test_setup();
+    reg.cc = 0x00;
     result = complement(0x23);
     if (result == 0xDC && reg.cc == 0x09) {
         passes++;
@@ -314,6 +315,7 @@ static void test_alu(void) {
     // INC
     // Zaks p.158
     test_setup();
+    reg.cc = 0x00;
     result = increment(0x35);
     if (result == 0x36 && reg.cc == 0x00) {
         passes++;
@@ -323,6 +325,7 @@ static void test_alu(void) {
     }
 
     test_setup();
+    reg.cc = 0x00;
     result = increment(0x7F);
     if (result == 0x80 && reg.cc == 0x0A) {
         passes++;
@@ -612,6 +615,7 @@ static void test_logic(void) {
     // ASR
     // Zaks p.128
     test_setup();
+    reg.cc = 0x00;
     result = arith_shift_right(0xE5);
     if (result == 0xF2 && reg.cc == 0x09) {
         passes++;
@@ -622,6 +626,7 @@ static void test_logic(void) {
 
     // Leventhal p22-10
     test_setup();
+    reg.cc = 0x00;
     result = arith_shift_right(0xCB);
     if (result == 0xE5 && reg.cc == 0x09) {
         passes++;
@@ -648,23 +653,25 @@ static void test_logic(void) {
     // Zaks p.149
     test_setup();
     reg.a = 0xE2;
+    reg.cc = 0x00;
     clr(CLRA, MODE_INHERENT);
     if (reg.a == 0x00 && reg.cc == 0x04) {
         passes++;
     } else {
         errors++;
-        expected(0x0004, (uint16_t)((result << 8) | reg.cc));
+        expected(0x0004, (uint16_t)((reg.a << 8) | reg.cc));
     }
 
     // Leventhal p.22-27
     test_setup();
     reg.a = 0x43;
+    reg.cc = 0x00;
     clr(CLRA, MODE_INHERENT);
     if (reg.a == 0x00 && reg.cc == 0x04) {
         passes++;
     } else {
         errors++;
-        expected(0x0004, (uint16_t)((result << 8) | reg.cc));
+        expected(0x0004, (uint16_t)((reg.a << 8) | reg.cc));
     }
 
     // EOR

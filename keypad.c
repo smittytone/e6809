@@ -2,7 +2,7 @@
  * e6809 for Raspberry Pi Pico
  * Keypad driver
  *
- * @version     1.0.0
+ * @version     0.0.2
  * @author      Pimoroni, smittytone
  * @copyright   2024
  * @licence     MIT

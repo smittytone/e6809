@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.14)
 
 # Set project data
 set(PROJECT_NAME "e6809")
-set(VERSION_NUMBER "1.0.0")
-set(BUILD_NUMBER "1")
+set(VERSION_NUMBER "0.0.2")
+set(BUILD_NUMBER "2")
 
 # Make project data accessible to compiler
 add_compile_definitions(APP_NAME="${PROJECT_NAME}")
@@ -15,7 +15,7 @@ include(pico_sdk_import.cmake)
 
 project(${PROJECT_NAME}
         LANGUAGES C CXX ASM
-        VERSION 1.0.0
+        VERSION 0.0.2
         DESCRIPTION "Motorola 6809e simulator")
 
 add_executable(${PROJECT_NAME}
