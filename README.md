@@ -25,6 +25,12 @@ The 6809e’s `NMI`, `IRQ` and `FIRQ` interrupts are broken out to the RP2040’
 
 The Monitor Board is based on [Pimoroni’s RGB Keyboard Base](https://shop.pimoroni.com/products/pico-rgb-keypad-base) add-on for the Raspberry Pi Pico. It also uses a custom display board based on two HT16K33-driven four-digit, seven-segment LED displays.
 
+For the display board mount the two [Adafruit 0.56in 4-digit 7-segment](https://www.adafruit.com/product/880) side by side on a breadboard. Make sure the two displays have different I&sup2;C addresses [as described here](https://learn.adafruit.com/adafruit-led-backpack/0-dot-56-seven-segment-backpack-assembly). Connect each of the two displays’ SDA, SCL, GND and 3V3 pins to four common connection points, and these four to the Keyboard Base’s 3V3, GND, GPIO 4 (SDA) and GPIO 5 (SCL) headers.
+
+The board typically shows an 8-bit value (left four digits) and a 16-bit address (right four digits) both in hexadecimal.
+
+![Monitor main menu](./images/display_board.webp)
+
 The Monitor code is menu driven. It provides code entry, program execution and memory inspection functions.
 
 ### Main Menu
