@@ -7,7 +7,7 @@ It is intended for standalone usage — though not as a drop in replacement for 
 There are two versions:
 
 1. Mac — [branch `mac`](https://github.com/smittytone/e6809/tree/mac)
-1. Raspberry Pi Pico - [branch `pico`](https://github.com/smittytone/e6809/tree/pico)
+1. Raspberry Pi Pico - [branch `main`](https://github.com/smittytone/e6809/tree/main)
 
 Current development activity is centred on the `pico` branch. The `main` branch will probably not be updated and may even be removed.
 
