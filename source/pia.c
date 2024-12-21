@@ -18,11 +18,13 @@
 #include "pia.h"
 
 
-uint8_t     pia_pa_pins[]    = {6, 7, 8, 9, 10, 11, 12, 13};
-uint8_t     pia_ca_pins[]    = {14, 15};
+// These are the RP2040 pins which are proxies for the
+
+uint8_t     pia_pa_pins[] = {6, 7, 8, 9, 10, 11, 12, 13};
+uint8_t     pia_ca_pins[] = {14, 15};
 uint8_t     reg_control_a = 0;
 uint8_t     reg_datadir_a = 0;
-uint8_t     reg_output_a  = 0;
+uint8_t     reg_output_a = 0;
 
 uint16_t    mem_control_a = 0x0000;
 uint16_t    mem_datadir_a = 0x0000;

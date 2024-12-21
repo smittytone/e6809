@@ -99,6 +99,37 @@ You can use [Spasm](https://github.com/smittytone/Spasm) to generate assembled `
 spasm.py -o test.rom test.asm
 ```
 
+## RP2040 Pinout
+
+```
+NMI•    0   - -------- -  VBUS
+IRQ•    1   - |      | -  VSYS
+        G   - |      | -  G
+FIRQ•   2   - |      | -  3V3EN
+RESET•  3   - |  R   | -  3V3   3V3*
+SDA*    4   - |  P   | -  
+SCL*    5   - |  2   | -  28
+        G   - |  0   | -  G
+PA0†    6   - |  4   | -  27
+PA1†    7   - |  0   | -  26
+PA2†    8   - |      | -  RUN
+PA3†    9   - |      | -  22
+        G   - |      | -  G
+PA4†    10  - |      | -  21
+PA5†    11  - |      | -  20
+PA6†    12  - |      | -  19    TX*
+PA7†    13  - |      | -  18    SCK*
+        G   - |      | -  G
+CA1†    14  - |      | -  17    CS*
+CA2†    15  - -------- -  16
+```
+
+&#42; Keypad Monitor board
+• 6809E
+† MC6821 PIA
+
+**SUBJECT TO CHANGE**
+
 ## To Do
 
 In no particular order...
