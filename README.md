@@ -99,7 +99,7 @@ You can use [Spasm](https://github.com/smittytone/Spasm) to generate assembled `
 spasm.py -o test.rom test.asm
 ```
 
-## RP2040 Pinout
+## RP2040 Pinout (Provisional)
 
 ```
 NMI•    0   - -------- -  VBUS
@@ -124,8 +124,8 @@ CA1†    14  - |      | -  17    CS*
 CA2†    15  - -------- -  16
 ```
 
-&#42; Keypad Monitor board
-• 6809E
+&#42; Keypad Monitor board<br />
+• 6809E<br />
 † MC6821 PIA
 
 **SUBJECT TO CHANGE**

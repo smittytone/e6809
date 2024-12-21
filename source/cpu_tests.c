@@ -414,15 +414,16 @@ static void test_alu(void) {
     reg.cc = 0x01;
     reg.b = 0x14;
     reg.y = 0x105A;
-    mem[reg.y + 0x3E] = 0x34;
+    reg.pc = 0x0000;
     mem[0x0000] = 0xA8;
     mem[0x0001] = 0x3E;
+    mem[reg.y + mem[0x0001]] = 0x34;
     sbc(SBCB_indexed, MODE_INDEXED);
     if (reg.b == 0xDF && (reg.cc & 0x0F) == 0x08) {
         passes++;
     } else {
         errors++;
-        expected(0xDF08, (uint16_t)((reg.b << 8) | reg.cc));
+        expected(0xDF08, (uint16_t)((reg.b << 8) | (reg.cc & 0x0F)));
     }
 
     // SUB 8-bit
@@ -640,13 +641,14 @@ static void test_logic(void) {
     test_setup();
     reg.cc = 0xFF;
     reg.a = 0xA6;
+    reg.pc = 0x0000;
     mem[0] = 0xE0;
     bit(BITA_immed, MODE_IMMEDIATE);
-    if (reg.a = 0xA6 && reg.cc == 0xF9) {
+    if (reg.a == 0xA6 && reg.cc == 0xF9) {
         passes++;
     } else {
         errors++;
-        expected(0xA6F9, (uint16_t)((result << 8) | reg.cc));
+        expected(0xA6F9, (uint16_t)((reg.a << 8) | reg.cc));
     }
 
     // CLR

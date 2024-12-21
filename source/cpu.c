@@ -85,25 +85,36 @@ void init_cpu(void) {
     state.is_sync = false;
     state.wait_for_interrupt = false;
 
+    // Set CC: I and F set
+    reg.cc = 0x50;
+
+    // Disarm NMI
+    state.nmi_disarmed = true;
+
     // Set initial register values
     reset_registers();
 }
 
 
 /**
- * @brief Initalise the virtual 6809's interrupt vectors.
+ * @brief Initialise the virtual 6809's interrupt vectors, ie.
+ *        write the vector table (addresses) into RAM between
+ *        0xFFF0 and 0xFFFF.
+ *
+ *        See MC6809 Datasheet p9
  *
  * @param vectors: Pointer to the vector address table.
  */
 void init_vectors(uint16_t* vectors) {
 
-    uint16_t start = 0xFFFD;
+    uint16_t start = 0xFFFF;
 
     for (uint8_t i = 0 ; i < 8 ; ++i) {
         uint16_t vector = vectors[i];
-        mem[start++] = (vector >> 8) & 0xFF;
-        mem[start++] = (uint8_t)(vector & 0xFF);
-        start -= 4;
+        printf("***  %04X\n", vector);
+        mem[start--] = (uint8_t)(vector & 0xFF);
+        mem[start--] = (uint8_t)((vector >> 8) & 0xFF);
+        printf("***  %02X %02X @ %04X\n", mem[start + 1], mem[start], start);
     }
 }
 
@@ -129,28 +140,33 @@ uint32_t process_next_instruction(void) {
         if (state.interrupts > 0) {
             state.interrupt_state = IRQ_STATE_ASSERTED;
 
+            // NMI -- always fires but see MC6809 datasheet p.9
             if (is_bit_set(state.interrupts, NMI_BIT)) {
-                process_interrupt(NMI_BIT);
-                state.interrupt_state = IRQ_STATE_HANDLED;
+                if (!state.nmi_disarmed) {
+                    process_interrupt(NMI_BIT);
+                    state.interrupt_state = IRQ_STATE_HANDLED;
+                }
             }
 
+            // FIRQ -- fires if CC F bit clear
             if (is_bit_set(state.interrupts, FIRQ_BIT)) {
-                // Clear bit
+                // Clear IRQ record bit
                 state.interrupts &= ~(1 << FIRQ_BIT);
-                
-                // Process if appropriate CC bit set
-                if (!is_cc_bit_set(F_BIT)) {
+
+                // Process if CC F bit is not set
+                if (!is_cc_bit_set(CC_F_BIT)) {
                     process_interrupt(FIRQ_BIT);
                     state.interrupt_state = IRQ_STATE_HANDLED;
                 }
             }
 
+            // IRQ -- fires if CC I bit clear
             if (is_bit_set(state.interrupts, IRQ_BIT)) {
-                // Clear bit
+                // Clear IRQ record bit
                 state.interrupts &= ~(1 << IRQ_BIT);
 
-                // Process if appropriate CC bit set
-                if (!is_cc_bit_set(I_BIT)) {
+                // Process if CC I bit not set
+                if (!is_cc_bit_set(CC_I_BIT)) {
                     process_interrupt(IRQ_BIT);
                     state.interrupt_state = IRQ_STATE_HANDLED;
                 }
@@ -160,12 +176,10 @@ uint32_t process_next_instruction(void) {
             if (state.interrupt_state == IRQ_STATE_HANDLED) {
                 state.wait_for_interrupt = false;
                 state.is_sync = false;
-            } else {
-                if (state.is_sync) {
-                    // SYNC continues processing on unhandled IRQ
-                    state.wait_for_interrupt = false;
-                    state.is_sync = false;
-                }
+            } else if (state.is_sync) {
+                // SYNC continues processing on unhandled IRQ
+                state.wait_for_interrupt = false;
+                state.is_sync = false;
             }
         }
 
@@ -417,25 +431,25 @@ static void do_branch(uint8_t bop, bool is_long) {
 
     if (bop == BRA) branch = true;
 
-    if (bop == BEQ &&  is_cc_bit_set(Z_BIT)) branch = true;
-    if (bop == BNE && !is_cc_bit_set(Z_BIT)) branch = true;
+    if (bop == BEQ &&  is_cc_bit_set(CC_Z_BIT)) branch = true;
+    if (bop == BNE && !is_cc_bit_set(CC_Z_BIT)) branch = true;
 
-    if (bop == BMI &&  is_cc_bit_set(N_BIT)) branch = true;
-    if (bop == BPL && !is_cc_bit_set(N_BIT)) branch = true;
+    if (bop == BMI &&  is_cc_bit_set(CC_N_BIT)) branch = true;
+    if (bop == BPL && !is_cc_bit_set(CC_N_BIT)) branch = true;
 
-    if (bop == BVS &&  is_cc_bit_set(V_BIT)) branch = true;
-    if (bop == BVC && !is_cc_bit_set(V_BIT)) branch = true;
+    if (bop == BVS &&  is_cc_bit_set(CC_V_BIT)) branch = true;
+    if (bop == BVC && !is_cc_bit_set(CC_V_BIT)) branch = true;
 
-    if (bop == BLO &&  is_cc_bit_set(C_BIT)) branch = true; // Also BCS
-    if (bop == BHS && !is_cc_bit_set(C_BIT)) branch = true; // Also BCC
+    if (bop == BLO &&  is_cc_bit_set(CC_C_BIT)) branch = true; // Also BCS
+    if (bop == BHS && !is_cc_bit_set(CC_C_BIT)) branch = true; // Also BCC
 
-    if (bop == BLE &&  (is_cc_bit_set(Z_BIT) || (is_cc_bit_set(N_BIT) != is_cc_bit_set(V_BIT)))) branch = true;
-    if (bop == BGT && !(is_cc_bit_set(Z_BIT) || (is_cc_bit_set(N_BIT) != is_cc_bit_set(V_BIT)))) branch = true;
-    if (bop == BLT &&  (is_cc_bit_set(N_BIT) != is_cc_bit_set(V_BIT))) branch = true;
-    if (bop == BGE && !(is_cc_bit_set(N_BIT) != is_cc_bit_set(V_BIT))) branch = true;
+    if (bop == BLE &&  (is_cc_bit_set(CC_Z_BIT) || (is_cc_bit_set(CC_N_BIT) != is_cc_bit_set(CC_V_BIT)))) branch = true;
+    if (bop == BGT && !(is_cc_bit_set(CC_Z_BIT) || (is_cc_bit_set(CC_N_BIT) != is_cc_bit_set(CC_V_BIT)))) branch = true;
+    if (bop == BLT &&  (is_cc_bit_set(CC_N_BIT) != is_cc_bit_set(CC_V_BIT))) branch = true;
+    if (bop == BGE && !(is_cc_bit_set(CC_N_BIT) != is_cc_bit_set(CC_V_BIT))) branch = true;
 
-    if (bop == BLS &&  (is_cc_bit_set(C_BIT) || is_cc_bit_set(Z_BIT))) branch = true;
-    if (bop == BHI && !(is_cc_bit_set(C_BIT) || is_cc_bit_set(Z_BIT))) branch = true;
+    if (bop == BLS &&  (is_cc_bit_set(CC_C_BIT) || is_cc_bit_set(CC_Z_BIT))) branch = true;
+    if (bop == BHI && !(is_cc_bit_set(CC_C_BIT) || is_cc_bit_set(CC_Z_BIT))) branch = true;
 
     if (bop == BSR) {
         // Branch to Subroutine: push PC to hardware stack (S) first
@@ -524,25 +538,30 @@ bool is_cc_bit_set(uint8_t bit) {
     return (((reg.cc >> bit) & 1) == 1);
 }
 
+
 void set_cc_bit(uint8_t bit) {
 
     reg.cc |= (1 << bit);
 }
+
 
 void clr_cc_bit(uint8_t bit) {
 
     reg.cc &= ~(1 << bit);
 }
 
+
 void flp_cc_bit(uint8_t bit) {
 
     reg.cc ^= (1 << bit);
 }
 
+
 /**
  * @brief The N, V and Z bits are frequently cleared, so clear bits 1-3.
  */
 void clr_cc_nzv(void) {
+
     reg.cc &= MASK_NZV;
 }
 
@@ -556,8 +575,8 @@ void clr_cc_nzv(void) {
 void set_cc_nz(uint16_t value, bool is_16_bit) {
 
     reg.cc &= MASK_NZ;
-    if (value == 0) set_cc_bit(Z_BIT);
-    if (is_bit_set(value, (is_16_bit ? SIGN_BIT_16 : SIGN_BIT_8))) set_cc_bit(N_BIT);
+    if (value == 0) set_cc_bit(CC_Z_BIT);
+    if (is_bit_set(value, (is_16_bit ? SIGN_BIT_16 : SIGN_BIT_8))) set_cc_bit(CC_N_BIT);
 }
 
 
@@ -568,7 +587,7 @@ void set_cc_nz(uint16_t value, bool is_16_bit) {
 void set_cc_after_clr(void) {
 
     reg.cc &= MASK_NZVC;
-    set_cc_bit(Z_BIT);
+    set_cc_bit(CC_Z_BIT);
 }
 
 
@@ -594,7 +613,7 @@ void set_cc_after_load(uint16_t value, bool is_16_bit) {
  * @param is_16_bit: `true` if the value is 16 bits long.
  */
 void set_cc_after_store(uint16_t value, bool is_16_bit) {
-    
+
     set_cc_after_load(value, is_16_bit);
 }
 
@@ -660,11 +679,11 @@ void add(uint8_t op, uint8_t mode) {
 void add_16(uint8_t op, uint8_t mode) {
 
     // Should not affect H, so preserve it
-    bool h_is_set = is_bit_set(reg.cc, H_BIT);
+    bool h_is_set = is_bit_set(reg.cc, CC_H_BIT);
 
     // Clear N and Z
-    clr_cc_bit(N_BIT);
-    clr_cc_bit(Z_BIT);
+    clr_cc_bit(CC_N_BIT);
+    clr_cc_bit(CC_Z_BIT);
 
     // Get bytes
     uint16_t address = address_from_mode(mode);
@@ -686,9 +705,9 @@ void add_16(uint8_t op, uint8_t mode) {
 
     // Restore H -- may have been changed by 'alu()'
     if (h_is_set) {
-        set_cc_bit(H_BIT);
+        set_cc_bit(CC_H_BIT);
     } else {
-        clr_cc_bit(H_BIT);
+        clr_cc_bit(CC_H_BIT);
     }
 }
 
@@ -889,7 +908,7 @@ void com(uint8_t op, uint8_t mode) {
 void cwai(void) {
 
     reg.cc &= get_next_byte();
-    set_cc_bit(E_BIT);
+    set_cc_bit(CC_E_BIT);
     push(PUSH_TO_HARD_STACK, PUSH_PULL_EVERY_REG);
     state.wait_for_interrupt = true;
 }
@@ -900,13 +919,13 @@ void cwai(void) {
  */
 void daa(void) {
 
-    bool carry = is_bit_set(reg.cc, C_BIT);
-    clr_cc_bit(C_BIT);
+    bool carry = is_bit_set(reg.cc, CC_C_BIT);
+    clr_cc_bit(CC_C_BIT);
 
     // Set Least Significant Conversion Factor, which will be either 0 or 6
     uint8_t correction = 0;
     uint8_t lsn = reg.a & 0x0F;
-    if (is_bit_set(reg.cc, H_BIT) || lsn > 9) correction = 6;
+    if (is_bit_set(reg.cc, CC_H_BIT) || lsn > 9) correction = 6;
     reg.a += correction;
 
     // Set Most Significant Conversion Factor, which will be either 0 or 6
@@ -914,7 +933,7 @@ void daa(void) {
     correction = 0;
     if (carry || msn > 8 || lsn > 9) correction = 6;
     msn += correction;
-    if (msn > 0x0F) set_cc_bit(C_BIT);
+    if (msn > 0x0F) set_cc_bit(CC_C_BIT);
 
     reg.a = (msn << 4) | (reg.a & 0x0F);
     set_cc_nz(reg.a, false);
@@ -1124,8 +1143,8 @@ void mul(void) {
 
     reg.cc &= MASK_ZC;
     uint16_t d = reg.a * reg.b;
-    if (is_bit_set(d, 7)) set_cc_bit(C_BIT);
-    if (d == 0) set_cc_bit(Z_BIT);
+    if (is_bit_set(d, 7)) set_cc_bit(CC_C_BIT);
+    if (d == 0) set_cc_bit(CC_Z_BIT);
 
     // Decompose D
     reg.a = (d >> 8) & 0xFF;
@@ -1237,7 +1256,7 @@ void ror(uint8_t op, uint8_t mode) {
 void rti(void) {
 
     pull(true, PUSH_PULL_CC_REG);
-    if (is_cc_bit_set(E_BIT)) {
+    if (is_cc_bit_set(CC_E_BIT)) {
         pull(true, PUSH_PULL_ALL_REGS);
     } else {
         pull(true, PUSH_PULL_PC_REG);
@@ -1282,10 +1301,10 @@ void sex(void) {
     reg.a = 0;
     if (is_bit_set(reg.b, SIGN_BIT_8)) {
         reg.a = 0xFF;
-        set_cc_bit(N_BIT);
+        set_cc_bit(CC_N_BIT);
     }
 
-    if (reg.b == 0) set_cc_bit(Z_BIT);
+    if (reg.b == 0) set_cc_bit(CC_Z_BIT);
 }
 
 
@@ -1422,13 +1441,13 @@ void sub_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
 void swi(uint8_t number) {
 
     // Set e to 1 then push every register to the hardware stac
-    set_cc_bit(E_BIT);
+    set_cc_bit(CC_E_BIT);
     push(true, PUSH_PULL_EVERY_REG);
 
     if (number == 1) {
         // Set I and F
-        set_cc_bit(I_BIT);
-        set_cc_bit(F_BIT);
+        set_cc_bit(CC_I_BIT);
+        set_cc_bit(CC_F_BIT);
 
         // Set the PC to the interrupt vector
         reg.pc = (mem[SWI1_VECTOR] << 8) | mem[SWI1_VECTOR + 1];
@@ -1503,10 +1522,10 @@ uint8_t alu(uint8_t value_1, uint8_t value_2, bool use_carry) {
         binary_2[i] = ((value_2 >> i) & 0x01);
     }
 
-    if (use_carry) bit_carry = is_cc_bit_set(C_BIT);
+    if (use_carry) bit_carry = is_cc_bit_set(CC_C_BIT);
 
-    clr_cc_bit(C_BIT);
-    clr_cc_bit(V_BIT);
+    clr_cc_bit(CC_C_BIT);
+    clr_cc_bit(CC_V_BIT);
 
     for (uint32_t i = 0 ; i < 8 ; ++i) {
         if (binary_1[i] == binary_2[i]) {
@@ -1522,14 +1541,14 @@ uint8_t alu(uint8_t value_1, uint8_t value_2, bool use_carry) {
         }
 
         // Check for half carry, ie. result of bit 3 add is a carry into bit 4
-        if (i == 3 && bit_carry) set_cc_bit(H_BIT);
+        if (i == 3 && bit_carry) set_cc_bit(CC_H_BIT);
 
         // Record bit 6 carry for overflow check
         if (i == 6) bit_6_carry = bit_carry;
     }
 
     // Preserve the final carry value in the CC register's C bit
-    if (bit_carry) set_cc_bit(C_BIT);
+    if (bit_carry) set_cc_bit(CC_C_BIT);
 
     /* Check for an overflow:
        V = 1 if C XOR c6 == 1
@@ -1537,7 +1556,7 @@ uint8_t alu(uint8_t value_1, uint8_t value_2, bool use_carry) {
         most significant bit is different from the carry out of the next most
         significant bit; that is, an overflow is the exclusive-OR of the carries
         into and out of the sign bit." */
-    if (bit_carry != bit_6_carry) set_cc_bit(V_BIT);
+    if (bit_carry != bit_6_carry) set_cc_bit(CC_V_BIT);
 
     // Copy answer into bits[] array for conversion to decimal
     uint8_t final = 0;
@@ -1650,7 +1669,7 @@ uint8_t sub_with_carry(uint8_t value, uint8_t amount) {
  */
 uint8_t base_sub(uint8_t value, uint8_t amount, bool use_carry) {
 
-    bool carry_set = is_bit_set(reg.cc, C_BIT);
+    bool carry_set = is_bit_set(reg.cc, CC_C_BIT);
     uint8_t comp = twos_complement(amount);
     uint8_t answer = alu(value, comp, false);
 
@@ -1662,7 +1681,7 @@ uint8_t base_sub(uint8_t value, uint8_t amount, bool use_carry) {
 
     // C represents a borrow and is set to the complement of the carry
     // of the internal binary addition
-    flp_cc_bit(C_BIT);
+    flp_cc_bit(CC_C_BIT);
 
     set_cc_nz(answer, false);
     return answer;
@@ -1704,7 +1723,7 @@ uint16_t subtract_16(uint16_t value, uint16_t amount) {
 
     // c represents a borrow and is set to the complement of the carry
     // of the internal binary addition
-    flp_cc_bit(C_BIT);
+    flp_cc_bit(CC_C_BIT);
 
     return answer;
 }
@@ -1733,9 +1752,9 @@ uint8_t negate(uint8_t value, bool ignore) {
 
     // C represents a borrow and is set to the complement of
     // the carry of the internal binary addition
-    flp_cc_bit(C_BIT);
+    flp_cc_bit(CC_C_BIT);
 
-    if (value == 0x80) set_cc_bit(V_BIT);
+    if (value == 0x80) set_cc_bit(CC_V_BIT);
     set_cc_nz(answer, false);
     return answer;
 }
@@ -1787,8 +1806,8 @@ uint8_t complement(uint8_t value) {
 
     value = ones_complement(value);
     set_cc_nz(value, false);
-    clr_cc_bit(V_BIT);
-    set_cc_bit(C_BIT);
+    clr_cc_bit(CC_V_BIT);
+    set_cc_bit(CC_C_BIT);
     return value;
 }
 
@@ -1819,7 +1838,7 @@ void compare(uint8_t value, uint8_t amount) {
  */
 uint8_t do_and(uint8_t value, uint8_t amount) {
 
-    clr_cc_bit(V_BIT);
+    clr_cc_bit(CC_V_BIT);
     uint8_t answer = value & amount;
     set_cc_nz(answer, false);
     return answer;
@@ -1837,7 +1856,7 @@ uint8_t do_and(uint8_t value, uint8_t amount) {
  */
 uint8_t do_or(uint8_t value, uint8_t amount) {
 
-    clr_cc_bit(V_BIT);
+    clr_cc_bit(CC_V_BIT);
     uint8_t answer = value | amount;
     set_cc_nz(answer, false);
     return answer;
@@ -1855,7 +1874,7 @@ uint8_t do_or(uint8_t value, uint8_t amount) {
  */
 uint8_t do_xor(uint8_t value, uint8_t amount) {
 
-    clr_cc_bit(V_BIT);
+    clr_cc_bit(CC_V_BIT);
     uint8_t answer = value ^ amount;
     set_cc_nz(answer, false);
     return answer;
@@ -1889,8 +1908,8 @@ uint8_t arith_shift_right(uint8_t value) {
 uint8_t logic_shift_left(uint8_t value) {
 
     reg.cc &= MASK_NZVC;
-    if (is_bit_set(value, 7)) set_cc_bit(C_BIT);
-    if (is_bit_set(value, 7) != is_bit_set(value, 6)) set_cc_bit(V_BIT);
+    if (is_bit_set(value, 7)) set_cc_bit(CC_C_BIT);
+    if (is_bit_set(value, 7) != is_bit_set(value, 6)) set_cc_bit(CC_V_BIT);
 
     for (uint32_t i = 7 ; i > 0  ; i--) {
         if (is_bit_set(value, i - 1)) {
@@ -1921,7 +1940,7 @@ uint8_t logic_shift_right(uint8_t value) {
 
     // Clear bit 7
     answer &= 0x7F;
-    if (answer == 0) set_cc_bit(Z_BIT);
+    if (answer == 0) set_cc_bit(CC_Z_BIT);
     return answer;
 }
 
@@ -1936,7 +1955,7 @@ uint8_t logic_shift_right(uint8_t value) {
 uint8_t partial_shift_right(uint8_t value) {
 
     reg.cc &= MASK_NZC;
-    if (is_bit_set(value, 0)) set_cc_bit(C_BIT);
+    if (is_bit_set(value, 0)) set_cc_bit(CC_C_BIT);
 
     for (uint32_t i = 0 ; i < 7 ; i++) {
         if (is_bit_set(value, i + 1)) {
@@ -1961,12 +1980,12 @@ uint8_t partial_shift_right(uint8_t value) {
 uint8_t rotate_left(uint8_t value) {
 
     // C becomes bit 7 of original operand
-    bool carry = is_cc_bit_set(C_BIT);
+    bool carry = is_cc_bit_set(CC_C_BIT);
     reg.cc &= MASK_NZVC;
-    if (is_bit_set(value, 7)) set_cc_bit(C_BIT);
+    if (is_bit_set(value, 7)) set_cc_bit(CC_C_BIT);
 
     // N is bit 7 XOR bit 6 of value
-    if (is_bit_set(value, 7) != is_bit_set(value, 6)) set_cc_bit(V_BIT);
+    if (is_bit_set(value, 7) != is_bit_set(value, 6)) set_cc_bit(CC_V_BIT);
 
     for (uint32_t i = 7 ; i > 0  ; i--) {
         if (is_bit_set(value, i - 1)) {
@@ -1999,9 +2018,9 @@ uint8_t rotate_left(uint8_t value) {
 uint8_t rotate_right(uint8_t value) {
 
     // C becomes bit 0 of original operand
-    bool carry = is_cc_bit_set(C_BIT);
+    bool carry = is_cc_bit_set(CC_C_BIT);
     reg.cc &= MASK_NZC;
-    if (is_bit_set(value, 0)) set_cc_bit(C_BIT);
+    if (is_bit_set(value, 0)) set_cc_bit(CC_C_BIT);
 
     for (uint32_t i = 0 ; i < 7 ; i++) {
         if (is_bit_set(value, i + 1)) {
@@ -2030,8 +2049,8 @@ uint8_t decrement(uint8_t value) {
     //          V set only if value is $80
 
     // See 'Programming the 6809' p 155
-    clr_cc_bit(V_BIT);
-    if (value == 0x80) set_cc_bit(V_BIT);
+    clr_cc_bit(CC_V_BIT);
+    if (value == 0x80) set_cc_bit(CC_V_BIT);
 
     uint8_t answer = value - 1;
     set_cc_nz(answer, false);
@@ -2044,8 +2063,8 @@ uint8_t increment(uint8_t value) {
     // Affects N, Z, V
 
     // See 'Programming the 6809' p 158
-    clr_cc_bit(V_BIT);
-    if (value == 0x7F) set_cc_bit(V_BIT);
+    clr_cc_bit(CC_V_BIT);
+    if (value == 0x7F) set_cc_bit(CC_V_BIT);
 
     uint8_t answer = value + 1;
     set_cc_nz(answer, false);
@@ -2316,9 +2335,9 @@ void load_effective(uint16_t amount, uint8_t reg_code) {
 
     if (reg_code < 2) {
         if (amount == 0) {
-            set_cc_bit(Z_BIT);
+            set_cc_bit(CC_Z_BIT);
         } else {
-            clr_cc_bit(Z_BIT);
+            clr_cc_bit(CC_Z_BIT);
         }
     }
 
@@ -2778,10 +2797,11 @@ void increment_register(uint8_t source_reg, int16_t amount) {
 void reset_registers(void) {
 
     // Zero DP
+    // See MC6809 Datasheet p.4
     reg.dp = 0;
 
     // Clear CC F and I bits
-    reg.cc &= 0xAf;
+    reg.cc &= 0xAF;
 
     // Set PC from reset vector
     reg.pc = (mem[RESET_VECTOR] << 8) | mem[RESET_VECTOR + 1];
@@ -2811,35 +2831,42 @@ void clear_all_registers(void) {
  */
 void process_interrupt(uint8_t irq) {
 
+    // FIRQ
     if (irq == FIRQ_BIT) {
-        clr_cc_bit(E_BIT);
+        clr_cc_bit(CC_E_BIT);
         push(true, PUSH_PULL_CC_REG | PUSH_PULL_PC_REG);
-        set_cc_bit(F_BIT);
-        set_cc_bit(I_BIT);
+        set_cc_bit(CC_F_BIT);
+        set_cc_bit(CC_I_BIT);
         state.bus_state_pins = 0x02;
         reg.pc = (mem[FIRQ_VECTOR] << 8) | mem[FIRQ_VECTOR + 1];
         state.bus_state_pins = 0x00;
         flash_led(2);
     }
 
+    // IRQ
     if (irq == IRQ_BIT) {
-        set_cc_bit(E_BIT);
+        set_cc_bit(CC_E_BIT);
         push(true, PUSH_PULL_ALL_REGS);
-        set_cc_bit(I_BIT);
+        set_cc_bit(CC_I_BIT);
         state.bus_state_pins = 0x02;
         reg.pc = (mem[IRQ_VECTOR] << 8) | mem[IRQ_VECTOR + 1];
         state.bus_state_pins = 0x00;
         flash_led(4);
     }
 
+    // NMI
     if (irq == NMI_BIT) {
-        set_cc_bit(E_BIT);
+        set_cc_bit(CC_E_BIT);
         push(true, PUSH_PULL_ALL_REGS);
-        set_cc_bit(F_BIT);
-        set_cc_bit(I_BIT);
+        set_cc_bit(CC_F_BIT);
+        set_cc_bit(CC_I_BIT);
         state.bus_state_pins = 0x02;
         reg.pc = (mem[NMI_VECTOR] << 8) | mem[NMI_VECTOR + 1];
         state.bus_state_pins = 0x00;
         flash_led(6);
+    }
+
+    if (irq == RESET_BIT) {
+
     }
 }

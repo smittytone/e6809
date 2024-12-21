@@ -33,14 +33,14 @@
 #define OPCODE_EXTENDED_1       0x10
 #define OPCODE_EXTENDED_2       0x11
 
-#define C_BIT                   0
-#define V_BIT                   1
-#define Z_BIT                   2
-#define N_BIT                   3
-#define I_BIT                   4
-#define H_BIT                   5
-#define F_BIT                   6
-#define E_BIT                   7
+#define CC_C_BIT                0
+#define CC_V_BIT                1
+#define CC_Z_BIT                2
+#define CC_N_BIT                3
+#define CC_I_BIT                4
+#define CC_H_BIT                5
+#define CC_F_BIT                6
+#define CC_E_BIT                7
 
 #define REG_X                   0
 #define REG_Y                   1
@@ -50,6 +50,7 @@
 #define NMI_BIT                 0
 #define IRQ_BIT                 1
 #define FIRQ_BIT                2
+#define RESET_BIT               3
 
 #define SIGN_BIT_8              7
 #define SIGN_BIT_16             15
@@ -110,6 +111,7 @@ typedef struct {
 typedef struct {
     bool        wait_for_interrupt;
     bool        is_sync;
+    bool        nmi_disarmed;
     uint8_t     interrupts;
     // May drop these below
     uint8_t     bus_state_pins;

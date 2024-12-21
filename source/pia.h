@@ -28,7 +28,7 @@
 /*
  *      PROTOTYPES
  */
-void        pia_init(uint16_t cra, uint16_t ddra);
+void        pia_init(uint16_t cra, uint16_t ddra, uint8_t* pa_pins, uint8_t* ca_pins);
 void        pia_init_gpio(void);
 
 void        pia_reset(void);

@@ -14,14 +14,15 @@
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 // App
+#include "main.h"
 #include "cpu.h"
 #include "pia.h"
 
 
 // These are the RP2040 pins which are proxies for the
 
-uint8_t     pia_pa_pins[] = {6, 7, 8, 9, 10, 11, 12, 13};
-uint8_t     pia_ca_pins[] = {14, 15};
+uint8_t*    pia_pa_pins;
+uint8_t*    pia_ca_pins;
 uint8_t     reg_control_a = 0;
 uint8_t     reg_datadir_a = 0;
 uint8_t     reg_output_a = 0;
@@ -36,18 +37,22 @@ bool        ca_2_can_interrupt = false;
 bool        ca_2_is_set_on_up = false;
 bool        ca_2_is_output = false;
 
-extern REG_6809    reg;
-extern uint8_t     mem[KB64];
+extern REG_6809     reg;
+extern uint8_t      mem[KB64];
+extern STATE_RP2040 pico_state;
 
 
-void pia_init(uint16_t cra, uint16_t ddra) {
+void pia_init(uint16_t cra, uint16_t ddra, uint8_t* pa_pins, uint8_t* ca_pins) {
 
     // Record register memory locations
     mem_control_a = cra;
     mem_datadir_a = ddra;
 
+    pia_pa_pins = pa_pins;
+    pia_ca_pins = ca_pins;
+    
     // Initialise the GPIO
-    pia_init_gpio();
+    //pia_init_gpio();
 
     // Perform a reset
     pia_reset();
@@ -72,12 +77,12 @@ void pia_reset(void) {
 
     // Update GPIO directions (all inputs)
     for (uint8_t i = 0 ; i < 8 ; i++) {
-        gpio_set_dir(pia_pa_pins[i], false);
+        gpio_set_dir(*(pia_pa_pins + i), false);
     }
 
     // Set up the CA pins (inputs)
-    gpio_set_dir(pia_ca_pins[0], false);
-    gpio_set_dir(pia_ca_pins[1], false);
+    gpio_set_dir(*(pia_ca_pins), false);
+    gpio_set_dir(*(pia_ca_pins + 1), false);
 }
 
 
@@ -88,12 +93,12 @@ void pia_init_gpio(void) {
 
     // Set up the PA pins
     for (uint8_t i = 0 ; i < 8 ; i++) {
-        gpio_init(pia_pa_pins[i]);
+        gpio_init(*(pia_pa_pins + i));
     }
 
     // Set up the CA pins
-    gpio_init(pia_ca_pins[0]);  // CA 1
-    gpio_init(pia_ca_pins[1]);  // CA 2
+    gpio_init(*(pia_ca_pins));  // CA 1
+    gpio_init(*(pia_ca_pins + 1));  // CA 2
 }
 
 
@@ -104,7 +109,7 @@ void set_gpio_direction(uint8_t pin) {
 
     // Pico SDK for put() -- false is input, true is output
     uint8_t value = ((reg_datadir_a & (1 << pin)) >> pin);
-    gpio_set_dir(pia_pa_pins[pin], (value == OUTPUT));
+    gpio_set_dir(*(pia_pa_pins + pin), (value == OUTPUT));
 
     // If it's an output, set its state
     // according to the OR
@@ -131,7 +136,7 @@ uint8_t get_gpio_direction(uint8_t pin) {
 void set_gpio_output_state(uint8_t pin) {
 
     uint8_t value = ((reg_output_a & (1 << pin)) >> pin);
-    gpio_put(pia_pa_pins[pin], (value == 1));
+    gpio_put(*(pia_pa_pins + pin), (value == 1));
 }
 
 /*
@@ -140,7 +145,7 @@ void set_gpio_output_state(uint8_t pin) {
  */
 void get_gpio_input_state(uint8_t pin) {
 
-    if (gpio_get(pia_pa_pins[pin])) {
+    if (gpio_get(*(pia_pa_pins + pin))) {
         reg_output_a |= (1 << pin);
     } else {
         reg_output_a &= !(1 << pin);
@@ -231,6 +236,6 @@ void pia_check_irqs(void) {
 void pia_set_pia_ca(void) {
 
     if (ca_2_is_output & (reg_control_a & 0x10) > 0) {
-        gpio_put(pia_ca_pins[1], (reg_control_a & 0x08 > 0));
+        gpio_put(*(pia_ca_pins + 1), (reg_control_a & 0x08 > 0));
     }
 }

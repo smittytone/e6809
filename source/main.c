@@ -27,9 +27,10 @@
 
 
 /*
- *  FDs
+ *  STATICS
  */
 static void boot_cpu(void);
+static void init_rp2040_gpio(void);
 // EXPERIMENTAL
 static void read_into_ram(void);
 static void save_ram(void);
@@ -38,7 +39,7 @@ static void save_ram(void);
 /*
  *  GLOBALS
  */
-uint8_t interrupts[3] = {PIN_6809_NMI, PIN_6809_IRQ, PIN_6809_FIRQ};
+STATE_RP2040 pico_state;
 
 extern REG_6809    reg;
 extern uint8_t     mem[KB64];
@@ -55,13 +56,25 @@ int main() {
     // Pause to allow the USB path to initialize
     sleep_ms(2000);
 #endif
-
+    
+    // Basic RP2040 config
+    pico_state.has_led = true;
+    pico_state.has_mc6821 = false;
+    
     // Prepare the board
     bool is_using_monitor = init_board();
+    
+    // Set up the host MCU
+    init_rp2040_gpio();
 
     // Boot the CPU
     boot_cpu();
-
+    
+    // Boot the PIA
+    if (pico_state.has_mc6821) {
+        pia_init(0x0000, 0x0000, &pico_state.pia_gpio[0], &pico_state.pia_gpio[8]);
+    }
+    
     // Branch according to whether the Pico is connected to a
     // monitor board or not (in which case run tests for now)
     if (is_using_monitor) {
@@ -69,14 +82,12 @@ int main() {
 #ifdef DEBUG
         printf("Using monitor board\n");
 #endif
-
         monitor_event_loop();
     } else {
         // Run tests -- for now
 #ifdef DEBUG
         printf("Running tests\n");
 #endif
-
         test_main();
     }
 
@@ -95,7 +106,7 @@ static void boot_cpu(void) {
 #endif
 
     // Interrupt Vectors:
-    uint16_t vectors[] = {0x0400,       //   Restart
+    uint16_t vectors[] = {0x0400,       //   RESET
                           0x0500,       //   NMI
                           0x0500,       //   SWI
                           0x0500,       //   IRQ
@@ -109,19 +120,18 @@ static void boot_cpu(void) {
 #ifdef DEBUG
     printf("Initializing memory\n");
 #endif
-    for (uint16_t i = 0 ; i < START_VECTORS ; ++i) {
-        mem[i] = RTI;
-    }
+    // Clear the RAM below the IRQ vector table
+    memset(mem, 0x00, START_VECTORS);
 
 #ifdef DEBUG
     printf("Entering sample program at 0x4000\n");
 
     uint16_t start = 0x4000;
     uint8_t prog[] = {0x86,0xFF,0x8E,0x80,0x00,0xA7,0x80,0x8C,0x80,0x09,0x2D,0xF9,0x8E,0x40,0x00,0x6E,0x84};
-    for (uint16_t i = 0 ; i < 17 ; i++) mem[start + i] = prog[i];
+    memcpy(&mem[start], prog, sizeof(prog));
 
-    reg.pc = 0x4000;
-    reg.cc = 0x6B;
+    reg.pc = start;
+    reg.cc = 0x6B;      // WHY THIS SETTING?
 
     /*
      * TEST PROGS
@@ -132,19 +142,56 @@ static void boot_cpu(void) {
     {0x86, 0x41, 0x8E, 0x04, 0x00, 0xA7, 0x80, 0x8C, 0x06, 0x00, 0x26, 0xF9, 0x1A, 0x0F, 0x3B};
     */
 #endif
+}
+
+
+/**
+ * @brief Configure the RP2040’s GPIO pins.
+ *
+ * @note Assumes the use of the Pico board.
+ */
+static void init_rp2040_gpio(void) {
 
 #ifdef DEBUG
-    printf("Setting interrupt vectors\n");
+    printf("Setting RP2040 GPIO pins\n");
 #endif
-    // Set up interrupt pins
-    // TODO Keep here or place in CPU file?
-    for (uint8_t i = 0 ; i < 3 ; ++i) {
-        gpio_init(interrupts[i]);
-        gpio_set_dir(interrupts[i], GPIO_IN);
-        gpio_pull_down(interrupts[i]);
+    // Configuration
+    pico_state.irq_gpio[0] = PIN_6809_NMI;
+    pico_state.irq_gpio[1] = PIN_6809_IRQ;
+    pico_state.irq_gpio[2] = PIN_6809_FIRQ;
+    pico_state.irq_gpio[3] = PIN_6809_RESET;
+    
+    pico_state.pia_gpio[0] = PIN_6821_PA0;
+    pico_state.pia_gpio[1] = PIN_6821_PA1,
+    pico_state.pia_gpio[2] = PIN_6821_PA2,
+    pico_state.pia_gpio[3] = PIN_6821_PA3,
+    pico_state.pia_gpio[4] = PIN_6821_PA4,
+    pico_state.pia_gpio[5] = PIN_6821_PA5,
+    pico_state.pia_gpio[6] = PIN_6821_PA6,
+    pico_state.pia_gpio[7] = PIN_6821_PA7,
+    pico_state.pia_gpio[8] = PIN_6821_CA1,
+    pico_state.pia_gpio[9] = PIN_6821_CA2;
+    
+    // Set up the IRQ pins
+    for (uint8_t i = 0 ; i < RP2040_IRQ_GPIO_COUNT ; ++i) {
+        gpio_init(pico_state.irq_gpio[i]);
+        gpio_set_dir(pico_state.irq_gpio[i], GPIO_IN);
+        gpio_pull_down(pico_state.irq_gpio[i]);
     }
-
-    // Set up the LED
+    
+    // Initialize PIA pins if PIA is present
+    // TODO Sync with pia.c
+    if (pico_state.has_mc6821) {
+        for (uint8_t i = 0 ; i < RP2040_PIA_GPIO_COUNT ; ++i) {
+            // On RESET, set PA0-7, CA1, CA2 to inputs
+            // See MC6821 Data Sheet p6
+            gpio_init(pico_state.pia_gpio[i]);
+            gpio_set_dir(pico_state.pia_gpio[i], GPIO_IN);
+            gpio_pull_down(pico_state.pia_gpio[i]);
+        }
+    }
+    
+    // Set up the Pico LED
     gpio_init(PIN_PICO_LED);
     gpio_set_dir(PIN_PICO_LED, GPIO_OUT);
     gpio_put(PIN_PICO_LED, false);
@@ -153,13 +200,14 @@ static void boot_cpu(void) {
 
 /**
  * @brief Sample the interrupt pins and return a bitfield.
- *        This will be called by the
+ *        This will be called by the CPU code, initially on a per-cycle
+ *        basis but later as true interrupts.
  */
 uint8_t sample_interrupts(void) {
 
     uint8_t irqs = 0;
     for (uint8_t i = 0 ; i < 3 ; ++i) {
-        if (gpio_get(interrupts[i])) irqs |= (1 << i);
+        if (gpio_get(pico_state.irq_gpio[i])) irqs |= (1 << i);
     }
     return irqs;
 }
@@ -172,12 +220,14 @@ uint8_t sample_interrupts(void) {
  */
 void flash_led(uint8_t count) {
 
-    while (count > 0) {
-        gpio_put(PIN_PICO_LED, true);
-        sleep_ms(250);
-        gpio_put(PIN_PICO_LED, false);
-        sleep_ms(250);
-        count--;
+    if (pico_state.has_led) {
+        while (count > 0) {
+            gpio_put(PIN_PICO_LED, true);
+            sleep_ms(250);
+            gpio_put(PIN_PICO_LED, false);
+            sleep_ms(250);
+            count--;
+        }
     }
 }
 
