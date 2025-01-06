@@ -4,7 +4,7 @@
  *
  * @version     0.0.2
  * @author      smittytone
- * @copyright   2024
+ * @copyright   2025
  * @licence     MIT
  *
  */
@@ -19,101 +19,117 @@
 #include "pia.h"
 
 
-// These are the RP2040 pins which are proxies for the
+/*
+ * STATICS
+ */
+static void pia_set_data_byte(MC6821* pia);
 
-uint8_t*    pia_pa_pins;
-uint8_t*    pia_ca_pins;
-uint8_t     reg_control_a = 0;
-uint8_t     reg_datadir_a = 0;
-uint8_t     reg_output_a = 0;
 
-uint16_t    mem_control_a = 0x0000;
-uint16_t    mem_datadir_a = 0x0000;
-
-bool        enabled = false;
-bool        ca_1_can_interrupt = false;
-bool        ca_1_is_set_on_up = false;
-bool        ca_2_can_interrupt = false;
-bool        ca_2_is_set_on_up = false;
-bool        ca_2_is_output = false;
-
+/*
+ * GLOBALS
+ */
 extern REG_6809     reg;
 extern uint8_t      mem[KB64];
 extern STATE_RP2040 pico_state;
 
 
-void pia_init(uint16_t cra, uint16_t ddra, uint8_t* pa_pins, uint8_t* ca_pins) {
-
-    // Record register memory locations
-    mem_control_a = cra;
-    mem_datadir_a = ddra;
-
-    pia_pa_pins = pa_pins;
-    pia_ca_pins = ca_pins;
-    
-    // Initialise the GPIO
-    //pia_init_gpio();
+/**
+ * @brief Initialise a PIA.
+ *
+ * @param pia: Pointee to an MC6821 struc
+ */
+void pia_init(MC6821* pia) {
 
     // Perform a reset
-    pia_reset();
+    pia_reset(pia);
 }
 
 
-void pia_reset(void) {
+void pia_reset(MC6821* pia) {
 
-    enabled = true;
+    pia->enabled = true;
 
     // All output, all low
-    reg_control_a = 0;
-    reg_datadir_a = 0;
-    reg_output_a = 0;
+    // NOTE This is a local store, for reference
+    pia->reg_output_a = 0;
+    pia->reg_direction_a = 0;
 
     // CA interrupts disabled, CA2 is input
-    ca_1_can_interrupt = false;
-    ca_1_is_set_on_up = false;
-    ca_2_can_interrupt = false;
-    ca_2_is_set_on_up = false;
-    ca_2_is_output = false;
+    pia->ca_1_can_interrupt = false;
+    pia->ca_1_is_set_on_up = false;
+    pia->ca_2_can_interrupt = false;
+    pia->ca_2_is_set_on_up = false;
+    pia->ca_2_is_output = false;
 
-    // Update GPIO directions (all inputs)
+    // Update GPIO directions (set all to input with pullup)
+    // See MC6821 Datasheet p.8
     for (uint8_t i = 0 ; i < 8 ; i++) {
-        gpio_set_dir(*(pia_pa_pins + i), false);
+        gpio_set_dir(*(pia->pa_pins + i), GPIO_IN);
+        gpio_pull_up(*(pia->pa_pins + i));
     }
 
-    // Set up the CA pins (inputs)
-    gpio_set_dir(*(pia_ca_pins), false);
-    gpio_set_dir(*(pia_ca_pins + 1), false);
+    // Set the CA pins (inputs)
+    gpio_set_dir(*(pia->ca_pins), GPIO_IN);
+    gpio_set_dir(*(pia->ca_pins + 1), GPIO_IN);
+    
+    // Update the Control Register
+    
 }
 
 
-void pia_init_gpio(void) {
-
-    // On RESET, set PA0-7, CA1, CA2 is inputs
-    // See MC6821 Data Sheet p6
-
-    // Set up the PA pins
-    for (uint8_t i = 0 ; i < 8 ; i++) {
-        gpio_init(*(pia_pa_pins + i));
+/**
+ * @brief Update the PIA status based on the current value of
+ *        the Control Register.
+ */
+void pia_process_control(MC6821* pia) {
+    
+    uint16_t reg_value = (uint16_t)*(pia->reg_control_a);
+    
+    pia->ca_1_can_interrupt = is_bit_set(reg_value, 0);
+    pia->ca_1_is_set_on_up = is_bit_set(reg_value, 1);
+    
+    pia->ca_2_can_interrupt = is_bit_set(reg_value, 5);
+    
+    if (pia->ca_2_can_interrupt) {
+        pia->ca_2_is_output = true;
+        if (is_bit_set(reg_value, 4)) {
+            gpio_put(*(pia->ca_pins + 1), is_bit_set(reg_value, 3));
+        } else {
+            // See MCP6821 Datasheet p.10
+        }
+    } else {
+        pia->ca_2_is_output = false;
+        pia->ca_2_is_set_on_up = is_bit_set(reg_value, 4);
     }
+    
+    // Data direction or Output register?
+    pia->emit_output = is_bit_set(reg_value, 2);
+    pia_set_data_byte(pia);
+}
 
-    // Set up the CA pins
-    gpio_init(*(pia_ca_pins));  // CA 1
-    gpio_init(*(pia_ca_pins + 1));  // CA 2
+
+static void pia_set_data_byte(MC6821* pia) {
+    
+    if (pia->emit_output) {
+        *(pia->reg_data_a) = pia->reg_output_a;
+    } else {
+        *(pia->reg_data_a) = pia->reg_direction_a;
+    }
 }
 
 
 /*
     Set the PA direction based on the DDR
  */
-void set_gpio_direction(uint8_t pin) {
+void pia_set_gpio_direction(MC6821* pia, uint8_t pin) {
 
-    // Pico SDK for put() -- false is input, true is output
-    uint8_t value = ((reg_datadir_a & (1 << pin)) >> pin);
-    gpio_set_dir(*(pia_pa_pins + pin), (value == OUTPUT));
+    // Pico GPIO directions: false is input, true is output
+    uint8_t value = ((*pia->reg_data_a & (1 << pin)) >> pin);
+    gpio_set_dir(*(pia->pa_pins + pin), (value == OUTPUT));
 
-    // If it's an output, set its state
-    // according to the OR
-    if (value == OUTPUT) set_gpio_output_state(pin);
+    // If the pin is an output, set its pin level according
+    // to the output register value
+    if (value == OUTPUT) pia_set_gpio_output_state(pia, pin);
 }
 
 
@@ -122,66 +138,70 @@ void set_gpio_direction(uint8_t pin) {
 
     - Returns: 1 for output, 0 for input
  */
-uint8_t get_gpio_direction(uint8_t pin) {
+uint8_t pia_get_gpio_direction(MC6821* pia, uint8_t pin) {
 
-    return ((reg_datadir_a & (1 << pin)) >> pin);
+    return ((*pia->reg_data_a & (1 << pin)) >> pin);
 }
 
 
-/*
-    Set the PA output value based on the OR.
-    NOTE Assumes we have already checked that the pin
-         *is* an output.
+/**
+ * @brief Set the PA output value based on the OR.
+ *
+ * @note Assumes we have already checked that the pin
+ *       *is* an output.
  */
-void set_gpio_output_state(uint8_t pin) {
+void pia_set_gpio_output_state(MC6821* pia, uint8_t pin) {
 
-    uint8_t value = ((reg_output_a & (1 << pin)) >> pin);
-    gpio_put(*(pia_pa_pins + pin), (value == 1));
+    uint8_t value = ((pia->reg_output_a & (1 << pin)) >> pin);
+    gpio_put(*(pia->pa_pins + pin), (value == 1));
 }
 
-/*
-    Read a specific input and set its OR bit
-    accordingly.
+/**
+ * @brief Read a specific input and set its output register bit
+ *        accordingly.
  */
-void get_gpio_input_state(uint8_t pin) {
+void pia_get_gpio_input_state(MC6821* pia, uint8_t pin) {
 
-    if (gpio_get(*(pia_pa_pins + pin))) {
-        reg_output_a |= (1 << pin);
+    if (gpio_get(*(pia->pa_pins + pin))) {
+        pia->reg_output_a |= (1 << pin);
     } else {
-        reg_output_a &= !(1 << pin);
+        pia->reg_output_a &= !(1 << pin);
     }
 }
 
 
-void pia_update(void) {
+/**
+ * @brief Update the memory for the specified PIA.
+ */
+void pia_update(MC6821* pia) {
 
-    if (!enabled) return;
+    if (!pia->enabled) return;
 
     // Update CR
     // Get bits 0-5 from memory; retain bits 6 and 7
-    reg_control_a = (reg_control_a & 0xC0) | (mem[mem_control_a] & 0x3F);
-    pia_set_pia_ca();
-    pia_update_flags();
+    //pia->reg_control_a = (pia->reg_control_a & 0xC0) | (mem[*pia->reg_control_a] & 0x3F);
+    pia_set_pia_ca(pia);
+    pia_update_flags(pia);
 
     // Check the DDR Access bit
-    uint8_t new = mem[mem_datadir_a];
-    if (reg_control_a & 0x04) {
-        // Read in the OR from memory (set by CPU)
-        // and set the pin state -- it its an output
-        if (new != reg_output_a) {
-            reg_output_a = new;
+    uint8_t new = *pia->reg_data_a;
+    if (*pia->reg_control_a & 0x04) {
+        // Read in the Output Register from memory (set by CPU)
+        // and set the pin state -- if its an output
+        if (new != pia->reg_output_a) {
+            pia->reg_output_a = new;
             for (uint8_t i = 0 ; i < 8 ; i++) {
                 // Update all output pins states
-                if (get_gpio_direction(i) == OUTPUT) set_gpio_output_state(i);
+                if (pia_get_gpio_direction(pia, i) == OUTPUT) pia_set_gpio_output_state(pia, i);
             }
         }
     } else {
         // Read in the DDR and set pin direction
         // NOTE This uses OR for state on output
-        if (new != reg_datadir_a) {
-            reg_datadir_a = new;
+        if (new != *pia->reg_data_a) {
+            *pia->reg_data_a = new;
             for (uint8_t i = 0 ; i < 8 ; i++) {
-                set_gpio_direction(i);
+                pia_set_gpio_direction(pia, i);
             }
         }
     }
@@ -189,7 +209,7 @@ void pia_update(void) {
     // Read inputs
     for (uint8_t i = 0 ; i < 8 ; i++) {
         // Update all input pins states: affects OR
-        if (get_gpio_direction(i) == INPUT) get_gpio_input_state(i);
+        if (pia_get_gpio_direction(pia, i) == INPUT) pia_get_gpio_input_state(pia, i);
     }
 
     // Handle IRQs
@@ -197,30 +217,29 @@ void pia_update(void) {
 }
 
 
-void pia_update_flags(void) {
+void pia_update_flags(MC6821* pia) {
 
-    ca_1_can_interrupt = ((reg_control_a & 0x01) > 0);
+    pia->ca_1_can_interrupt = ((*pia->reg_control_a & 0x01) > 0);
 
     // Bit is 1, IRQ trigged on LOW to HIGH (up), else
     // on HIGH to LOW (down)
-    ca_1_is_set_on_up = ((reg_control_a & 0x02) > 0);
+    pia->ca_1_is_set_on_up = ((*pia->reg_control_a & 0x02) > 0);
 
-    bool is_output = ((reg_control_a & 0x20) > 0);
-    if (ca_2_is_output != is_output) {
+    bool is_output = ((*pia->reg_control_a & 0x20) > 0);
+    if (pia->ca_2_is_output != is_output) {
         // Settings changed
-        ca_2_is_output = is_output;
+        pia->ca_2_is_output = is_output;
 
-        if (!ca_2_is_output) {
-            ca_2_can_interrupt = ((reg_control_a & 0x08) > 0);
+        if (!pia->ca_2_is_output) {
+            pia->ca_2_can_interrupt = ((*pia->reg_control_a & 0x08) > 0);
 
             // Bit is 1, IRQ trigged on LOW to HIGH (up), else
             // on HIGH to LOW (down)
-            ca_2_is_set_on_up = ((reg_control_a & 0x10) > 0);
+            pia->ca_2_is_set_on_up = ((*pia->reg_control_a & 0x10) > 0);
         } else {
 
         }
     }
-
 }
 
 
@@ -233,9 +252,9 @@ void pia_check_irqs(void) {
 /*
     Set CA2 -- if it's an output -- to value of CR bit 3
  */
-void pia_set_pia_ca(void) {
+void pia_set_pia_ca(MC6821* pia) {
 
-    if (ca_2_is_output & (reg_control_a & 0x10) > 0) {
-        gpio_put(*(pia_ca_pins + 1), (reg_control_a & 0x08 > 0));
+    if (pia->ca_2_is_output & (*pia->reg_control_a & 0x10) > 0) {
+        gpio_put(*(pia->ca_pins + 1), (*pia->reg_control_a & 0x08 > 0));
     }
 }

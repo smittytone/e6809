@@ -3,7 +3,7 @@
  *
  * @version     0.0.2
  * @author      smittytone
- * @copyright   2024
+ * @copyright   2025
  * @licence     MIT
  *
  */

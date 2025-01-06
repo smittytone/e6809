@@ -3,7 +3,7 @@
  *
  * @version     0.0.2
  * @author      smittytone
- * @copyright   2024
+ * @copyright   2025
  * @licence     MIT
  *
  */
@@ -206,6 +206,6 @@ uint16_t    address_from_mode(uint8_t mode);
 void init_cpu(void);
 void init_vectors(uint16_t* vectors);
 void reset_registers(void);
-
+bool is_bit_set(uint16_t value, uint8_t bit);
 
 #endif // _CPU_HEADER_

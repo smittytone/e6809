@@ -3,7 +3,7 @@
  *
  * @version     0.0.2
  * @author      smittytone
- * @copyright   2024
+ * @copyright   2025
  * @licence     MIT
  *
  */
@@ -41,7 +41,6 @@ static uint8_t  get_next_byte(void);
 static uint8_t  get_byte(uint16_t address);
 static void     set_byte(uint16_t address, uint8_t value);
 static void     move_pc(int16_t amount);
-static bool     is_bit_set(uint16_t value, uint8_t bit);
 // Condition code register bit-level getters and setters
 static bool     is_cc_bit_set(uint8_t bit);
 static void     set_cc_bit(uint8_t bit);

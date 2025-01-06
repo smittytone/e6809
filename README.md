@@ -1,6 +1,6 @@
 # e6809 0.0.2
 
-An emulation of the Motorola 6809e 8-bit microprocessor designed to run on the a RP2040 microcontroller board, such as the Raspberry Pi Pico.
+An emulation of the Motorola 6809e 8-bit microprocessor designed to run on the RP2040 microcontroller board, such as the Raspberry Pi Pico.
 
 It is intended for standalone usage — though not as a drop in replacement for an original 6808e — and within a microprocessor kit design called the Monitor Board.
 
@@ -105,7 +105,7 @@ You can use [Spasm](https://github.com/smittytone/Spasm) to generate assembled `
 spasm.py -o test.rom test.asm
 ```
 
-## RP2040 Pinout (Provisional)
+## RP2040 Pinout (Provisional!)
 
 ```
 NMI•    0   - -------- -  VBUS
@@ -149,6 +149,6 @@ In no particular order...
 
 ## Copyright
 
-Emulation software copyright &copy; 2024 Tony Smith (@smittytone)
+Emulation software copyright &copy; 2025 Tony Smith (@smittytone)
 
 6809e ISA copyright &copy; 1977 Motorola &mdash; and, by sequential ownership, NXP Semiconductor.

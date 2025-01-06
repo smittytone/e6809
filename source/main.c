@@ -3,7 +3,7 @@
  *
  * @version     0.0.2
  * @author      smittytone
- * @copyright   2024
+ * @copyright   2025
  * @licence     MIT
  *
  */
@@ -42,8 +42,10 @@ static void save_ram(void);
 STATE_RP2040 pico_state;
 
 extern REG_6809    reg;
-extern uint8_t     mem[KB64];
 extern STATE_6809  state;
+extern uint8_t     mem[KB64];
+
+MC6821 pia01;
 
 
 /*
@@ -72,7 +74,11 @@ int main() {
     
     // Boot the PIA
     if (pico_state.has_mc6821) {
-        pia_init(0x0000, 0x0000, &pico_state.pia_gpio[0], &pico_state.pia_gpio[8]);
+        pia01.pa_pins = &pico_state.pia_gpio[0];
+        pia01.ca_pins = &pico_state.pia_gpio[8];
+        pia01.reg_control_a = &mem[0xFF00];
+        pia01.reg_data_a = &mem[0xFF01];
+        pia_init(&pia01);
     }
     
     // Branch according to whether the Pico is connected to a
