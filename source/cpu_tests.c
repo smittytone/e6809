@@ -333,7 +333,17 @@ static void test_alu(void) {
         errors++;
         expected(0x39F1, (uint16_t)((result << 8) | reg.cc));
     }
-
+    
+    test_setup();
+    reg.cc = 0x09;
+    result = decrement(0x80);
+    if (result == 0x7F && reg.cc == 0x03) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x7F03, (uint16_t)((result << 8) | reg.cc));
+    }
+    
     // INC
     // Zaks p.158
     test_setup();
@@ -875,7 +885,7 @@ static void test_reg(void) {
     test_setup();
     reg.a = 0x42;
     reg.dp = 0x00;
-    transfer_decode2(0x8B, true);
+    transfer_decode(0x8B, true);
     if (reg.a == 0x00 && reg.dp == 0x42) {
         passes++;
     } else {
@@ -886,11 +896,22 @@ static void test_reg(void) {
     test_setup();
     reg.a = 0x7E;
     reg.b = 0xA5;
-    transfer_decode2(0x89, true);
+    transfer_decode(0x89, true);
     if (reg.a == 0xA5 && reg.b == 0x7E) {
         passes++;
     } else {
         errors++;
+    }
+    
+    test_setup();
+    reg.a = 0x7E;
+    reg.x = 0x0011;
+    transfer_decode(0x81, true);
+    if (reg.a == 0x7E && reg.x == 0x0011) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0011, reg.x);
     }
 
     // LD 8-bit
@@ -1137,7 +1158,86 @@ static void test_branch(void) {
         errors++;
         expected(0x3A05, reg.pc);
     }
-
+    
+    test_setup();
+    reg.pc = 0x00FF;
+    mem[0x00FF] = 0x40;
+    mem[0x0100] = 0x00;
+    jmp(MODE_EXTENDED);
+    if (reg.pc == 0x4000) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x4000, reg.pc);
+    }
+    
+    test_setup();
+    reg.pc = 0x00FF;
+    mem[0x00FF] = 0x9F;
+    mem[0x0100] = 0x40;
+    mem[0x0101] = 0x00;
+    mem[0x4000] = 0xFF;
+    mem[0x4001] = 0x00;
+    jmp(MODE_INDEXED);
+    if (reg.pc == 0xFF00) {
+        passes++;
+    } else {
+        errors++;
+        expected(0xFF00, reg.pc);
+    }
+    
+    test_setup();
+    reg.pc = 0x00FF;
+    mem[0x00FF] = 0x84;
+    reg.x = 0x4000;
+    jmp(MODE_INDEXED);
+    if (reg.pc == 0x4000) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x4000, reg.pc);
+    }
+    
+    test_setup();
+    reg.pc = 0x00FF;
+    mem[0x00FF] = 0x85;
+    reg.x = 0x4000;
+    reg.b = 0x7F;
+    jmp(MODE_INDEXED);
+    if (reg.pc == 0x407F) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x407F, reg.pc);
+    }
+    
+    test_setup();
+    reg.pc = 0x00FF;
+    mem[0x00FF] = 0x95;
+    reg.x = 0x4000;
+    reg.b = 0x7F;
+    mem[0x407F] = 0xAA;
+    mem[0x4080] = 0xBB;
+    jmp(MODE_INDEXED);
+    if (reg.pc == 0xAABB) {
+        passes++;
+    } else {
+        errors++;
+        expected(0xAABB, reg.pc);
+    }
+    
+    test_setup();
+    reg.pc = 0x00FF;
+    reg.dp = 0xFF;
+    mem[0x00FF] = 0x40;
+    jmp(MODE_DIRECT);
+    if (reg.pc == 0xFF40) {
+        passes++;
+    } else {
+        errors++;
+        expected(0xFF40, reg.pc);
+    }
+    
     // JSR
     // Zaks p.160
     test_setup();
@@ -1258,7 +1358,7 @@ static void test_branch(void) {
     // TFR
     test_setup();
     reg.a = 0xFF;
-    transfer_decode2(0x8A, false);
+    transfer_decode(0x8A, false);
     if (reg.cc == reg.a) {
         passes++;
     } else {
