@@ -91,6 +91,9 @@
 #define IRQ_STATE_ASSERTED      1
 #define IRQ_STATE_HANDLED       2
 
+#define IS_8_BIT                false
+#define IS_16_BIT               true
+
 
 /*
  * STRUCTURES

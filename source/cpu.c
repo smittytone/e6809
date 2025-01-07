@@ -696,7 +696,7 @@ void add_16(uint8_t op, uint8_t mode) {
 
     // Convert the bytes back to a 16-bit value and set N, Z
     uint16_t answer = (msb << 8) | lsb;
-    set_cc_nz(answer, true);
+    set_cc_nz(answer, IS_16_BIT);
 
     // Set D's component registers
     reg.a = (answer >> 8) & 0xFF;
@@ -935,7 +935,7 @@ void daa(void) {
     if (msn > 0x0F) set_cc_bit(CC_C_BIT);
 
     reg.a = (msn << 4) | (reg.a & 0x0F);
-    set_cc_nz(reg.a, false);
+    set_cc_nz(reg.a, IS_8_BIT);
 }
 
 
@@ -1422,7 +1422,7 @@ void sub_16(uint8_t op, uint8_t mode, uint8_t ex_op) {
 
     // Convert the bytes back to a 16-bit value and set the CC
     uint16_t answer = (msb << 8) | lsb;
-    set_cc_nz(answer, true);
+    set_cc_nz(answer, IS_16_BIT);
 
     // Set D's component registers
     reg.a = (answer >> 8) & 0x0FF;
@@ -1605,7 +1605,7 @@ uint16_t alu_16(uint16_t value_1, uint16_t value_2, bool use_carry) {
 uint8_t add_no_carry(uint8_t value, uint8_t amount) {
 
     uint8_t answer = alu(value, amount, false);
-    set_cc_nz(answer, false);
+    set_cc_nz(answer, IS_8_BIT);
     return answer;
 }
 
@@ -1622,7 +1622,7 @@ uint8_t add_no_carry(uint8_t value, uint8_t amount) {
 uint8_t add_with_carry(uint8_t value, uint8_t amount) {
 
     uint8_t answer = alu(value, amount, true);
-    set_cc_nz(answer, false);
+    set_cc_nz(answer, IS_8_BIT);
     return answer;
 }
 
@@ -1682,7 +1682,7 @@ uint8_t base_sub(uint8_t value, uint8_t amount, bool use_carry) {
     // of the internal binary addition
     flp_cc_bit(CC_C_BIT);
 
-    set_cc_nz(answer, false);
+    set_cc_nz(answer, IS_8_BIT);
     return answer;
 }
 
@@ -1718,7 +1718,7 @@ uint16_t subtract_16(uint16_t value, uint16_t amount) {
 
     // Convert the bytes back to a 16-bit value and set the CC
     uint16_t answer = (msb << 8) | lsb;
-    set_cc_nz(answer, true);
+    set_cc_nz(answer, IS_16_BIT);
 
     // c represents a borrow and is set to the complement of the carry
     // of the internal binary addition
@@ -1754,7 +1754,7 @@ uint8_t negate(uint8_t value, bool ignore) {
     flp_cc_bit(CC_C_BIT);
 
     if (value == 0x80) set_cc_bit(CC_V_BIT);
-    set_cc_nz(answer, false);
+    set_cc_nz(answer, IS_8_BIT);
     return answer;
 }
 
@@ -1804,7 +1804,7 @@ uint8_t twos_complement(uint8_t value) {
 uint8_t complement(uint8_t value) {
 
     value = ones_complement(value);
-    set_cc_nz(value, false);
+    set_cc_nz(value, IS_8_BIT);
     clr_cc_bit(CC_V_BIT);
     set_cc_bit(CC_C_BIT);
     return value;
@@ -1839,7 +1839,7 @@ uint8_t do_and(uint8_t value, uint8_t amount) {
 
     clr_cc_bit(CC_V_BIT);
     uint8_t answer = value & amount;
-    set_cc_nz(answer, false);
+    set_cc_nz(answer, IS_8_BIT);
     return answer;
 }
 
@@ -1857,7 +1857,7 @@ uint8_t do_or(uint8_t value, uint8_t amount) {
 
     clr_cc_bit(CC_V_BIT);
     uint8_t answer = value | amount;
-    set_cc_nz(answer, false);
+    set_cc_nz(answer, IS_8_BIT);
     return answer;
 }
 
@@ -1875,7 +1875,7 @@ uint8_t do_xor(uint8_t value, uint8_t amount) {
 
     clr_cc_bit(CC_V_BIT);
     uint8_t answer = value ^ amount;
-    set_cc_nz(answer, false);
+    set_cc_nz(answer, IS_8_BIT);
     return answer;
 }
 
@@ -1891,7 +1891,7 @@ uint8_t do_xor(uint8_t value, uint8_t amount) {
 uint8_t arith_shift_right(uint8_t value) {
 
     uint8_t answer = partial_shift_right(value);
-    set_cc_nz(answer, false);
+    set_cc_nz(answer, IS_8_BIT);
     return answer;
 }
 
@@ -1920,7 +1920,7 @@ uint8_t logic_shift_left(uint8_t value) {
 
     // Clear bit 0
     value = value & 0xFE;
-    set_cc_nz(value, false);
+    set_cc_nz(value, IS_8_BIT);
     return value;
 }
 
@@ -2001,7 +2001,7 @@ uint8_t rotate_left(uint8_t value) {
         value &= 0xFE;
     }
 
-    set_cc_nz(value, false);
+    set_cc_nz(value, IS_8_BIT);
     return value;
 }
 
@@ -2036,7 +2036,7 @@ uint8_t rotate_right(uint8_t value) {
         value &= 0x7F;
     }
 
-    set_cc_nz(value, false);
+    set_cc_nz(value, IS_8_BIT);
     return value;
 }
 
@@ -2052,7 +2052,7 @@ uint8_t decrement(uint8_t value) {
     if (value == 0x80) set_cc_bit(CC_V_BIT);
 
     uint8_t answer = value - 1;
-    set_cc_nz(answer, false);
+    set_cc_nz(answer, IS_8_BIT);
     return answer;
 }
 
@@ -2066,7 +2066,7 @@ uint8_t increment(uint8_t value) {
     if (value == 0x7F) set_cc_bit(CC_V_BIT);
 
     uint8_t answer = value + 1;
-    set_cc_nz(answer, false);
+    set_cc_nz(answer, IS_8_BIT);
     return answer;
 }
 
@@ -2495,7 +2495,7 @@ void test(uint8_t value) {
 	// Affects N, Z, V
     //         V is always cleared
     clr_cc_nzv();
-    set_cc_nz(value, false);
+    set_cc_nz(value, IS_8_BIT);
 }
 
 
