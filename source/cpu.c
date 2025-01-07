@@ -35,7 +35,6 @@
 /*
  * STATICS
  */
-static void     do_branch(uint8_t bop, bool is_long);
 // Memory access
 static uint8_t  get_next_byte(void);
 static uint8_t  get_byte(uint16_t address);
@@ -414,7 +413,7 @@ uint32_t process_next_instruction(void) {
  * @param bop:     The branch opcode.
  * @param is_long: `true` if its a long branch op, otherwise `false`.
  */
-static void do_branch(uint8_t bop, bool is_long) {
+void do_branch(uint8_t bop, bool is_long) {
 
     int16_t offset = 0;
 
@@ -422,8 +421,8 @@ static void do_branch(uint8_t bop, bool is_long) {
         offset = address_from_next_two_bytes();
         if (is_bit_set(offset, SIGN_BIT_16)) offset -= 65536;
     } else {
-        offset = get_next_byte();
-        if (is_bit_set(offset, SIGN_BIT_8)) offset -= 256;
+        // Need all the typecasting? YES!!
+        offset = (int16_t)((int8_t)get_byte(reg.pc));
     }
 
     bool branch = false;
@@ -459,7 +458,7 @@ static void do_branch(uint8_t bop, bool is_long) {
         set_byte(reg.s, ((reg.pc >> 8) & 0xFF));
     }
 
-    if (branch) reg.pc += offset;
+    if (branch) reg.pc += (uint16_t)offset;
 }
 
 
@@ -1952,10 +1951,14 @@ uint8_t logic_shift_right(uint8_t value) {
  * @retval The result.
  */
 uint8_t partial_shift_right(uint8_t value) {
-
+    
+    // Clear N, Z and C
     reg.cc &= MASK_NZC;
+    
+    // Set C if value bit 0 is set
     if (is_bit_set(value, 0)) set_cc_bit(CC_C_BIT);
 
+    // Shift the bits
     for (uint32_t i = 0 ; i < 7 ; i++) {
         if (is_bit_set(value, i + 1)) {
             value |= (1 << i);

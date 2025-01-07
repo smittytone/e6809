@@ -203,6 +203,7 @@ void        load_effective(uint16_t amount, uint8_t reg_code);
 void        push(bool to_hardware, uint8_t post_byte);
 void        pull(bool from_hardware, uint8_t post_byte);
 void        test(uint8_t value);
+void        do_branch(uint8_t bop, bool is_long);
 // Addressing Functions
 uint16_t    address_from_mode(uint8_t mode);
 // Misc

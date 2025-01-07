@@ -137,7 +137,7 @@ static void test_alu(void) {
         errors++;
         expected(0xB72A, (uint16_t)((result << 8) | reg.cc));
     }
-
+    
     // ADD 8-bit
     // Zaks p.123
     test_setup();
@@ -495,6 +495,17 @@ static void test_index(void) {
     } else {
         errors++;
     }
+    
+    // Atkinsom p.4
+    test_setup();
+    reg.x = 0x301B;
+    reg.b = 0xFF;
+    abx();
+    if (reg.x == 0x311A) {
+        passes++;
+    } else {
+        errors++;
+    }
 
     // LEA
     // Zaks p.163
@@ -526,6 +537,21 @@ static void test_index(void) {
     } else {
         errors++;
     }
+    
+    // Atkinson p.4
+    test_setup();
+    reg.pc = 0x00;
+    mem[0x0000] = 0x85;
+    reg.x = 0x301B;
+    reg.b = 0xFF;
+    lea(LEAX_indexed);
+    if (reg.x == 0x301A) {
+        passes++;
+    } else {
+        errors++;
+    }
+    
+    
     
     test_report(2, errors - current_errors);
 }
@@ -634,6 +660,17 @@ static void test_logic(void) {
     } else {
         errors++;
         expected(0xE509, (uint16_t)((result << 8) | reg.cc));
+    }
+    
+    // Me
+    test_setup();
+    reg.cc = 0x0F;
+    result = partial_shift_right(0xA9);
+    if (result == 0xD4 && is_bit_set(reg.cc, CC_C_BIT) && !is_bit_set(reg.cc, CC_Z_BIT) && !is_bit_set(reg.cc, CC_N_BIT)) {
+        passes++;
+    } else {
+        errors++;
+        expected(0xD403, (uint16_t)((result << 8) | reg.cc));
     }
 
     // BIT
@@ -1207,6 +1244,727 @@ static void test_branch(void) {
         expected(reg.a, (uint16_t)reg.cc);
     }
     
+    // BCC
+    // Branch back
+    test_setup();
+    reg.cc = 0x00;
+    reg.pc = 0xFFF;
+    mem[0x0FFF] = 0xFF;
+    do_branch(BCC, false);
+    if (reg.pc == 0x0FFE) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFE, reg.pc);
+    }
+    
+    // Branch forward
+    test_setup();
+    reg.cc = 0x00;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BCC, false);
+    if (reg.pc == 0x1000) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x1000, reg.pc);
+    }
+    
+    // No branch
+    test_setup();
+    reg.cc = 0x01;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BCC, false);
+    if (reg.pc == 0x0FFF) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFF, reg.pc);
+    }
+    
+    // BCS
+    // Branch back
+    test_setup();
+    reg.cc = 0x01;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0xFF;
+    do_branch(BCS, false);
+    if (reg.pc == 0x0FFE) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFE, reg.pc);
+    }
+    
+    // Branch forward
+    test_setup();
+    reg.cc = 0x01;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BCS, false);
+    if (reg.pc == 0x1000) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x1000, reg.pc);
+    }
+    
+    // No branch
+    test_setup();
+    reg.cc = 0x00;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BCS, false);
+    if (reg.pc == 0x0FFF) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFF, reg.pc);
+    }
+    
+    // BEQ
+    // Branch back
+    test_setup();
+    reg.cc = 0x04;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0xFF;
+    do_branch(BEQ, false);
+    if (reg.pc == 0x0FFE) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFE, reg.pc);
+    }
+    
+    // Branch forward
+    test_setup();
+    reg.cc = 0x04;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BEQ, false);
+    if (reg.pc == 0x1000) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x1000, reg.pc);
+    }
+    
+    // No branch
+    test_setup();
+    reg.cc = 0x00;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BEQ, false);
+    if (reg.pc == 0x0FFF) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFF, reg.pc);
+    }
+    
+    // BGE
+    // Branch back
+    test_setup();
+    reg.cc = 0x0A;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0xFF;
+    do_branch(BGE, false);
+    if (reg.pc == 0x0FFE) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFE, reg.pc);
+    }
+    
+    // Branch forward
+    test_setup();
+    reg.cc = 0x0A;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BGE, false);
+    if (reg.pc == 0x1000) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x1000, reg.pc);
+    }
+    
+    // No branch
+    test_setup();
+    reg.cc = 0x08;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BGE, false);
+    if (reg.pc == 0x0FFF) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFF, reg.pc);
+    }
+    
+    // BGT
+    // Branch back
+    test_setup();
+    reg.cc = 0x0A;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0xFF;
+    do_branch(BGT, false);
+    if (reg.pc == 0x0FFE) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFE, reg.pc);
+    }
+    
+    // Branch forward
+    test_setup();
+    reg.cc = 0x0A;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BGT, false);
+    if (reg.pc == 0x1000) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x1000, reg.pc);
+    }
+    
+    // No branch
+    test_setup();
+    reg.cc = 0x0E;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BGT, false);
+    if (reg.pc == 0x0FFF) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFF, reg.pc);
+    }
+    
+    // BHI
+    // Branch back
+    test_setup();
+    reg.cc = 0x0A;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0xFF;
+    do_branch(BHI, false);
+    if (reg.pc == 0x0FFE) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFE, reg.pc);
+    }
+    
+    // Branch forward
+    test_setup();
+    reg.cc = 0x0A;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BHI, false);
+    if (reg.pc == 0x1000) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x1000, reg.pc);
+    }
+    
+    // No branch - C = 1
+    test_setup();
+    reg.cc = 0x0B;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BHI, false);
+    if (reg.pc == 0x0FFF) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFF, reg.pc);
+    }
+    
+    // No branch - Z = 1
+    test_setup();
+    reg.cc = 0x0E;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BHI, false);
+    if (reg.pc == 0x0FFF) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFF, reg.pc);
+    }
+    
+    // No branch - Z = C = 1
+    test_setup();
+    reg.cc = 0x0F;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BHI, false);
+    if (reg.pc == 0x0FFF) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFF, reg.pc);
+    }
+    
+    // BHS
+    // Branch back
+    test_setup();
+    reg.cc = 0x00;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0xFF;
+    do_branch(BHS, false);
+    if (reg.pc == 0x0FFE) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFE, reg.pc);
+    }
+    
+    // Branch forward
+    test_setup();
+    reg.cc = 0x00;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BHS, false);
+    if (reg.pc == 0x1000) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x1000, reg.pc);
+    }
+    
+    // No branch
+    test_setup();
+    reg.cc = 0x01;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BHS, false);
+    if (reg.pc == 0x0FFF) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFF, reg.pc);
+    }
+    
+    // BLE
+    // Branch back
+    test_setup();
+    reg.cc = 0x0E; // z = 1, c = v
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0xFF;
+    do_branch(BLE, false);
+    if (reg.pc == 0x0FFE) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFE, reg.pc);
+    }
+    
+    // Branch forward
+    test_setup();
+    reg.cc = 0x0C; // z = 0, c != v
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BLE, false);
+    if (reg.pc == 0x1000) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x1000, reg.pc);
+    }
+    
+    // No branch
+    test_setup();
+    reg.cc = 0x0A; // z = 0, c = v
+    reg.cc = 0x0A;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BLE, false);
+    if (reg.pc == 0x0FFF) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFF, reg.pc);
+    }
+    
+    // BLO
+    // Branch back
+    test_setup();
+    reg.cc = 0x01;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0xFF;
+    do_branch(BLO, false);
+    if (reg.pc == 0x0FFE) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFE, reg.pc);
+    }
+    
+    // Branch forward
+    test_setup();
+    reg.cc = 0x01;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BLO, false);
+    if (reg.pc == 0x1000) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x1000, reg.pc);
+    }
+    
+    // No branch
+    test_setup();
+    reg.cc = 0x00;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BLO, false);
+    if (reg.pc == 0x0FFF) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFF, reg.pc);
+    }
+    
+    // BLS
+    // Branch back
+    test_setup();
+    reg.cc = 0x04;  // z = 1, c = 0
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0xFF;
+    do_branch(BLS, false);
+    if (reg.pc == 0x0FFE) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFE, reg.pc);
+    }
+    
+    // Branch forward
+    test_setup();
+    reg.cc = 0x01;  // z = 0, c = 1
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BLS, false);
+    if (reg.pc == 0x1000) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x1000, reg.pc);
+    }
+    
+    // No branch
+    test_setup();
+    reg.cc = 0x00;  // z = 0, c = 0
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BLS, false);
+    if (reg.pc == 0x0FFF) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFF, reg.pc);
+    }
+    
+    // BLT
+    // Branch back
+    test_setup();
+    reg.cc = 0x08;  // n = 1, v = 0
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0xFF;
+    do_branch(BLT, false);
+    if (reg.pc == 0x0FFE) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFE, reg.pc);
+    }
+    
+    // Branch forward
+    test_setup();
+    reg.cc = 0x02;  // n = 0, v = 1
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BLT, false);
+    if (reg.pc == 0x1000) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x1000, reg.pc);
+    }
+    
+    // No branch
+    test_setup();
+    reg.cc = 0x00;  // n = 0, v = 0
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BLT, false);
+    if (reg.pc == 0x0FFF) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFF, reg.pc);
+    }
+    
+    // BMI
+    // Branch back
+    test_setup();
+    reg.cc = 0x08;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0xFF;
+    do_branch(BMI, false);
+    if (reg.pc == 0x0FFE) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFE, reg.pc);
+    }
+    
+    // Branch forward
+    test_setup();
+    reg.cc = 0x08;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BMI, false);
+    if (reg.pc == 0x1000) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x1000, reg.pc);
+    }
+    
+    // No branch
+    test_setup();
+    reg.cc = 0x00;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BMI, false);
+    if (reg.pc == 0x0FFF) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFF, reg.pc);
+    }
+    
+    // BNE
+    // Branch back
+    test_setup();
+    reg.cc = 0x0B;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0xFF;
+    do_branch(BNE, false);
+    if (reg.pc == 0x0FFE) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFE, reg.pc);
+    }
+    
+    // Branch forward
+    test_setup();
+    reg.cc = 0x00;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BNE, false);
+    if (reg.pc == 0x1000) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x1000, reg.pc);
+    }
+    
+    // No branch
+    test_setup();
+    reg.cc = 0x0F;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BNE, false);
+    if (reg.pc == 0x0FFF) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFF, reg.pc);
+    }
+    
+    // BPL
+    // Branch back
+    test_setup();
+    reg.cc = 0x07;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0xFF;
+    do_branch(BPL, false);
+    if (reg.pc == 0x0FFE) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFE, reg.pc);
+    }
+    
+    // Branch forward
+    test_setup();
+    reg.cc = 0x00;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BPL, false);
+    if (reg.pc == 0x1000) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x1000, reg.pc);
+    }
+    
+    // No branch
+    test_setup();
+    reg.cc = 0x0F;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BPL, false);
+    if (reg.pc == 0x0FFF) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFF, reg.pc);
+    }
+    
+    // BRA
+    // Branch back
+    test_setup();
+    reg.cc = 0xFF;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0xFF;
+    do_branch(BRA, false);
+    if (reg.pc == 0x0FFE) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFE, reg.pc);
+    }
+    
+    // Branch forward
+    test_setup();
+    reg.cc = 0x00;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BRA, false);
+    if (reg.pc == 0x1000) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x1000, reg.pc);
+    }
+    
+    // BRN
+    // Branch back
+    test_setup();
+    reg.cc = 0xFF;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0xFF;
+    do_branch(BRN, false);
+    if (reg.pc == 0x0FFF) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFF, reg.pc);
+    }
+    
+    // Branch forward
+    test_setup();
+    reg.cc = 0x00;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BRN, false);
+    if (reg.pc == 0x0FFF) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFF, reg.pc);
+    }
+    
+    // BVC
+    // Branch back
+    test_setup();
+    reg.cc = 0x0D;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0xFF;
+    do_branch(BVC, false);
+    if (reg.pc == 0x0FFE) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFE, reg.pc);
+    }
+    
+    // Branch forward
+    test_setup();
+    reg.cc = 0x00;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BVC, false);
+    if (reg.pc == 0x1000) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x1000, reg.pc);
+    }
+    
+    // No branch
+    test_setup();
+    reg.cc = 0x0F;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BVC, false);
+    if (reg.pc == 0x0FFF) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFF, reg.pc);
+    }
+    
+    // BVS
+    // Branch back
+    test_setup();
+    reg.cc = 0x0F;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0xFF;
+    do_branch(BVS, false);
+    if (reg.pc == 0x0FFE) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFE, reg.pc);
+    }
+    
+    // Branch forward
+    test_setup();
+    reg.cc = 0x02;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BVS, false);
+    if (reg.pc == 0x1000) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x1000, reg.pc);
+    }
+    
+    // No branch
+    test_setup();
+    reg.cc = 0x0D;
+    reg.pc = 0x0FFF;
+    mem[0x0FFF] = 0x01;
+    do_branch(BVS, false);
+    if (reg.pc == 0x0FFF) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x0FFF, reg.pc);
+    }
+    
     test_report(5, errors - current_errors);
 }
 
@@ -1238,3 +1996,5 @@ static void expected(uint16_t wanted, uint16_t got) {
     
     printf("  %02d. Expected %04X got %04X\n", tests, wanted, got);
 }
+
+

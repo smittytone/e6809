@@ -38,22 +38,24 @@
 #define EXG_immed                    0x1E //
 #define TFR_immed                    0x1F //
 
-#define BRA                          0x20 // UNTESTED
-#define BRN                          0x21 // UNTESTED
-#define BHI                          0x22 // UNTESTED
-#define BLS                          0x23 // UNTESTED
-#define BHS                          0x24 // UNTESTED
-#define BLO                          0x25 // UNTESTED
-#define BNE                          0x26 // UNTESTED
-#define BEQ                          0x27 // UNTESTED
-#define BVC                          0x28 // UNTESTED
-#define BVS                          0x29 // UNTESTED
-#define BPL                          0x2A // UNTESTED
-#define BMI                          0x2B // UNTESTED
-#define BGE                          0x2C // UNTESTED
-#define BLT                          0x2D // UNTESTED
-#define BGT                          0x2E // UNTESTED
-#define BLE                          0x2F // UNTESTED
+#define BRA                          0x20
+#define BRN                          0x21
+#define BHI                          0x22
+#define BLS                          0x23
+#define BCC                          0x24
+#define BHS                          0x24
+#define BCS                          0x25
+#define BLO                          0x25
+#define BNE                          0x26
+#define BEQ                          0x27
+#define BVC                          0x28
+#define BVS                          0x29
+#define BPL                          0x2A
+#define BMI                          0x2B
+#define BGE                          0x2C
+#define BLT                          0x2D
+#define BGT                          0x2E
+#define BLE                          0x2F
 
 #define LEAX_indexed                 0x30 //
 #define LEAY_indexed                 0x31 //
@@ -255,22 +257,22 @@
 
 // Extended opcode start here
 
-#define LBRN                         0x1021
-#define LBHI                         0x1022
-#define LBLS                         0x1023
-#define LBHS                         0x1024
-#define LBLO                         0x1025
-#define LBNE                         0x1026
-#define LBEQ                         0x1027
-#define LBVC                         0x1028
-#define LBVS                         0x1029
-#define LBPL                         0x102A
-#define LBMI                         0x102B
-#define LBGE                         0x102C
-#define LBLT                         0x102D
+#define LBRN                         0x1021 // UNTESTED
+#define LBHI                         0x1022 // UNTESTED
+#define LBLS                         0x1023 // UNTESTED
+#define LBHS                         0x1024 // UNTESTED
+#define LBLO                         0x1025 // UNTESTED
+#define LBNE                         0x1026 // UNTESTED
+#define LBEQ                         0x1027 // UNTESTED
+#define LBVC                         0x1028 // UNTESTED
+#define LBVS                         0x1029 // UNTESTED
+#define LBPL                         0x102A // UNTESTED
+#define LBMI                         0x102B // UNTESTED
+#define LBGE                         0x102C // UNTESTED
+#define LBLT                         0x102D // UNTESTED
+#define LBGT                         0x102E // UNTESTED
+#define LBLE                         0x102F // UNTESTED
 
-#define LBGT                         0x102E
-#define LBLE                         0x102F
 #define SWI2                         0x103F
 #define CMPD_immed                   0x1083
 #define CMPY_immed                   0x108C
