@@ -197,7 +197,7 @@ uint8_t     decrement(uint8_t value);
 uint8_t     increment(uint8_t value);
 uint8_t     *set_reg_ptr(uint8_t reg_code);
 uint16_t    *set_reg_16_ptr(uint8_t reg_code);
-void        transfer_decode2(uint8_t reg_code, bool is_swap);
+void        transfer_decode(uint8_t reg_code, bool is_swap);
 void        transfer_decode(uint8_t reg_code, bool is_swap);
 uint8_t     exchange(uint8_t value, uint8_t reg_code);
 uint16_t    exchange_16(uint16_t value, uint8_t reg_code);

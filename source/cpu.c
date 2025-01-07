@@ -240,8 +240,8 @@ uint32_t process_next_instruction(void) {
             if (lsn == 0x0A) orcc(get_next_byte());
             if (lsn == 0x0C) andcc(get_next_byte());
             if (lsn == 0x0D) sex();
-            if (lsn == 0x0E) transfer_decode2(get_next_byte(), true);
-            if (lsn == 0x0F) transfer_decode2(get_next_byte(), false);
+            if (lsn == 0x0E) transfer_decode(get_next_byte(), true);
+            if (lsn == 0x0F) transfer_decode(get_next_byte(), false);
             return cycles_used;
         }
 
@@ -2102,11 +2102,13 @@ uint16_t *set_reg_16_ptr(uint8_t reg_code) {
 }
 
 
-void transfer_decode2(uint8_t reg_code, bool is_swap) {
+void transfer_decode(uint8_t postbyte, bool is_swap) {
 
-    uint8_t source_reg = (reg_code & 0xF0) >> 4;
-    uint8_t dest_reg = reg_code & 0x0F;
-
+    uint8_t source_reg = (postbyte & 0xF0) >> 4;
+    uint8_t dest_reg = postbyte & 0x0F;
+    
+    // Reject mis-matched transfers
+    // See MC6809E Reference Manual
     if (source_reg < 0x08 && dest_reg > 0x05) return;
     if (source_reg > 0x05 && dest_reg < 0x08) return;
 
@@ -2137,7 +2139,7 @@ void transfer_decode2(uint8_t reg_code, bool is_swap) {
     }
 }
 
-
+/*
 void transfer_decode(uint8_t reg_code, bool is_swap) {
 
     // 'reg_code' contains an 8-bit number that identifies the two registers
@@ -2314,6 +2316,7 @@ uint16_t exchange_16(uint16_t value, uint8_t reg_code) {
 
     return return_value;
 }
+*/
 
 
 void load_effective(uint16_t amount, uint8_t reg_code) {
@@ -2588,7 +2591,7 @@ uint16_t indexed_address(uint8_t post_byte) {
     // Determine the source register
     uint8_t source_reg = ((post_byte & 0x60) >> 5);
 
-    // Set 'returnValue' to the contents of the source register
+    // Set return value to the contents of the source register
     uint16_t address = register_value(source_reg);
 
     // Process the opcode encoded in the first five bits of the postbyte
@@ -2739,7 +2742,7 @@ uint16_t indexed_address(uint8_t post_byte) {
             uint16_t pc = reg.pc;
             reg.pc = address;
             address = address_from_next_two_bytes();
-
+            
             // Put original PC value back
             reg.pc = pc;
         }
