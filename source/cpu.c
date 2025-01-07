@@ -920,20 +920,15 @@ void daa(void) {
     bool carry = is_bit_set(reg.cc, CC_C_BIT);
     clr_cc_bit(CC_C_BIT);
 
-    // Set Least Significant Conversion Factor, which will be either 0 or 6
-    uint8_t correction = 0;
     uint8_t lsn = reg.a & 0x0F;
-    if (is_bit_set(reg.cc, CC_H_BIT) || lsn > 9) correction = 6;
-    reg.a += correction;
-
-    // Set Most Significant Conversion Factor, which will be either 0 or 6
     uint8_t msn = (reg.a & 0xF0) >> 4;
-    correction = 0;
-    if (carry || msn > 8 || lsn > 9) correction = 6;
-    msn += correction;
+    uint8_t conversion = 0;
+    
+    if (carry || msn > 9 || (msn > 8 && lsn > 9)) conversion = DAA_CONVERSION_FACTOR;
+    if (is_bit_set(reg.cc, CC_H_BIT) || lsn > 9) conversion = DAA_CONVERSION_FACTOR;
     if (msn > 0x0F) set_cc_bit(CC_C_BIT);
 
-    reg.a = (msn << 4) | (reg.a & 0x0F);
+    reg.a += conversion;
     set_cc_nz(reg.a, IS_8_BIT);
 }
 
@@ -1528,7 +1523,7 @@ uint8_t alu(uint8_t value_1, uint8_t value_2, bool use_carry) {
     for (uint32_t i = 0 ; i < 8 ; ++i) {
         if (binary_1[i] == binary_2[i]) {
             // Both digits are the same, ie. 1 and 1, or 0 and 0,
-            // so added value is 0 + a carry to the next digit
+            // so added value is 0 + maybe a carry to the next digit
             answer[i] = bit_carry ? 1 : 0;
             bit_carry = binary_1[i] == 1;
         } else {
@@ -1559,7 +1554,7 @@ uint8_t alu(uint8_t value_1, uint8_t value_2, bool use_carry) {
     // Copy answer into bits[] array for conversion to decimal
     uint8_t final = 0;
     for (uint32_t i = 0 ; i < 8 ; ++i) {
-        if (answer[i] != 0) final = (final | (1 << i));
+        if (answer[i] != 0) final |= (1 << i);
     }
 
     // Return the answer (condition codes already set elsewhere)

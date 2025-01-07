@@ -285,9 +285,29 @@ static void test_alu(void) {
         errors++;
         expected(0x86, (uint16_t)reg.a);
     }
+    
+    // Atkinson p.56
+    test_setup();
+    reg.cc = 0x00;
+    reg.a = add_no_carry(0x64, 0x27);
+    daa();
+    if (reg.a == 0x91) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x91, (uint16_t)reg.a);
+    }
 
     // Zaks p.154
-    // Bad example
+    test_setup();
+    reg.a = 0x7F;
+    daa();
+    if (reg.a == 0x85) {
+        passes++;
+    } else {
+        errors++;
+        expected(0x85, (uint16_t)reg.a);
+    }
 
     // DEC
     // Zaks p.155

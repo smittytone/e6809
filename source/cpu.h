@@ -94,6 +94,8 @@
 #define IS_8_BIT                false
 #define IS_16_BIT               true
 
+#define DAA_CONVERSION_FACTOR   6
+
 
 /*
  * STRUCTURES
