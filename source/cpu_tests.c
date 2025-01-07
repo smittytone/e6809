@@ -27,6 +27,7 @@ static void test_logic(void);
 static void test_reg(void);
 static void test_branch(void);
 static void test_setup(void);
+static void test_irqs(void);
 static void test_report(uint16_t code, uint32_t err_count);
 static void expected(uint16_t wanted, uint16_t got);
 
@@ -55,6 +56,7 @@ void test_main(void) {
     test_logic();
     test_reg();
     test_branch();
+    test_irqs();
 
     printf("Tests: %i\n", tests);
     printf("Passes: %i\n", passes);
@@ -1989,6 +1991,69 @@ static void test_branch(void) {
 }
 
 
+static void test_irqs(void) {
+
+    uint16_t result;
+    uint32_t current_errors = errors;
+    
+    // FIRQ
+    test_setup();
+    reg.pc = 0x00FF;
+    reg.cc = 0x80;
+    reg.s = 0x0FFF;
+    mem[0x00FF] = 0x0A;
+    process_interrupt(FIRQ_BIT);
+    if (reg.pc == (mem[FIRQ_VECTOR] << 8) | mem[FIRQ_VECTOR + 1]
+        && !is_bit_set(reg.cc, CC_E_BIT)
+        && reg.s == 0x0FFF - 3
+        && is_bit_set(reg.cc, CC_F_BIT)
+        && is_bit_set(reg.cc, CC_I_BIT)) {
+        passes++;
+    } else {
+        errors++;
+    }
+    
+    // IRQ
+    test_setup();
+    reg.pc = 0x00FF;
+    reg.cc = 0x80;
+    reg.s = 24;
+    mem[0x00FF] = 0x0A;
+    process_interrupt(IRQ_BIT);
+    if (reg.pc == (mem[IRQ_VECTOR] << 8) | mem[IRQ_VECTOR + 1]
+        && is_bit_set(reg.cc, CC_E_BIT)
+        && reg.s == 12
+        && !is_bit_set(reg.cc, CC_F_BIT)
+        && is_bit_set(reg.cc, CC_I_BIT)) {
+        passes++;
+    } else {
+        errors++;
+        expected(12, reg.s);
+    }
+
+    // NMI
+    test_setup();
+    reg.pc = 0x00FF;
+    reg.cc = 0x80;
+    reg.s = 24;
+    mem[0x00FF] = 0x0A;
+    process_interrupt(NMI_BIT);
+    if (reg.pc == (mem[NMI_VECTOR] << 8) | mem[NMI_VECTOR + 1]
+        && is_bit_set(reg.cc, CC_E_BIT)
+        && reg.s == 12
+        && is_bit_set(reg.cc, CC_F_BIT)
+        && is_bit_set(reg.cc, CC_I_BIT)) {
+        passes++;
+    } else {
+        errors++;
+        expected(12, reg.s);
+    }
+    
+    test_report(6, errors - current_errors);
+}
+
+
+
 static void test_setup(void) {
 
     tests++;
@@ -1998,15 +2063,17 @@ static void test_setup(void) {
 
 static void test_report(uint16_t code, uint32_t err_count) {
     
-    const char *names[6];
+    uint32_t test_count = 7;
+    const char *names[test_count];
     names[0] = "Addressing";
     names[1] = "ALU";
     names[2] = "Index";
     names[3] = "Logic";
     names[4] = "Registers";
     names[5] = "Branch Ops";
+    names[6] = "IRQs";
     
-    if (code < 6) {
+    if (code < test_count) {
         printf("%02d errors in %s (see above). Test count: %03d\n", err_count, names[code], tests);
     }
 }

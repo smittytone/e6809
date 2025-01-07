@@ -57,7 +57,7 @@ static uint16_t indexed_address(uint8_t post_byte);
 static uint16_t register_value(uint8_t source_reg);
 static void     increment_register(uint8_t source_reg, int16_t amount);
 // IO
-static void     process_interrupt(uint8_t irq);
+//static void     process_interrupt(uint8_t irq);
 
 /*
  * GLOBALS
@@ -2836,30 +2836,30 @@ void process_interrupt(uint8_t irq) {
         set_cc_bit(CC_I_BIT);
         state.bus_state_pins = 0x02;
         reg.pc = (mem[FIRQ_VECTOR] << 8) | mem[FIRQ_VECTOR + 1];
-        state.bus_state_pins = 0x00;
+        //state.bus_state_pins = 0x00;
         flash_led(2);
     }
 
     // IRQ
     if (irq == IRQ_BIT) {
         set_cc_bit(CC_E_BIT);
-        push(true, PUSH_PULL_ALL_REGS);
+        push(true, PUSH_PULL_EVERY_REG);
         set_cc_bit(CC_I_BIT);
         state.bus_state_pins = 0x02;
         reg.pc = (mem[IRQ_VECTOR] << 8) | mem[IRQ_VECTOR + 1];
-        state.bus_state_pins = 0x00;
+        //state.bus_state_pins = 0x00;
         flash_led(4);
     }
 
     // NMI
     if (irq == NMI_BIT) {
         set_cc_bit(CC_E_BIT);
-        push(true, PUSH_PULL_ALL_REGS);
+        push(true, PUSH_PULL_EVERY_REG);
         set_cc_bit(CC_F_BIT);
         set_cc_bit(CC_I_BIT);
         state.bus_state_pins = 0x02;
         reg.pc = (mem[NMI_VECTOR] << 8) | mem[NMI_VECTOR + 1];
-        state.bus_state_pins = 0x00;
+        //state.bus_state_pins = 0x00;
         flash_led(6);
     }
 
