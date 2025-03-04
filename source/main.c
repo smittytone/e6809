@@ -90,11 +90,11 @@ int main() {
 #endif
         monitor_event_loop();
     } else {
-        // Run tests -- for now
+        // Follow standard boot sequence
 #ifdef DEBUG
-        printf("Running tests\n");
+        printf("Booted\n");
 #endif
-        test_main();
+        prepare_environment();
     }
 
     return 0;
@@ -112,7 +112,7 @@ static void boot_cpu(void) {
 #endif
 
     // Interrupt Vectors:
-    uint16_t vectors[] = {0x0400,       //   RESET
+    uint16_t vectors[] = {0x8000,       //   RESET
                           0x0500,       //   NMI
                           0x0500,       //   SWI
                           0x0500,       //   IRQ
@@ -265,4 +265,9 @@ static void save_ram(void) {
     flash_range_erase (RP2040_FLASH_DATA_START, RP2040_FLASH_DATA_SIZE);
     flash_range_program (RP2040_FLASH_DATA_START, mem, RP2040_FLASH_DATA_SIZE);
     restore_interrupts (irqs);
+}
+
+
+static void prepare_environment() {
+    
 }
