@@ -21,7 +21,7 @@ Show your support: [buy a 6089 T-shirt here](https://www.redbubble.com/i/t-shirt
 
 And for Dragon fans in particular:
 
-[![Dragon Data Logo T-shirt. photo (c) 2025 Tony Smith](./images/dd1.webp)](https://www.redbubble.com/i/t-shirt/Dragon-Data-Logo-by-squinter-mac/83509782.IJ6L0) [![Dragon Data Logo T-shirt. photo (c) 2025 Tony Smith](./images/dd2.webp)](https://www.redbubble.com/i/t-shirt/Dragon-Data-Logo-Slim-by-squinter-mac/83509973.IJ6L0) [![Dragon Data boot T-shirt. photo (c) 2025 Tony Smith](./images/dd3.webp)](https://www.redbubble.com/i/t-shirt/Dragon-Boot-Message-Reverse-Video-by-squinter-mac/46847689.IJ6L0)
+[![Dragon Data Logo T-shirt. photo (c) 2025 Tony Smith](./images/dd1.webp)](https://www.redbubble.com/i/t-shirt/Dragon-Data-Logo-by-squinter-mac/83509782.IJ6L0) [![Dragon Data Logo T-shirt. photo (c) 2025 Tony Smith](./images/dd2.webp)](https://www.redbubble.com/i/t-shirt/Dragon-Data-Logo-Slim-by-squinter-mac/83509973.IJ6L0) [![Dragon Data boot T-shirt. photo (c) 2025 Tony Smith](./images/dd3.webp)](https://www.redbubble.com/i/t-shirt/Dragon-Boot-Message-Reverse-Video-by-squinter-mac/46847689.IJ6L0) [![Dragon Data boot T-shirt. photo (c) 2025 Tony Smith](./images/dd4.webp)](https://www.redbubble.com/i/t-shirt/Dragon-Boot-Message-by-squinter-mac/46847619.1482B)
 
 ## The CPU
 
