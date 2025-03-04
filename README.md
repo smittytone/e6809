@@ -15,9 +15,13 @@ Current development activity is centred on the `main` branch. The `pico` branch 
 
 ## 6809 Merch
 
-![6809 T-shirt. Shirt, logo, photo (c) 2025 Tony Smith](./images/6809.webp)
+[![6809 T-shirt. Shirt, logo, photo (c) 2025 Tony Smith](./images/6809.webp)](https://www.redbubble.com/i/t-shirt/6809-microprocessor-by-squinter-mac/85380308.IJ6L0)
 
 Show your support: [buy a 6089 T-shirt here](https://www.redbubble.com/i/t-shirt/6809-microprocessor-by-squinter-mac/85380308.IJ6L0)!
+
+And for Dragon fans in particular:
+
+[![Dragon Data Logo T-shirt. photo (c) 2025 Tony Smith](./images/dd1.webp)](https://www.redbubble.com/i/t-shirt/Dragon-Data-Logo-by-squinter-mac/83509782.IJ6L0) [![Dragon Data Logo T-shirt. photo (c) 2025 Tony Smith](./images/dd2.webp)](https://www.redbubble.com/i/t-shirt/Dragon-Data-Logo-Slim-by-squinter-mac/83509973.IJ6L0) [![Dragon Data boot T-shirt. photo (c) 2025 Tony Smith](./images/dd3.webp)](https://www.redbubble.com/i/t-shirt/Dragon-Boot-Message-Reverse-Video-by-squinter-mac/46847689.IJ6L0)
 
 ## The CPU
 
