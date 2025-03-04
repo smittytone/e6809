@@ -9,9 +9,15 @@ There are two versions:
 1. Raspberry Pi Pico - [branch `main`](https://github.com/smittytone/e6809/tree/main)
 1. Mac — [branch `mac`](https://github.com/smittytone/e6809/tree/mac)
 
-Current development activity is centred on the `main` branch. The `pico` branch will soon be removed. The `mac` branch is out of data and may be removed.
+Current development activity is centred on the `main` branch. The `pico` branch will soon be removed. The `mac` branch is out of data and will be removed.
 
 **This is a work in progress which I tackle occasionally. Expect errors, breakage and a slow response to bug reports!**
+
+## 6809 Merch
+
+![6809 T-shirt. Shirt, logo, photo (c) 2025 Tony Smith](./images/6809.webp)
+
+Show your support: [buy a 6089 T-shirt here](https://www.redbubble.com/i/t-shirt/6809-microprocessor-by-squinter-mac/85380308.IJ6L0)!
 
 ## The CPU
 
