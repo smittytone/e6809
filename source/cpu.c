@@ -405,6 +405,8 @@ uint32_t process_next_instruction(void) {
             }
         }
     }
+
+    return cycles_used;
 }
 
 /**
@@ -923,7 +925,7 @@ void daa(void) {
     uint8_t lsn = reg.a & 0x0F;
     uint8_t msn = (reg.a & 0xF0) >> 4;
     uint8_t conversion = 0;
-    
+
     if (carry || msn > 9 || (msn > 8 && lsn > 9)) conversion = DAA_CONVERSION_FACTOR;
     if (is_bit_set(reg.cc, CC_H_BIT) || lsn > 9) conversion = DAA_CONVERSION_FACTOR;
     if (msn > 0x0F) set_cc_bit(CC_C_BIT);
@@ -1946,10 +1948,10 @@ uint8_t logic_shift_right(uint8_t value) {
  * @retval The result.
  */
 uint8_t partial_shift_right(uint8_t value) {
-    
+
     // Clear N, Z and C
     reg.cc &= MASK_NZC;
-    
+
     // Set C if value bit 0 is set
     if (is_bit_set(value, 0)) set_cc_bit(CC_C_BIT);
 
@@ -2106,7 +2108,7 @@ void transfer_decode(uint8_t postbyte, bool is_swap) {
 
     uint8_t source_reg = (postbyte & 0xF0) >> 4;
     uint8_t dest_reg = postbyte & 0x0F;
-    
+
     // Reject mis-matched transfers
     // See MC6809E Reference Manual
     if (source_reg < 0x08 && dest_reg > 0x05) return;
@@ -2327,8 +2329,10 @@ void load_effective(uint16_t amount, uint8_t reg_code) {
     switch (reg_code) {
         case 0x01:
             reg_ptr = &reg.y;
+            break;
         case 0x02:
             reg_ptr = &reg.s;
+            break;
         case 0x03:
             reg_ptr = &reg.u;
     }
@@ -2742,7 +2746,7 @@ uint16_t indexed_address(uint8_t post_byte) {
             uint16_t pc = reg.pc;
             reg.pc = address;
             address = address_from_next_two_bytes();
-            
+
             // Put original PC value back
             reg.pc = pc;
         }

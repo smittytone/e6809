@@ -31,6 +31,7 @@
  */
 static void boot_cpu(void);
 static void init_rp2040_gpio(void);
+static void prepare_environment(void);
 // EXPERIMENTAL
 static void read_into_ram(void);
 static void save_ram(void);
@@ -58,20 +59,20 @@ int main() {
     // Pause to allow the USB path to initialize
     sleep_ms(2000);
 #endif
-    
+
     // Basic RP2040 config
     pico_state.has_led = true;
     pico_state.has_mc6821 = false;
-    
+
     // Prepare the board
     bool is_using_monitor = init_board();
-    
+
     // Set up the host MCU
     init_rp2040_gpio();
 
     // Boot the CPU
     boot_cpu();
-    
+
     // Boot the PIA
     if (pico_state.has_mc6821) {
         pia01.pa_pins = &pico_state.pia_gpio[0];
@@ -80,7 +81,7 @@ int main() {
         pia01.reg_data_a = &mem[0xFF01];
         pia_init(&pia01);
     }
-    
+
     // Branch according to whether the Pico is connected to a
     // monitor board or not (in which case run tests for now)
     if (is_using_monitor) {
@@ -166,7 +167,7 @@ static void init_rp2040_gpio(void) {
     pico_state.irq_gpio[1] = PIN_6809_IRQ;
     pico_state.irq_gpio[2] = PIN_6809_FIRQ;
     pico_state.irq_gpio[3] = PIN_6809_RESET;
-    
+
     pico_state.pia_gpio[0] = PIN_6821_PA0;
     pico_state.pia_gpio[1] = PIN_6821_PA1,
     pico_state.pia_gpio[2] = PIN_6821_PA2,
@@ -177,14 +178,14 @@ static void init_rp2040_gpio(void) {
     pico_state.pia_gpio[7] = PIN_6821_PA7,
     pico_state.pia_gpio[8] = PIN_6821_CA1,
     pico_state.pia_gpio[9] = PIN_6821_CA2;
-    
+
     // Set up the IRQ pins
     for (uint8_t i = 0 ; i < RP2040_IRQ_GPIO_COUNT ; ++i) {
         gpio_init(pico_state.irq_gpio[i]);
         gpio_set_dir(pico_state.irq_gpio[i], GPIO_IN);
         gpio_pull_down(pico_state.irq_gpio[i]);
     }
-    
+
     // Initialize PIA pins if PIA is present
     // TODO Sync with pia.c
     if (pico_state.has_mc6821) {
@@ -196,7 +197,7 @@ static void init_rp2040_gpio(void) {
             gpio_pull_down(pico_state.pia_gpio[i]);
         }
     }
-    
+
     // Set up the Pico LED
     gpio_init(PIN_PICO_LED);
     gpio_set_dir(PIN_PICO_LED, GPIO_OUT);
@@ -268,6 +269,6 @@ static void save_ram(void) {
 }
 
 
-static void prepare_environment() {
-    
+static void prepare_environment(void) {
+
 }
