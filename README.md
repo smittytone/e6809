@@ -9,7 +9,7 @@ There are two versions:
 1. Raspberry Pi Pico - [branch `main`](https://github.com/smittytone/e6809/tree/main)
 1. Mac — [branch `mac`](https://github.com/smittytone/e6809/tree/mac)
 
-Current development activity is centred on the `main` branch. The `pico` branch will soon be removed. The `mac` branch is out of data and will be removed.
+Current development activity is centred on the `main` branch. The `mac` branch is out of data and will be removed.
 
 **This is a work in progress which I tackle occasionally. Expect errors, breakage and a slow response to bug reports!**
 
